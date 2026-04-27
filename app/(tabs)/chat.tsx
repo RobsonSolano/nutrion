@@ -97,8 +97,8 @@ export default function ChatScreen() {
             </View>
             <View className="flex-1">
               <Text className="text-text text-base font-bold">Nutri IA</Text>
-              <Text className="text-text-dim text-[11px]" numberOfLines={1}>
-                consciente do seu perfil e metas
+              <Text className="text-violet-soft text-[10px]" numberOfLines={1}>
+                ✨ temporariamente gratuito
               </Text>
             </View>
           </View>

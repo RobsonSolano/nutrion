@@ -177,6 +177,41 @@ serve(async (req: Request) => {
       return json({ error: 'invalid_body' }, 400);
     }
 
+    // Cota: 1ª vez é livre (onboarding_completed_at NULL), refazer custa
+    // 1 uso por dia (ai_usage_log).
+    const { data: profileQuota, error: profileErr } = await supabase
+      .from('profiles')
+      .select('onboarding_completed_at')
+      .eq('id', user.id)
+      .maybeSingle();
+    if (profileErr) {
+      console.error('[onboarding-plan] profile quota error:', profileErr);
+    }
+    const hasCompletedOnce = !!profileQuota?.onboarding_completed_at;
+    if (hasCompletedOnce) {
+      const today = new Date().toISOString().slice(0, 10);
+      const { count: usedToday, error: usageErr } = await supabase
+        .from('ai_usage_log')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('day', today)
+        .eq('feature', 'onboarding_plan');
+      if (usageErr) {
+        console.error('[onboarding-plan] usage count error:', usageErr);
+      }
+      if ((usedToday ?? 0) >= 1) {
+        return json(
+          {
+            error: 'daily_limit',
+            detail:
+              'Você já refez seu plano hoje. Pra gerar outro, volta amanhã.',
+            limit: 1,
+          },
+          429,
+        );
+      }
+    }
+
     // Busca catálogo filtrado por grupos relevantes ao perfil.
     const slugs = pickRelevantGroups(body);
     const catalog = await fetchCatalog(supabase, slugs);
@@ -255,6 +290,17 @@ serve(async (req: Request) => {
     }
 
     const sanitized = sanitizePlan(plan, catalog);
+
+    // Só registra consumo nos refazimentos (1ª vez é grátis).
+    if (hasCompletedOnce) {
+      const { error: usageErr } = await supabase.from('ai_usage_log').insert({
+        user_id: user.id,
+        feature: 'onboarding_plan',
+      });
+      if (usageErr) {
+        console.error('[onboarding-plan] usage log error:', usageErr);
+      }
+    }
 
     return json({ plan: sanitized, usage: groqJson?.usage ?? null, model: MODEL });
   } catch (err) {

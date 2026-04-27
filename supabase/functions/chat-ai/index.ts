@@ -36,7 +36,8 @@ type ChatRequest = {
   stream?: boolean;
 };
 
-const DAILY_USER_MESSAGE_LIMIT = 20;
+const DAILY_USER_MESSAGE_LIMIT = 10;
+const DAILY_SANITY_CHECK_LIMIT = 5;
 const MAX_MESSAGE_CHARS = 255;
 const HISTORY_MESSAGES = 10;
 
@@ -140,9 +141,10 @@ serve(async (req: Request) => {
       );
     }
 
-    // Cota diária de mensagens do usuário (somente modo chat).
+    const today = new Date().toISOString().slice(0, 10);
+
+    // Cota diária de mensagens do chat.
     if (isChatMode) {
-      const today = new Date().toISOString().slice(0, 10);
       const { count: dailyCount, error: countErr } = await supabase
         .from('chat_messages')
         .select('id', { count: 'exact', head: true })
@@ -158,6 +160,29 @@ serve(async (req: Request) => {
             error: 'daily_limit',
             detail: `Você atingiu o limite de ${DAILY_USER_MESSAGE_LIMIT} mensagens hoje. Volta amanhã!`,
             limit: DAILY_USER_MESSAGE_LIMIT,
+          },
+          429,
+        );
+      }
+    }
+
+    // Cota diária de Sanity Check.
+    if (!isChatMode) {
+      const { count: sanityCount, error: sanityErr } = await supabase
+        .from('ai_usage_log')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('day', today)
+        .eq('feature', 'sanity_check');
+      if (sanityErr) {
+        console.error('[chat-ai] sanity count error:', sanityErr);
+      }
+      if ((sanityCount ?? 0) >= DAILY_SANITY_CHECK_LIMIT) {
+        return json(
+          {
+            error: 'daily_limit',
+            detail: `Você atingiu o limite de ${DAILY_SANITY_CHECK_LIMIT} análises de prato hoje. Volta amanhã!`,
+            limit: DAILY_SANITY_CHECK_LIMIT,
           },
           429,
         );
@@ -332,6 +357,15 @@ serve(async (req: Request) => {
       });
       if (insertErr) {
         console.error('[chat-ai] insert assistant msg error:', insertErr);
+      }
+    } else {
+      // Registra uso do Sanity Check pra contagem da cota diária.
+      const { error: usageErr } = await supabase.from('ai_usage_log').insert({
+        user_id: user.id,
+        feature: 'sanity_check',
+      });
+      if (usageErr) {
+        console.error('[chat-ai] sanity usage log error:', usageErr);
       }
     }
 

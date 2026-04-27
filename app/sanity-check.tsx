@@ -26,6 +26,10 @@ import {
 import { runSanityCheck, type SanityCheckResult } from '@/services/sanityCheck';
 import { useCreateFoodLog } from '@/hooks/useLogMutations';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
+import { useDailySanityUsage } from '@/hooks/useAiUsage';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys, todayKey } from '@/lib/queryKeys';
+import { useAuth } from '@/hooks/useAuth';
 import { Button, Card, Input, MarkdownText, Screen } from '@/components/ui';
 import { colors } from '@/lib/theme';
 import {
@@ -39,6 +43,9 @@ export default function SanityCheckScreen() {
   const router = useRouter();
   const createFood = useCreateFoodLog();
   const kbHeight = useKeyboardHeight();
+  const sanityUsage = useDailySanityUsage();
+  const qc = useQueryClient();
+  const { user } = useAuth();
 
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [photoBase64, setPhotoBase64] = useState<string | null>(null);
@@ -109,6 +116,13 @@ export default function SanityCheckScreen() {
       );
       return;
     }
+    if (sanityUsage.limitReached) {
+      Alert.alert(
+        'Limite diário',
+        `Você já analisou ${sanityUsage.limit} pratos hoje. Volta amanhã!`,
+      );
+      return;
+    }
 
     setStage('analyzing');
     try {
@@ -120,6 +134,11 @@ export default function SanityCheckScreen() {
       setResult(res);
       setStage('result');
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      if (user?.id) {
+        void qc.invalidateQueries({
+          queryKey: queryKeys.aiUsage(user.id, 'sanity_check', todayKey()),
+        });
+      }
     } catch (err) {
       setStage('input');
       Alert.alert(
@@ -185,7 +204,28 @@ export default function SanityCheckScreen() {
               <X size={18} color={colors.textDim} />
             </Pressable>
             <Text className="text-text font-semibold">Sanity Check</Text>
-            <View style={{ width: 40 }} />
+            <View
+              className="rounded-full border px-2.5 py-1"
+              style={{
+                borderColor: sanityUsage.limitReached
+                  ? `${colors.danger}55`
+                  : `${colors.violetSoft}55`,
+                backgroundColor: sanityUsage.limitReached
+                  ? `${colors.danger}15`
+                  : `${colors.violetSoft}15`,
+              }}
+            >
+              <Text
+                className="text-[11px] font-semibold"
+                style={{
+                  color: sanityUsage.limitReached
+                    ? colors.danger
+                    : colors.violetSoft,
+                }}
+              >
+                {sanityUsage.used}/{sanityUsage.limit}
+              </Text>
+            </View>
           </View>
 
           <ScrollView
