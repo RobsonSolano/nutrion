@@ -35,6 +35,10 @@ type ChatRequest = {
   mode?: 'chat' | 'sanity_check';
 };
 
+const DAILY_USER_MESSAGE_LIMIT = 20;
+const MAX_MESSAGE_CHARS = 255;
+const HISTORY_MESSAGES = 10;
+
 type Profile = {
   full_name: string | null;
   weight_kg: number | null;
@@ -120,7 +124,47 @@ serve(async (req: Request) => {
       return json({ error: 'message or imageBase64 required' }, 400);
     }
 
-    const [profileRes, foodRes, workoutRes] = await Promise.all([
+    const isChatMode = body.mode !== 'sanity_check';
+    const userMessage = body.message?.trim() ?? '';
+
+    // Validação extra do tamanho no modo chat (sanity_check não conta na cota
+    // pois é fluxo separado com imagem).
+    if (isChatMode && userMessage.length > MAX_MESSAGE_CHARS) {
+      return json(
+        {
+          error: 'message_too_long',
+          detail: `Limite de ${MAX_MESSAGE_CHARS} caracteres por mensagem.`,
+        },
+        400,
+      );
+    }
+
+    // Cota diária de mensagens do usuário (somente modo chat).
+    if (isChatMode) {
+      const today = new Date().toISOString().slice(0, 10);
+      const { count: dailyCount, error: countErr } = await supabase
+        .from('chat_messages')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('day', today)
+        .eq('role', 'user');
+      if (countErr) {
+        console.error('[chat-ai] count error:', countErr);
+      }
+      if ((dailyCount ?? 0) >= DAILY_USER_MESSAGE_LIMIT) {
+        return json(
+          {
+            error: 'daily_limit',
+            detail: `Você atingiu o limite de ${DAILY_USER_MESSAGE_LIMIT} mensagens hoje. Volta amanhã!`,
+            limit: DAILY_USER_MESSAGE_LIMIT,
+          },
+          429,
+        );
+      }
+    }
+
+    // Contexto rico (perfil + logs) — usado em ambos os modos.
+    const [profileRes, foodRes, workoutRes, historyRes] = await Promise.all([
       supabase
         .from('profiles')
         .select('full_name, weight_kg, height_cm, goal_weight_kg, daily_calorie_goal, protein_goal_g')
@@ -138,24 +182,31 @@ serve(async (req: Request) => {
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(5),
+      isChatMode
+        ? supabase
+            .from('chat_messages')
+            .select('role, content')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(HISTORY_MESSAGES)
+        : Promise.resolve({ data: [] as { role: string; content: string }[] }),
     ]);
 
     const profile = (profileRes.data ?? null) as Profile | null;
     const foods = (foodRes.data ?? []) as FoodLog[];
     const workouts = (workoutRes.data ?? []) as WorkoutLog[];
+    const history = ((historyRes.data ?? []) as { role: string; content: string }[])
+      .reverse(); // banco vem desc; modelo precisa cronológico asc
 
     const todayTotals = aggregateToday(foods);
     const contextBlock = buildContext(profile, todayTotals, workouts);
 
     const userText =
-      body.mode === 'sanity_check' ? buildSanityPrompt(body) : body.message;
+      body.mode === 'sanity_check' ? buildSanityPrompt(body) : userMessage;
 
     const isMultimodal = !!body.imageBase64;
     const modelToUse = isMultimodal ? VISION_MODEL : TEXT_MODEL;
 
-    // Groq (formato OpenAI):
-    // Texto: content é string.
-    // Multimodal: content é array de { type, text | image_url }.
     const userContent = isMultimodal
       ? [
           { type: 'text', text: userText },
@@ -168,6 +219,26 @@ serve(async (req: Request) => {
         ]
       : userText;
 
+    // Persiste a mensagem do usuário ANTES de chamar o Groq — assim, mesmo se
+    // a IA falhar, a msg do user fica registrada e a próxima tentativa não
+    // precisa repetir o input.
+    if (isChatMode) {
+      const { error: insertErr } = await supabase.from('chat_messages').insert({
+        user_id: user.id,
+        role: 'user',
+        content: userMessage,
+      });
+      if (insertErr) {
+        console.error('[chat-ai] insert user msg error:', insertErr);
+      }
+    }
+
+    const messages: { role: string; content: unknown }[] = [
+      { role: 'system', content: `${PERSONA_PROMPT}\n\n${contextBlock}` },
+      ...history.map((h) => ({ role: h.role, content: h.content })),
+      { role: 'user', content: userContent },
+    ];
+
     const groqRes = await fetch(GROQ_URL, {
       method: 'POST',
       headers: {
@@ -176,10 +247,7 @@ serve(async (req: Request) => {
       },
       body: JSON.stringify({
         model: modelToUse,
-        messages: [
-          { role: 'system', content: `${PERSONA_PROMPT}\n\n${contextBlock}` },
-          { role: 'user', content: userContent },
-        ],
+        messages,
         temperature: 0.6,
         max_tokens: 700,
         top_p: 0.9,
@@ -231,6 +299,18 @@ serve(async (req: Request) => {
         },
         502,
       );
+    }
+
+    // Persiste resposta da IA no histórico do chat (somente modo chat).
+    if (isChatMode) {
+      const { error: insertErr } = await supabase.from('chat_messages').insert({
+        user_id: user.id,
+        role: 'assistant',
+        content: aiText,
+      });
+      if (insertErr) {
+        console.error('[chat-ai] insert assistant msg error:', insertErr);
+      }
     }
 
     return json({

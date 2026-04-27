@@ -18,6 +18,9 @@ export const queryKeys = {
   routineDetail: (routineId: string) => ['routine-detail', routineId] as const,
   todaySessions: (userId: string, day: string) =>
     ['today-sessions', userId, day] as const,
+  chatMessages: (userId: string) => ['chat-messages', userId] as const,
+  chatDailyCount: (userId: string, day: string) =>
+    ['chat-daily-count', userId, day] as const,
 };
 
 export function todayKey() {
