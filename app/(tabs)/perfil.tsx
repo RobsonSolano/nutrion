@@ -9,10 +9,13 @@ import {
   Ruler,
   Droplet,
   Sparkles,
+  Crown,
+  Gift,
 } from 'lucide-react-native';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
 import { useResetOnboarding } from '@/hooks/useOnboarding';
+import { useDailyOnboardingUsage } from '@/hooks/useAiUsage';
 import { useOnboardingStore } from '@/stores/useOnboardingStore';
 import { Button, Card, Screen } from '@/components/ui';
 import Disclaimer from '@/components/Disclaimer';
@@ -26,8 +29,21 @@ export default function PerfilScreen() {
   const profile = profileQ.data;
   const resetOnboardingM = useResetOnboarding();
   const resetOnboardingStore = useOnboardingStore((s) => s.reset);
+  const onboardingUsage = useDailyOnboardingUsage();
+
+  // Refazer só conta cota se o user já completou ao menos uma vez.
+  const refazerBlocked =
+    !!profile?.onboarding_completed_at && onboardingUsage.limitReached;
+  const isEarlyAdopter = profile?.is_early_adopter === true;
 
   async function handleRedoOnboarding() {
+    if (refazerBlocked) {
+      Alert.alert(
+        'Limite diário',
+        'Você já refez seu plano hoje. Tenta de novo amanhã.',
+      );
+      return;
+    }
     try {
       resetOnboardingStore();
       await resetOnboardingM.mutateAsync();
@@ -93,7 +109,41 @@ export default function PerfilScreen() {
           {user?.email && (
             <Text className="text-text-dim text-sm mt-1">{user.email}</Text>
           )}
+          {isEarlyAdopter && (
+            <View
+              className="mt-3 flex-row items-center gap-1.5 rounded-full border px-3 py-1"
+              style={{
+                borderColor: `${colors.accent}55`,
+                backgroundColor: `${colors.accent}15`,
+              }}
+            >
+              <Crown size={12} color={colors.accent} />
+              <Text className="text-accent text-[11px] font-bold tracking-wide">
+                Founding User #{profile?.user_number}
+              </Text>
+            </View>
+          )}
         </View>
+
+        <Card glow accent="violet" padding="md">
+          <View className="flex-row items-start gap-3">
+            <View className="h-10 w-10 rounded-xl bg-violet/15 border border-violet/40 items-center justify-center">
+              <Gift size={18} color={colors.violetSoft} />
+            </View>
+            <View className="flex-1">
+              <Text className="text-text font-semibold">
+                Recursos de IA gratuitos
+              </Text>
+              <Text className="text-text-dim text-xs mt-1 leading-relaxed">
+                Chat (10/dia · 255 chars), Sanity Check (5/dia) e onboarding
+                inteligente são <Text className="text-violet-soft font-semibold">temporariamente gratuitos</Text>.
+                {isEarlyAdopter
+                  ? ' Como early adopter, você continua com acesso quando virarem premium.'
+                  : ' Aproveita enquanto está aberto.'}
+              </Text>
+            </View>
+          </View>
+        </Card>
 
         <Button
           label="Editar perfil"
@@ -195,12 +245,15 @@ export default function PerfilScreen() {
 
         <Button
           label={
-            profile?.onboarding_completed_at
-              ? 'Gerar plano com IA de novo'
-              : 'Completar onboarding com IA'
+            !profile?.onboarding_completed_at
+              ? 'Completar onboarding com IA'
+              : refazerBlocked
+                ? 'Refazer disponível amanhã'
+                : 'Gerar plano com IA de novo'
           }
           onPress={handleRedoOnboarding}
           loading={resetOnboardingM.isPending}
+          disabled={refazerBlocked}
           variant="secondary"
           size="md"
           icon={<Sparkles size={16} color={colors.accent} />}
