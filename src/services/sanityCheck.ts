@@ -81,6 +81,16 @@ export async function runSanityCheck(
       // raw
     }
     if (res.status === 429) throw new Error(String(detail));
+    if (res.status === 413) {
+      throw new Error(
+        'Essa foto ainda está grande demais pra IA processar. Tenta uma foto menor ou mais simples.',
+      );
+    }
+    if (res.status === 400) {
+      throw new Error(
+        'A IA não conseguiu ler essa foto. Tenta outra imagem mais nítida do prato.',
+      );
+    }
     throw new Error(`${res.status} · ${detail}`);
   }
 
