@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   FlatList,
   KeyboardAvoidingView,
+  Platform,
   Pressable,
   Text,
   TextInput,
@@ -10,7 +11,7 @@ import {
 } from 'react-native';
 import { Send, Sparkles, MessageCircle } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useChat, type ChatMessage } from '@/hooks/useChat';
 import { useProfile } from '@/hooks/useProfile';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
@@ -42,9 +43,14 @@ export default function ChatScreen() {
     maxChars,
   } = useChat();
   const profileQ = useProfile();
-  const tabBarHeight = useBottomTabBarHeight();
+  const insets = useSafeAreaInsets();
   const kbHeight = useKeyboardHeight();
   const isKeyboardOpen = kbHeight > 0;
+  // Calcula a altura da tab bar a partir dos insets (mesma fórmula do
+  // (tabs)/_layout.tsx). useBottomTabBarHeight pode retornar valores
+  // dessincronizados em Android com edge-to-edge depois do teclado abrir
+  // e fechar — usar insets direto é estável.
+  const tabBarHeight = 78 + insets.bottom;
 
   const [text, setText] = useState('');
   const inputRef = useRef<TextInput>(null);
@@ -100,7 +106,11 @@ export default function ChatScreen() {
   return (
     <Screen variant="violet" edges={['top']}>
       <KeyboardAvoidingView
-        behavior="padding"
+        // Em Android o sistema já faz adjustResize via WindowInsets quando
+        // edge-to-edge está ativo. Forçar behavior="padding" gerava padding
+        // extra que persistia depois do teclado fechar, deixando o input
+        // muito longe da tab bar.
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={0}
         className="flex-1"
       >
