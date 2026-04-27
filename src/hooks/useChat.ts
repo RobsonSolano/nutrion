@@ -139,16 +139,30 @@ export function useChat() {
                   : prev,
               );
             },
-            onDone: () => {
+            onDone: async (fullText) => {
               handleRef.current = null;
-              setStream(null);
-              if (!userId) return;
-              void qc.invalidateQueries({
+              // Garante que o stream local mostra a versão completa
+              // (proteção contra perda de últimos chunks).
+              setStream((prev) =>
+                prev ? { ...prev, assistantText: fullText } : prev,
+              );
+              if (!userId) {
+                setStream(null);
+                return;
+              }
+              // A edge function persiste a assistant msg no `onComplete` do
+              // proxy, que roda DEPOIS de mandar [DONE] pro cliente. Damos
+              // ~600ms pro servidor terminar de gravar e fazemos refetch
+              // ANTES de limpar o stream local. Sem isso, há um gap onde a
+              // resposta da IA some até o refetch trazer ela do banco.
+              await new Promise((r) => setTimeout(r, 600));
+              await qc.refetchQueries({
                 queryKey: queryKeys.chatMessages(userId),
               });
               void qc.invalidateQueries({
                 queryKey: queryKeys.chatDailyCount(userId, day),
               });
+              setStream(null);
             },
             onError: (err) => {
               handleRef.current = null;
