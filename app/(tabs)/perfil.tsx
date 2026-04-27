@@ -17,7 +17,6 @@ import { useProfile } from '@/hooks/useProfile';
 import { useResetOnboarding } from '@/hooks/useOnboarding';
 import { useDailyOnboardingUsage } from '@/hooks/useAiUsage';
 import { useOnboardingStore } from '@/stores/useOnboardingStore';
-import { testSentry } from '@/lib/sentry';
 import { Button, Card, Screen } from '@/components/ui';
 import Disclaimer from '@/components/Disclaimer';
 import { colors } from '@/lib/theme';
@@ -250,7 +249,7 @@ export default function PerfilScreen() {
               ? 'Completar onboarding com IA'
               : refazerBlocked
                 ? 'Refazer disponível amanhã'
-                : 'Gerar plano com IA de novo'
+                : 'Gerar novo plano com IA'
           }
           onPress={handleRedoOnboarding}
           loading={resetOnboardingM.isPending}
@@ -259,21 +258,6 @@ export default function PerfilScreen() {
           size="md"
           icon={<Sparkles size={16} color={colors.accent} />}
         />
-
-        {__DEV__ && (
-          <Button
-            label="🧪 Testar Sentry (dev only)"
-            onPress={() => {
-              testSentry();
-              Alert.alert(
-                'Sentry',
-                'Evento + exception enviados. Confere o dashboard em ~10s.',
-              );
-            }}
-            variant="ghost"
-            size="md"
-          />
-        )}
 
         <Button
           label="Sair da conta"
