@@ -1,6 +1,7 @@
 import { Text, View } from 'react-native';
 import { Sparkles } from 'lucide-react-native';
 import { colors } from '@/lib/theme';
+import { MarkdownText } from '@/components/ui';
 import type { ChatMessage } from '@/hooks/useChat';
 
 type Props = { message: ChatMessage };
@@ -50,13 +51,17 @@ export default function ChatBubble({ message }: Props) {
             : 'bg-surface border border-border'
         }`}
       >
-        <Text
-          className={`text-[15px] leading-relaxed ${
-            message.error ? 'text-danger' : 'text-text'
-          }`}
-        >
-          {message.text}
-        </Text>
+        {message.error ? (
+          <Text className="text-danger text-[15px] leading-relaxed">
+            {message.text}
+          </Text>
+        ) : (
+          <MarkdownText
+            value={message.text}
+            textColor={colors.text}
+            fontSize={15}
+          />
+        )}
       </View>
     </View>
   );
