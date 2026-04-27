@@ -1,0 +1,63 @@
+import type { ExpoConfig } from 'expo/config';
+
+// Quando rodando em Expo Go (npm run start:go), o Expo injeta EXPO_PUBLIC_PROJECT_EXPO_GO.
+// Mais confiável: o argv contém "--go".
+const IS_EXPO_GO =
+  process.argv.includes('--go') || process.env.EXPO_GO === '1';
+
+const plugins: ExpoConfig['plugins'] = [
+  'expo-router',
+  'expo-secure-store',
+  [
+    'expo-image-picker',
+    {
+      photosPermission:
+        'O NutriOn precisa acessar suas fotos para analisar refeições.',
+      cameraPermission:
+        'O NutriOn precisa da câmera para registrar pratos em tempo real.',
+    },
+  ],
+];
+
+// @react-native-google-signin tem código nativo customizado: só entra
+// em builds customizadas (dev build / preview / production), nunca em Expo Go.
+if (!IS_EXPO_GO) {
+  plugins.push('@react-native-google-signin/google-signin');
+}
+
+const config: ExpoConfig = {
+  name: 'NutriOn',
+  slug: 'nutrion',
+  scheme: 'nutrion',
+  version: '1.0.0',
+  orientation: 'portrait',
+  icon: './assets/icon.png',
+  userInterfaceStyle: 'dark',
+  newArchEnabled: true,
+  splash: {
+    image: './assets/splash-icon.png',
+    resizeMode: 'contain',
+    backgroundColor: '#000000',
+  },
+  android: {
+    package: 'br.com.nutrion',
+    versionCode: 1,
+    adaptiveIcon: {
+      foregroundImage: './assets/adaptive-icon.png',
+      backgroundColor: '#000000',
+    },
+    edgeToEdgeEnabled: true,
+    predictiveBackGestureEnabled: false,
+  },
+  plugins,
+  experiments: {
+    typedRoutes: true,
+  },
+  extra: {
+    eas: {
+      projectId: '6aed6bd3-078e-4424-b7e1-5d4afbd9d624',
+    },
+  },
+};
+
+export default config;

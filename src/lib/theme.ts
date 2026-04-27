@@ -1,0 +1,32 @@
+export const colors = {
+  bg: '#07080B',
+  bgDeep: '#040507',
+  bgElevated: '#0F1115',
+  surface: '#12141A',
+  surfaceRaised: '#1A1D25',
+  surfaceMuted: '#0B0D12',
+  border: '#1F232B',
+  borderStrong: '#2B313C',
+  borderSubtle: '#151921',
+  text: '#F4F5F7',
+  textDim: '#A1A6B2',
+  textMuted: '#6B7180',
+  textInverse: '#0A0B0E',
+  accent: '#39FF14',
+  accentSoft: '#7BFF5C',
+  accentDeep: '#1DB954',
+  accentGlow: 'rgba(57,255,20,0.25)',
+  violet: '#8B5CF6',
+  violetSoft: '#A78BFA',
+  violetDeep: '#6D28D9',
+  danger: '#F43F5E',
+  warn: '#F59E0B',
+  info: '#38BDF8',
+} as const;
+
+export const gradients = {
+  heroRadial: ['rgba(57,255,20,0.18)', 'rgba(29,185,84,0.05)', 'rgba(7,8,11,0)'] as const,
+  violet: ['rgba(139,92,246,0.18)', 'rgba(139,92,246,0.02)'] as const,
+  cardGlow: ['rgba(57,255,20,0.10)', 'rgba(57,255,20,0)'] as const,
+  screen: ['#07080B', '#0B0D12', '#07080B'] as const,
+};
