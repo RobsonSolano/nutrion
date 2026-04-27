@@ -102,6 +102,8 @@ serve(async (req: Request) => {
     );
   }
 
+  const startedAt = Date.now();
+
   try {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader?.startsWith('Bearer ')) {
@@ -128,6 +130,26 @@ serve(async (req: Request) => {
 
     const isChatMode = body.mode !== 'sanity_check';
     const userMessage = body.message?.trim() ?? '';
+    const featureLabel: 'chat' | 'sanity_check' = isChatMode
+      ? 'chat'
+      : 'sanity_check';
+
+    // Helper de log estruturado — não bloqueia o fluxo principal se falhar.
+    const logEvent = async (params: {
+      status: 'success' | 'error' | 'quota_exceeded';
+      tokens?: number | null;
+      errorCode?: string | null;
+    }) => {
+      const { error } = await supabase.from('ai_usage_log').insert({
+        user_id: user.id,
+        feature: featureLabel,
+        duration_ms: Date.now() - startedAt,
+        tokens: params.tokens ?? null,
+        status: params.status,
+        error_code: params.errorCode ?? null,
+      });
+      if (error) console.error('[chat-ai] log error:', error);
+    };
 
     // Validação extra do tamanho no modo chat (sanity_check não conta na cota
     // pois é fluxo separado com imagem).
@@ -155,6 +177,7 @@ serve(async (req: Request) => {
         console.error('[chat-ai] count error:', countErr);
       }
       if ((dailyCount ?? 0) >= DAILY_USER_MESSAGE_LIMIT) {
+        await logEvent({ status: 'quota_exceeded' });
         return json(
           {
             error: 'daily_limit',
@@ -166,18 +189,21 @@ serve(async (req: Request) => {
       }
     }
 
-    // Cota diária de Sanity Check.
+    // Cota diária de Sanity Check (conta só os sucessos — quota_exceeded
+    // e error não consomem cota).
     if (!isChatMode) {
       const { count: sanityCount, error: sanityErr } = await supabase
         .from('ai_usage_log')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', user.id)
         .eq('day', today)
-        .eq('feature', 'sanity_check');
+        .eq('feature', 'sanity_check')
+        .eq('status', 'success');
       if (sanityErr) {
         console.error('[chat-ai] sanity count error:', sanityErr);
       }
       if ((sanityCount ?? 0) >= DAILY_SANITY_CHECK_LIMIT) {
+        await logEvent({ status: 'quota_exceeded' });
         return json(
           {
             error: 'daily_limit',
@@ -297,6 +323,7 @@ serve(async (req: Request) => {
       }
 
       if (groqRes.status === 429) {
+        await logEvent({ status: 'error', errorCode: 'rate_limit' });
         return json(
           {
             error: 'rate_limit',
@@ -308,6 +335,7 @@ serve(async (req: Request) => {
         );
       }
 
+      await logEvent({ status: 'error', errorCode: 'groq_api_error' });
       return json(
         {
           error: 'groq_api_error',
@@ -319,17 +347,21 @@ serve(async (req: Request) => {
     }
 
     if (useStream && groqRes.body) {
-      return streamProxy(groqRes.body, async (fullText) => {
-        if (!fullText.trim()) return;
-        const { error: insertErr } = await supabase
-          .from('chat_messages')
-          .insert({
-            user_id: user.id,
-            role: 'assistant',
-            content: fullText,
-          });
-        if (insertErr) {
-          console.error('[chat-ai] insert assistant msg error:', insertErr);
+      return streamProxy(groqRes.body, async (fullText, totalTokens) => {
+        if (fullText.trim()) {
+          const { error: insertErr } = await supabase
+            .from('chat_messages')
+            .insert({
+              user_id: user.id,
+              role: 'assistant',
+              content: fullText,
+            });
+          if (insertErr) {
+            console.error('[chat-ai] insert assistant msg error:', insertErr);
+          }
+          await logEvent({ status: 'success', tokens: totalTokens });
+        } else {
+          await logEvent({ status: 'error', errorCode: 'empty_response' });
         }
       });
     }
@@ -339,6 +371,7 @@ serve(async (req: Request) => {
 
     if (!aiText.trim()) {
       console.error('[chat-ai] empty response:', groqJson);
+      await logEvent({ status: 'error', errorCode: 'empty_response' });
       return json(
         {
           error: 'empty_response',
@@ -358,16 +391,13 @@ serve(async (req: Request) => {
       if (insertErr) {
         console.error('[chat-ai] insert assistant msg error:', insertErr);
       }
-    } else {
-      // Registra uso do Sanity Check pra contagem da cota diária.
-      const { error: usageErr } = await supabase.from('ai_usage_log').insert({
-        user_id: user.id,
-        feature: 'sanity_check',
-      });
-      if (usageErr) {
-        console.error('[chat-ai] sanity usage log error:', usageErr);
-      }
     }
+
+    const usedTokens =
+      typeof groqJson?.usage?.total_tokens === 'number'
+        ? groqJson.usage.total_tokens
+        : null;
+    await logEvent({ status: 'success', tokens: usedTokens });
 
     return json({
       text: aiText,
@@ -465,12 +495,16 @@ function json(payload: unknown, status = 200) {
  */
 function streamProxy(
   source: ReadableStream<Uint8Array>,
-  onComplete: (fullText: string) => Promise<void> | void,
+  onComplete: (
+    fullText: string,
+    totalTokens: number | null,
+  ) => Promise<void> | void,
 ): Response {
   const decoder = new TextDecoder();
   const encoder = new TextEncoder();
   let buffer = '';
   let fullText = '';
+  let totalTokens: number | null = null;
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
@@ -505,6 +539,10 @@ function streamProxy(
               const json = JSON.parse(data);
               const delta = json?.choices?.[0]?.delta?.content;
               if (typeof delta === 'string') fullText += delta;
+              // Groq inclui usage no último chunk antes do [DONE].
+              if (typeof json?.usage?.total_tokens === 'number') {
+                totalTokens = json.usage.total_tokens;
+              }
             } catch {
               // chunks parciais ou linhas de keepalive — ignora silenciosamente
             }
@@ -514,7 +552,7 @@ function streamProxy(
         console.error('[chat-ai] stream proxy error:', err);
       } finally {
         try {
-          await onComplete(fullText);
+          await onComplete(fullText, totalTokens);
         } catch (err) {
           console.error('[chat-ai] onComplete error:', err);
         }

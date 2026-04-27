@@ -153,6 +153,8 @@ serve(async (req: Request) => {
     );
   }
 
+  const startedAt = Date.now();
+
   try {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader?.startsWith('Bearer ')) {
@@ -172,34 +174,57 @@ serve(async (req: Request) => {
       return json({ error: 'Unauthorized' }, 401);
     }
 
+    const logEvent = async (params: {
+      status: 'success' | 'error' | 'quota_exceeded';
+      tokens?: number | null;
+      errorCode?: string | null;
+    }) => {
+      const { error } = await supabase.from('ai_usage_log').insert({
+        user_id: user.id,
+        feature: 'onboarding_plan',
+        duration_ms: Date.now() - startedAt,
+        tokens: params.tokens ?? null,
+        status: params.status,
+        error_code: params.errorCode ?? null,
+      });
+      if (error) console.error('[onboarding-plan] log error:', error);
+    };
+
     const body = (await req.json()) as OnboardingInput;
     if (!body || typeof body !== 'object') {
       return json({ error: 'invalid_body' }, 400);
     }
 
-    // Cota: 1ª vez é livre (onboarding_completed_at NULL), refazer custa
-    // 1 uso por dia (ai_usage_log).
-    const { data: profileQuota, error: profileErr } = await supabase
-      .from('profiles')
-      .select('onboarding_completed_at')
-      .eq('id', user.id)
-      .maybeSingle();
-    if (profileErr) {
-      console.error('[onboarding-plan] profile quota error:', profileErr);
+    // Cota: 1ª vez (lifetime) é livre, refazer custa 1 uso por dia.
+    // Conta successes em ai_usage_log — não confiamos em
+    // profile.onboarding_completed_at porque o app reseta esse campo ao
+    // pedir refazer. Filtra por status=success pra que tentativas falhas
+    // não consumam cota.
+    const { count: lifetimeSuccesses, error: lifetimeErr } = await supabase
+      .from('ai_usage_log')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('feature', 'onboarding_plan')
+      .eq('status', 'success');
+    if (lifetimeErr) {
+      console.error('[onboarding-plan] lifetime count error:', lifetimeErr);
     }
-    const hasCompletedOnce = !!profileQuota?.onboarding_completed_at;
-    if (hasCompletedOnce) {
+    const isFirstTime = (lifetimeSuccesses ?? 0) === 0;
+
+    if (!isFirstTime) {
       const today = new Date().toISOString().slice(0, 10);
       const { count: usedToday, error: usageErr } = await supabase
         .from('ai_usage_log')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', user.id)
         .eq('day', today)
-        .eq('feature', 'onboarding_plan');
+        .eq('feature', 'onboarding_plan')
+        .eq('status', 'success');
       if (usageErr) {
         console.error('[onboarding-plan] usage count error:', usageErr);
       }
       if ((usedToday ?? 0) >= 1) {
+        await logEvent({ status: 'quota_exceeded' });
         return json(
           {
             error: 'daily_limit',
@@ -217,6 +242,7 @@ serve(async (req: Request) => {
     const catalog = await fetchCatalog(supabase, slugs);
 
     if (catalog.length === 0) {
+      await logEvent({ status: 'error', errorCode: 'empty_catalog' });
       return json(
         {
           error: 'empty_catalog',
@@ -259,6 +285,7 @@ serve(async (req: Request) => {
         // keep raw
       }
       if (groqRes.status === 429) {
+        await logEvent({ status: 'error', errorCode: 'rate_limit' });
         return json(
           {
             error: 'rate_limit',
@@ -268,6 +295,7 @@ serve(async (req: Request) => {
           429,
         );
       }
+      await logEvent({ status: 'error', errorCode: 'groq_api_error' });
       return json(
         { error: 'groq_api_error', detail: `${groqRes.status}: ${detail}` },
         502,
@@ -280,6 +308,7 @@ serve(async (req: Request) => {
 
     if (!plan) {
       console.error('[onboarding-plan] parse_failed:', text.slice(0, 500));
+      await logEvent({ status: 'error', errorCode: 'parse_failed' });
       return json(
         {
           error: 'parse_failed',
@@ -290,17 +319,12 @@ serve(async (req: Request) => {
     }
 
     const sanitized = sanitizePlan(plan, catalog);
+    const usedTokens =
+      typeof groqJson?.usage?.total_tokens === 'number'
+        ? groqJson.usage.total_tokens
+        : null;
 
-    // Só registra consumo nos refazimentos (1ª vez é grátis).
-    if (hasCompletedOnce) {
-      const { error: usageErr } = await supabase.from('ai_usage_log').insert({
-        user_id: user.id,
-        feature: 'onboarding_plan',
-      });
-      if (usageErr) {
-        console.error('[onboarding-plan] usage log error:', usageErr);
-      }
-    }
+    await logEvent({ status: 'success', tokens: usedTokens });
 
     return json({ plan: sanitized, usage: groqJson?.usage ?? null, model: MODEL });
   } catch (err) {

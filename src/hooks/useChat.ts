@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { streamChatAi, type StreamHandle } from '@/services/chat';
+import { captureError } from '@/lib/sentry';
 import {
   countTodayUserMessages,
   DAILY_USER_MESSAGE_LIMIT,
@@ -161,6 +162,7 @@ export function useChat() {
                     }
                   : null,
               );
+              captureError(err, { feature: 'chat' });
               if (!userId) return;
               // Refetch mesmo em erro: a edge function persiste a user msg
               // antes de chamar Groq, então a cota foi consumida.
