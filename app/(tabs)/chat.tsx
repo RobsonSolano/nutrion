@@ -30,6 +30,7 @@ export default function ChatScreen() {
   const {
     messages,
     isSending,
+    isAwaitingFirstToken,
     isLoading,
     sendMessage,
     dailyCount,
@@ -168,7 +169,7 @@ export default function ChatScreen() {
               paddingTop: 12,
               paddingBottom: 12,
             }}
-            ListHeaderComponent={isSending ? <TypingIndicator /> : null}
+            ListHeaderComponent={isAwaitingFirstToken ? <TypingIndicator /> : null}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="interactive"
             showsVerticalScrollIndicator={false}

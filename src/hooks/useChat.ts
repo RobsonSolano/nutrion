@@ -1,10 +1,6 @@
-import { useCallback, useMemo } from 'react';
-import {
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from '@tanstack/react-query';
-import { invokeChatAi } from '@/services/chat';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { streamChatAi, type StreamHandle } from '@/services/chat';
 import {
   countTodayUserMessages,
   DAILY_USER_MESSAGE_LIMIT,
@@ -22,6 +18,7 @@ export type ChatMessage = {
   createdAt: number;
   error?: boolean;
   pending?: boolean;
+  streaming?: boolean;
 };
 
 export { DAILY_USER_MESSAGE_LIMIT, MAX_MESSAGE_CHARS };
@@ -67,99 +64,156 @@ export function useDailyMessageCount() {
 }
 
 /**
- * Envia mensagem com optimistic update: a msg do user aparece imediatamente
- * (status pending), depois é substituída pelos registros reais do banco.
- * Em caso de erro, injeta uma "msg da IA" de erro no histórico local mas
- * continua persistindo a tentativa do user no banco (a edge function já
- * persiste antes de chamar o Groq).
+ * Estado local do streaming: a msg do usuário enviada agora + a resposta da
+ * IA construída chunk a chunk. Ao terminar (ou em erro), fazemos refetch e
+ * limpamos o estado local — o histórico no banco vira a fonte canônica.
  */
-export function useSendChatMessage() {
-  const { user } = useAuth();
-  const qc = useQueryClient();
-  const userId = user?.id;
-  const day = todayKey();
+type StreamState = {
+  userText: string;
+  assistantText: string;
+  error: string | null;
+} | null;
 
-  return useMutation({
-    mutationFn: async (text: string) => {
-      const trimmed = text.trim();
-      if (!trimmed) throw new Error('Mensagem vazia.');
-      if (trimmed.length > MAX_MESSAGE_CHARS) {
-        throw new Error(`Limite de ${MAX_MESSAGE_CHARS} caracteres.`);
-      }
-      return invokeChatAi({ message: trimmed, mode: 'chat' });
-    },
-    onSuccess: () => {
-      if (!userId) return;
-      void qc.invalidateQueries({ queryKey: queryKeys.chatMessages(userId) });
-      void qc.invalidateQueries({
-        queryKey: queryKeys.chatDailyCount(userId, day),
-      });
-    },
-    onError: () => {
-      // A edge function persiste a msg do user antes de chamar Groq, então
-      // mesmo em erro a msg dela está no banco. Re-fetch pra refletir.
-      if (!userId) return;
-      void qc.invalidateQueries({ queryKey: queryKeys.chatMessages(userId) });
-      void qc.invalidateQueries({
-        queryKey: queryKeys.chatDailyCount(userId, day),
-      });
-    },
-  });
-}
-
-/**
- * Hook composto pra UI: junta histórico + cota + mutation + estado pending.
- */
 export function useChat() {
   const messagesQ = useChatMessages();
   const countQ = useDailyMessageCount();
-  const send = useSendChatMessage();
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  const userId = user?.id;
+  const day = todayKey();
 
-  const messages = useMemo<ChatMessage[]>(() => {
-    const stored = (messagesQ.data ?? []).map(toUiMessage);
-    if (send.isPending && send.variables) {
-      const text = String(send.variables).trim();
-      if (text) {
-        stored.unshift({
-          id: `pending-${uid()}`,
-          role: 'user',
-          text,
-          createdAt: Date.now(),
-          pending: true,
-        });
-      }
-    }
-    if (send.isError) {
-      const message =
-        send.error instanceof Error
-          ? send.error.message
-          : 'Falha ao interagir com a IA. Tenta de novo mais tarde.';
-      stored.unshift({
-        id: `error-${uid()}`,
-        role: 'assistant',
-        text: message,
-        createdAt: Date.now(),
-        error: true,
-      });
-    }
-    return stored;
-  }, [messagesQ.data, send.isPending, send.variables, send.isError, send.error]);
+  const [stream, setStream] = useState<StreamState>(null);
+  const handleRef = useRef<StreamHandle | null>(null);
+
+  // Cancela qualquer stream em curso ao desmontar.
+  useEffect(() => {
+    return () => {
+      handleRef.current?.cancel();
+      handleRef.current = null;
+    };
+  }, []);
 
   const dailyCount = countQ.data ?? 0;
   const remaining = Math.max(0, DAILY_USER_MESSAGE_LIMIT - dailyCount);
   const limitReached = remaining === 0;
+  const isSending = stream !== null && stream.error === null;
+  // Mostrar "digitando..." só até o primeiro chunk chegar.
+  const isAwaitingFirstToken =
+    isSending && stream !== null && stream.assistantText.length === 0;
 
   const sendMessage = useCallback(
-    (text: string) => {
-      if (limitReached) return;
-      send.mutate(text);
+    async (text: string) => {
+      const trimmed = text.trim();
+      if (!trimmed) return;
+      if (limitReached || isSending) return;
+      if (trimmed.length > MAX_MESSAGE_CHARS) {
+        setStream({
+          userText: trimmed,
+          assistantText: '',
+          error: `Limite de ${MAX_MESSAGE_CHARS} caracteres por mensagem.`,
+        });
+        return;
+      }
+
+      setStream({ userText: trimmed, assistantText: '', error: null });
+
+      try {
+        handleRef.current = await streamChatAi(
+          { message: trimmed, mode: 'chat' },
+          {
+            onDelta: (chunk) => {
+              setStream((prev) =>
+                prev
+                  ? { ...prev, assistantText: prev.assistantText + chunk }
+                  : prev,
+              );
+            },
+            onDone: () => {
+              handleRef.current = null;
+              setStream(null);
+              if (!userId) return;
+              void qc.invalidateQueries({
+                queryKey: queryKeys.chatMessages(userId),
+              });
+              void qc.invalidateQueries({
+                queryKey: queryKeys.chatDailyCount(userId, day),
+              });
+            },
+            onError: (err) => {
+              handleRef.current = null;
+              setStream((prev) =>
+                prev ? { ...prev, error: err.message } : null,
+              );
+              if (!userId) return;
+              // Refetch mesmo em erro: a edge function persiste a user msg
+              // antes de chamar Groq, então a cota foi consumida.
+              void qc.invalidateQueries({
+                queryKey: queryKeys.chatMessages(userId),
+              });
+              void qc.invalidateQueries({
+                queryKey: queryKeys.chatDailyCount(userId, day),
+              });
+            },
+          },
+        );
+      } catch (err) {
+        handleRef.current = null;
+        setStream({
+          userText: trimmed,
+          assistantText: '',
+          error:
+            err instanceof Error
+              ? err.message
+              : 'Falha ao interagir com a IA. Tenta de novo mais tarde.',
+        });
+      }
     },
-    [limitReached, send],
+    [limitReached, isSending, userId, qc, day],
   );
+
+  const messages = useMemo<ChatMessage[]>(() => {
+    const stored = (messagesQ.data ?? []).map(toUiMessage);
+
+    // Stream em curso: msgs locais aparecem no topo (FlatList inverted),
+    // antes do histórico do banco.
+    if (stream) {
+      const local: ChatMessage[] = [];
+      if (stream.error) {
+        local.push({
+          id: `error-${uid()}`,
+          role: 'assistant',
+          text: stream.error,
+          createdAt: Date.now(),
+          error: true,
+        });
+      } else if (stream.assistantText.length > 0) {
+        local.push({
+          id: 'streaming',
+          role: 'assistant',
+          text: stream.assistantText,
+          createdAt: Date.now(),
+          streaming: true,
+        });
+      }
+      // user msg só fica visível enquanto não foi persistida no banco —
+      // após onDone o refetch traz a versão real e o stream é limpo.
+      local.push({
+        id: 'pending-user',
+        role: 'user',
+        text: stream.userText,
+        createdAt: Date.now() - 1,
+        pending: true,
+      });
+      return [...local, ...stored];
+    }
+
+    return stored;
+  }, [messagesQ.data, stream]);
 
   return {
     messages,
-    isSending: send.isPending,
+    isSending,
+    isAwaitingFirstToken,
     isLoading: messagesQ.isLoading,
     sendMessage,
     dailyCount,
