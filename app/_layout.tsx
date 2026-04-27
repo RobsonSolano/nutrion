@@ -5,15 +5,25 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useAuthBootstrap } from '@/hooks/useAuth';
+import { useSessionStore } from '@/stores/useSessionStore';
+import { initSentry, Sentry, setSentryUser } from '@/lib/sentry';
+
+initSentry();
 
 function Providers({ children }: { children: React.ReactNode }) {
   useAuthBootstrap();
+  const userId = useSessionStore((s) => s.user?.id ?? null);
+
+  useEffect(() => {
+    setSentryUser(userId);
+  }, [userId]);
+
   return <>{children}</>;
 }
 
-export default function RootLayout() {
+function RootLayout() {
   const queryClient = useMemo(
     () =>
       new QueryClient({
@@ -44,3 +54,7 @@ export default function RootLayout() {
     </QueryClientProvider>
   );
 }
+
+// Wrap exportado pelo Sentry: captura erros não tratados e adiciona
+// instrumentação automática de navegação. No-op quando initSentry é no-op.
+export default Sentry.wrap(RootLayout);

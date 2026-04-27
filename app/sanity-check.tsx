@@ -36,6 +36,7 @@ import {
   compressImageForAI,
   ImageTooLargeError,
 } from '@/lib/imageCompress';
+import { captureError } from '@/lib/sentry';
 
 type Stage = 'input' | 'analyzing' | 'result';
 
@@ -147,6 +148,9 @@ export default function SanityCheckScreen() {
           : 'Falha ao interagir com a IA. Tenta de novo mais tarde.';
       // Cota esgotada não é retryable — só fecha.
       const isQuotaError = /limite/i.test(message);
+      if (!isQuotaError) {
+        captureError(err, { feature: 'sanity_check' });
+      }
       Alert.alert(
         'Não consegui analisar',
         message,

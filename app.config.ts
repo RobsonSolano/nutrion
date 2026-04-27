@@ -17,6 +17,7 @@ const plugins: ExpoConfig['plugins'] = [
         'O NutriOn precisa da câmera para registrar pratos em tempo real.',
     },
   ],
+  '@sentry/react-native/expo',
 ];
 
 // @react-native-google-signin tem código nativo customizado: só entra

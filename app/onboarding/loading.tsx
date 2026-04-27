@@ -8,6 +8,7 @@ import { useOnboardingStore } from '@/stores/useOnboardingStore';
 import { useOnboardingResultStore } from '@/stores/useOnboardingResultStore';
 import { useGenerateOnboardingPlan } from '@/hooks/useOnboarding';
 import { useProfile } from '@/hooks/useProfile';
+import { captureError } from '@/lib/sentry';
 import type { OnboardingInput } from '@/services/onboarding';
 
 const STAGES = [
@@ -61,9 +62,16 @@ export default function OnboardingLoading() {
         router.replace('/onboarding/resultado' as Href);
       })
       .catch((err) => {
+        const message =
+          err instanceof Error
+            ? err.message
+            : 'Tenta de novo em instantes.';
+        if (!/limite/i.test(message)) {
+          captureError(err, { feature: 'onboarding_plan' });
+        }
         Alert.alert(
           'Não consegui gerar o plano',
-          err instanceof Error ? err.message : 'Tenta de novo em instantes.',
+          message,
           [
             {
               text: 'Tentar de novo',
