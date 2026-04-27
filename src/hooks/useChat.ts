@@ -116,13 +116,42 @@ export function useChat() {
     };
   }, []);
 
+  // Quando o banco trouxer (via refetch ou setQueryData do polling) tanto a
+  // user quanto a assistant msg do stream atual, podemos limpar o stream
+  // local — a UI vai usar exclusivamente o `stored`. Isso elimina a janela
+  // em que a resposta poderia "sumir" entre o setStream(null) e o cache
+  // estar atualizado.
+  useEffect(() => {
+    if (!stream || stream.error || stream.finishedAt === null) return;
+    const stored = messagesQ.data ?? [];
+    const cutoff = stream.startedAt - CLOCK_SKEW_TOLERANCE_MS;
+    const userInDb = stored.some(
+      (m) =>
+        m.role === 'user' && new Date(m.created_at).getTime() >= cutoff,
+    );
+    const assistantInDb = stored.some(
+      (m) =>
+        m.role === 'assistant' && new Date(m.created_at).getTime() >= cutoff,
+    );
+    if (userInDb && assistantInDb) {
+      activeStreamRef.current = null;
+      setStream(null);
+    }
+  }, [stream, messagesQ.data]);
+
   const dailyCount = countQ.data ?? 0;
   const remaining = Math.max(0, DAILY_USER_MESSAGE_LIMIT - dailyCount);
   const limitReached = remaining === 0;
-  const isSending = stream !== null && stream.error === null;
+  // isSending = true só enquanto o stream técnico está rodando (antes de
+  // finishedAt). Depois disso, mesmo que o stream local ainda esteja visível
+  // aguardando confirmação do banco, o user já pode enviar nova mensagem
+  // (sendMessage substitui o stream).
+  const isStreaming =
+    stream !== null && stream.error === null && stream.finishedAt === null;
+  const isSending = isStreaming;
   // Mostrar "digitando..." só até o primeiro chunk chegar.
   const isAwaitingFirstToken =
-    isSending && stream !== null && stream.assistantText.length === 0;
+    isStreaming && stream !== null && stream.assistantText.length === 0;
 
   const sendMessage = useCallback(
     async (text: string) => {
@@ -165,7 +194,10 @@ export function useChat() {
             },
             onDone: async (fullText) => {
               handleRef.current = null;
-              // Mostra texto completo + marca como finalizado.
+              // Mostra texto completo + marca como finalizado. Importante:
+              // NÃO limpamos o stream ainda — o useMemo já evita duplicar
+              // com o stored quando o banco trouxer. Limpamos só via o
+              // useEffect que monitora o cache (abaixo).
               setStream((prev) =>
                 prev
                   ? {
@@ -180,10 +212,11 @@ export function useChat() {
                 queryKey: queryKeys.chatDailyCount(userId, day),
               });
 
-              // Polling ativo: a edge function persiste a assistant msg DEPOIS
-              // de mandar [DONE]. Um único refetch pode pegar o estado
-              // intermediário (só a user msg). Aqui fazemos refetch periódico
-              // até confirmar que a assistant msg apareceu, OU desistimos.
+              // Polling: refetcha periodicamente pra forçar o cache a ver
+              // a assistant msg quando a edge function terminar de gravar.
+              // Sem timeout de "limpa à força": se o servidor falhar em
+              // persistir, o stream local fica visível pra sempre na sessão
+              // atual. A nova mensagem do user vai substituí-lo.
               const pollStartMs = Date.now();
               while (
                 Date.now() - pollStartMs < POST_STREAM_POLL_MAX_MS &&
@@ -191,7 +224,6 @@ export function useChat() {
               ) {
                 try {
                   const fresh = await listChatMessages(userId);
-                  // Atualiza o cache do TanStack Query manualmente.
                   qc.setQueryData(queryKeys.chatMessages(userId), fresh);
                   const hasFreshAssistant = fresh.some(
                     (m) =>
@@ -199,21 +231,16 @@ export function useChat() {
                       new Date(m.created_at).getTime() >=
                         startedAt - CLOCK_SKEW_TOLERANCE_MS,
                   );
-                  if (hasFreshAssistant) break;
+                  if (hasFreshAssistant) return; // useEffect cuida da limpeza
                 } catch {
-                  // Falha de rede momentânea: tenta de novo no próximo tick.
+                  // Falha de rede momentânea: tenta no próximo tick.
                 }
                 await new Promise((r) =>
                   setTimeout(r, POST_STREAM_POLL_INTERVAL_MS),
                 );
               }
-              // Só limpa se o polling era o "atual". Se o user enviou outra
-              // mensagem durante o polling, activeStreamRef já mudou e essa
-              // execução não pode mexer no stream do novo envio.
-              if (activeStreamRef.current === startedAt) {
-                activeStreamRef.current = null;
-                setStream(null);
-              }
+              // Timeout sem confirmação: stream local fica visível.
+              // Não limpamos — o user vê a resposta até enviar outra msg.
             },
             onError: (err) => {
               handleRef.current = null;
@@ -268,30 +295,42 @@ export function useChat() {
 
   const messages = useMemo<ChatMessage[]>(() => {
     const stored = (messagesQ.data ?? []).map(toUiMessage);
+    if (!stream) return stored;
 
-    // Stream em curso: msgs locais aparecem no topo (FlatList inverted),
-    // antes do histórico do banco.
-    if (stream) {
-      const local: ChatMessage[] = [];
-      if (stream.error) {
-        local.push({
-          id: `error-${uid()}`,
-          role: 'assistant',
-          text: stream.error,
-          createdAt: Date.now(),
-          error: true,
-        });
-      } else if (stream.assistantText.length > 0) {
-        local.push({
-          id: 'streaming',
-          role: 'assistant',
-          text: stream.assistantText,
-          createdAt: Date.now(),
-          streaming: true,
-        });
-      }
-      // user msg só fica visível enquanto não foi persistida no banco —
-      // após onDone o refetch traz a versão real e o stream é limpo.
+    // Detecta se a user msg e/ou assistant msg do stream atual já apareceram
+    // no `stored` (= banco trouxe via refetch). Se sim, não duplicamos com
+    // a versão local — usamos a do banco. A comparação é por timestamp:
+    // qualquer msg criada depois do startedAt (com tolerância de skew) é
+    // considerada "do stream atual".
+    const cutoff = stream.startedAt - CLOCK_SKEW_TOLERANCE_MS;
+    const userInDb = stored.some(
+      (m) => m.role === 'user' && m.createdAt >= cutoff,
+    );
+    const assistantInDb = stored.some(
+      (m) => m.role === 'assistant' && m.createdAt >= cutoff,
+    );
+
+    const local: ChatMessage[] = [];
+    if (stream.error) {
+      local.push({
+        id: `error-${uid()}`,
+        role: 'assistant',
+        text: stream.error,
+        createdAt: Date.now(),
+        error: true,
+      });
+    } else if (stream.assistantText.length > 0 && !assistantInDb) {
+      // Mostra a versão local da resposta APENAS enquanto o banco ainda
+      // não trouxe a oficial. Quando trouxer, vem do `stored`.
+      local.push({
+        id: 'streaming',
+        role: 'assistant',
+        text: stream.assistantText,
+        createdAt: Date.now(),
+        streaming: stream.finishedAt === null,
+      });
+    }
+    if (!userInDb) {
       local.push({
         id: 'pending-user',
         role: 'user',
@@ -299,10 +338,8 @@ export function useChat() {
         createdAt: Date.now() - 1,
         pending: true,
       });
-      return [...local, ...stored];
     }
-
-    return stored;
+    return [...local, ...stored];
   }, [messagesQ.data, stream]);
 
   return {

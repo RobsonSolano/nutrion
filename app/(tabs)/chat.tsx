@@ -106,11 +106,12 @@ export default function ChatScreen() {
   return (
     <Screen variant="violet" edges={['top']}>
       <KeyboardAvoidingView
-        // Em Android o sistema já faz adjustResize via WindowInsets quando
-        // edge-to-edge está ativo. Forçar behavior="padding" gerava padding
-        // extra que persistia depois do teclado fechar, deixando o input
-        // muito longe da tab bar.
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        // behavior="padding" em ambas plataformas: edge-to-edge no Android
+        // desabilita o adjustResize automático, então precisamos do padding
+        // manual via KAV pra empurrar o input acima do teclado. O fantasma
+        // anterior vinha do useBottomTabBarHeight desincronizado — agora
+        // calculamos via insets, que é estável.
+        behavior="padding"
         keyboardVerticalOffset={0}
         className="flex-1"
       >
