@@ -33,6 +33,7 @@ type ChatRequest = {
   imageMime?: 'image/jpeg' | 'image/png' | 'image/webp';
   scaleWeightG?: number;
   mode?: 'chat' | 'sanity_check';
+  stream?: boolean;
 };
 
 const DAILY_USER_MESSAGE_LIMIT = 20;
@@ -239,6 +240,10 @@ serve(async (req: Request) => {
       { role: 'user', content: userContent },
     ];
 
+    // Streaming só faz sentido no chat texto. Sanity check + multimodal
+    // continuam síncronos (devolvem JSON estrito de uma vez).
+    const useStream = !!body.stream && isChatMode && !isMultimodal;
+
     const groqRes = await fetch(GROQ_URL, {
       method: 'POST',
       headers: {
@@ -251,6 +256,7 @@ serve(async (req: Request) => {
         temperature: 0.6,
         max_tokens: 700,
         top_p: 0.9,
+        stream: useStream,
       }),
     });
 
@@ -285,6 +291,22 @@ serve(async (req: Request) => {
         },
         502,
       );
+    }
+
+    if (useStream && groqRes.body) {
+      return streamProxy(groqRes.body, async (fullText) => {
+        if (!fullText.trim()) return;
+        const { error: insertErr } = await supabase
+          .from('chat_messages')
+          .insert({
+            user_id: user.id,
+            role: 'assistant',
+            content: fullText,
+          });
+        if (insertErr) {
+          console.error('[chat-ai] insert assistant msg error:', insertErr);
+        }
+      });
     }
 
     const groqJson = await groqRes.json();
@@ -396,5 +418,84 @@ function json(payload: unknown, status = 200) {
   return new Response(JSON.stringify(payload), {
     status,
     headers: { ...CORS, 'Content-Type': 'application/json' },
+  });
+}
+
+/**
+ * Faz proxy do stream SSE do Groq (formato OpenAI) pro client. Acumula o
+ * conteúdo dos deltas e chama `onComplete(fullText)` ao detectar [DONE] —
+ * usado pra persistir a assistant msg no banco quando o stream encerra.
+ *
+ * Os chunks são reemitidos exatamente como vieram (cada `data: {...}\n\n`),
+ * compatível com clientes EventSource padrão (react-native-sse no app).
+ */
+function streamProxy(
+  source: ReadableStream<Uint8Array>,
+  onComplete: (fullText: string) => Promise<void> | void,
+): Response {
+  const decoder = new TextDecoder();
+  const encoder = new TextEncoder();
+  let buffer = '';
+  let fullText = '';
+
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const reader = source.getReader();
+      try {
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+
+          // Quebra em mensagens completas (SSE separa por linha em branco).
+          const parts = buffer.split('\n\n');
+          buffer = parts.pop() ?? '';
+
+          for (const part of parts) {
+            const trimmed = part.trim();
+            if (!trimmed) continue;
+
+            // Reemite o chunk pro client (padrão SSE).
+            controller.enqueue(encoder.encode(part + '\n\n'));
+
+            const dataLine = trimmed
+              .split('\n')
+              .find((l) => l.startsWith('data:'));
+            if (!dataLine) continue;
+
+            const data = dataLine.slice(5).trim();
+            if (data === '[DONE]') continue;
+
+            try {
+              const json = JSON.parse(data);
+              const delta = json?.choices?.[0]?.delta?.content;
+              if (typeof delta === 'string') fullText += delta;
+            } catch {
+              // chunks parciais ou linhas de keepalive — ignora silenciosamente
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[chat-ai] stream proxy error:', err);
+      } finally {
+        try {
+          await onComplete(fullText);
+        } catch (err) {
+          console.error('[chat-ai] onComplete error:', err);
+        }
+        controller.close();
+        reader.releaseLock();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      ...CORS,
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive',
+    },
   });
 }
