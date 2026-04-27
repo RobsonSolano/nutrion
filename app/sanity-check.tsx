@@ -28,6 +28,10 @@ import { useCreateFoodLog } from '@/hooks/useLogMutations';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { Button, Card, Input, Screen } from '@/components/ui';
 import { colors } from '@/lib/theme';
+import {
+  compressImageForAI,
+  ImageTooLargeError,
+} from '@/lib/imageCompress';
 
 type Stage = 'input' | 'analyzing' | 'result';
 
@@ -42,6 +46,7 @@ export default function SanityCheckScreen() {
   const [scaleWeight, setScaleWeight] = useState('');
   const [stage, setStage] = useState<Stage>('input');
   const [result, setResult] = useState<SanityCheckResult | null>(null);
+  const [preparing, setPreparing] = useState(false);
 
   async function pickImage(source: 'camera' | 'library') {
     const permission =
@@ -64,18 +69,32 @@ export default function SanityCheckScreen() {
         ? ImagePicker.launchCameraAsync
         : ImagePicker.launchImageLibraryAsync;
 
-    const result = await launcher({
+    const picked = await launcher({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      base64: true,
-      quality: 0.7,
+      quality: 1,
       allowsEditing: false,
     });
 
-    if (result.canceled || !result.assets?.[0]) return;
-    const asset = result.assets[0];
-    setPhotoUri(asset.uri);
-    setPhotoBase64(asset.base64 ?? null);
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (picked.canceled || !picked.assets?.[0]) return;
+    const asset = picked.assets[0];
+
+    setPreparing(true);
+    try {
+      const compressed = await compressImageForAI(asset.uri);
+      setPhotoUri(compressed.uri);
+      setPhotoBase64(compressed.base64);
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch (err) {
+      const message =
+        err instanceof ImageTooLargeError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : 'Não consegui preparar essa foto. Tenta outra.';
+      Alert.alert('Foto muito pesada', message);
+    } finally {
+      setPreparing(false);
+    }
   }
 
   async function handleAnalyze() {
@@ -184,12 +203,17 @@ export default function SanityCheckScreen() {
                 photoUri={photoUri}
                 description={description}
                 scaleWeight={scaleWeight}
+                preparing={preparing}
                 onPickCamera={() => pickImage('camera')}
                 onPickLibrary={() => pickImage('library')}
                 onDescriptionChange={setDescription}
                 onScaleWeightChange={setScaleWeight}
                 onAnalyze={handleAnalyze}
-                canAnalyze={!!photoBase64 && description.trim().length >= 3}
+                canAnalyze={
+                  !!photoBase64 &&
+                  description.trim().length >= 3 &&
+                  !preparing
+                }
               />
             )}
 
@@ -219,6 +243,7 @@ function InputStage(props: {
   photoUri: string | null;
   description: string;
   scaleWeight: string;
+  preparing: boolean;
   onPickCamera: () => void;
   onPickLibrary: () => void;
   onDescriptionChange: (v: string) => void;
@@ -253,6 +278,16 @@ function InputStage(props: {
               resizeMode="cover"
             />
           </View>
+        ) : props.preparing ? (
+          <View className="rounded-2xl border border-dashed border-violet/40 bg-violet/5 items-center justify-center py-12 mb-3 gap-2">
+            <Sparkles size={22} color={colors.violetSoft} />
+            <Text className="text-violet-soft text-xs font-semibold">
+              Preparando foto...
+            </Text>
+            <Text className="text-text-muted text-[11px]">
+              Reduzindo tamanho pra enviar pra IA
+            </Text>
+          </View>
         ) : (
           <View className="rounded-2xl border border-dashed border-border bg-surface-muted items-center justify-center py-12 mb-3">
             <ImageIcon size={28} color={colors.textMuted} />
@@ -268,6 +303,8 @@ function InputStage(props: {
               onPress={props.onPickCamera}
               variant="secondary"
               size="md"
+              loading={props.preparing}
+              disabled={props.preparing}
               icon={<Camera size={16} color={colors.text} />}
             />
           </View>
@@ -277,6 +314,7 @@ function InputStage(props: {
               onPress={props.onPickLibrary}
               variant="ghost"
               size="md"
+              disabled={props.preparing}
               icon={<ImageIcon size={16} color={colors.textDim} />}
             />
           </View>
