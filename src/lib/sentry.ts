@@ -80,4 +80,24 @@ export function addBreadcrumb(
   });
 }
 
+/**
+ * Dispara um evento de teste no Sentry. Use só em dev (botão escondido)
+ * pra confirmar que a integração está funcionando ponta a ponta.
+ */
+export function testSentry() {
+  if (!initialized) {
+    console.warn('[sentry] não inicializado — verifique EXPO_PUBLIC_SENTRY_DSN');
+    return;
+  }
+  addBreadcrumb('Botão Testar Sentry pressionado', 'test', {
+    timestamp: Date.now(),
+  });
+  Sentry.captureMessage('NutriOn — teste de integração Sentry', 'info');
+  // Também dispara uma exception pra cobrir ambos os caminhos.
+  captureError(new Error('NutriOn test exception'), {
+    feature: 'sentry_test',
+    intentional: true,
+  });
+}
+
 export { Sentry };
