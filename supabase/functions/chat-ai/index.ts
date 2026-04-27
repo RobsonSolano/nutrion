@@ -33,7 +33,13 @@ type ChatRequest = {
   imageMime?: 'image/jpeg' | 'image/png' | 'image/webp';
   scaleWeightG?: number;
   mode?: 'chat' | 'sanity_check';
+  stream?: boolean;
 };
+
+const DAILY_USER_MESSAGE_LIMIT = 10;
+const DAILY_SANITY_CHECK_LIMIT = 5;
+const MAX_MESSAGE_CHARS = 255;
+const HISTORY_MESSAGES = 10;
 
 type Profile = {
   full_name: string | null;
@@ -71,7 +77,10 @@ Diretrizes inegociáveis:
 - Para validação de pratos: se a imagem não for comida, explique com delicadeza. Se a descrição não bater com o volume visível, aponte a discrepância.
 - Feche sempre com um lembrete implícito da meta, de forma motivacional.
 - Evite termos clínicos ameaçadores ("erro", "problema", "falha grave") — prefira "ajuste", "oportunidade", "correção de rota".
-- Lembre, quando relevante, que orientações profissionais (médico, nutricionista, educador físico) são complementares.`;
+- Lembre, quando relevante, que orientações profissionais (médico, nutricionista, educador físico) são complementares.
+
+Formatação:
+- Use markdown leve. **Negrito** em números/métricas chave (ex: "**1850 kcal**"); listas com "- " quando enumerar pontos ou itens; parágrafos curtos separados por linha em branco. Nunca use tabelas. Não abuse — texto fluido continua sendo o padrão.`;
 
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -92,6 +101,8 @@ serve(async (req: Request) => {
       500,
     );
   }
+
+  const startedAt = Date.now();
 
   try {
     const authHeader = req.headers.get('Authorization');
@@ -117,7 +128,95 @@ serve(async (req: Request) => {
       return json({ error: 'message or imageBase64 required' }, 400);
     }
 
-    const [profileRes, foodRes, workoutRes] = await Promise.all([
+    const isChatMode = body.mode !== 'sanity_check';
+    const userMessage = body.message?.trim() ?? '';
+    const featureLabel: 'chat' | 'sanity_check' = isChatMode
+      ? 'chat'
+      : 'sanity_check';
+
+    // Helper de log estruturado — não bloqueia o fluxo principal se falhar.
+    const logEvent = async (params: {
+      status: 'success' | 'error' | 'quota_exceeded';
+      tokens?: number | null;
+      errorCode?: string | null;
+    }) => {
+      const { error } = await supabase.from('ai_usage_log').insert({
+        user_id: user.id,
+        feature: featureLabel,
+        duration_ms: Date.now() - startedAt,
+        tokens: params.tokens ?? null,
+        status: params.status,
+        error_code: params.errorCode ?? null,
+      });
+      if (error) console.error('[chat-ai] log error:', error);
+    };
+
+    // Validação extra do tamanho no modo chat (sanity_check não conta na cota
+    // pois é fluxo separado com imagem).
+    if (isChatMode && userMessage.length > MAX_MESSAGE_CHARS) {
+      return json(
+        {
+          error: 'message_too_long',
+          detail: `Limite de ${MAX_MESSAGE_CHARS} caracteres por mensagem.`,
+        },
+        400,
+      );
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+
+    // Cota diária de mensagens do chat.
+    if (isChatMode) {
+      const { count: dailyCount, error: countErr } = await supabase
+        .from('chat_messages')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('day', today)
+        .eq('role', 'user');
+      if (countErr) {
+        console.error('[chat-ai] count error:', countErr);
+      }
+      if ((dailyCount ?? 0) >= DAILY_USER_MESSAGE_LIMIT) {
+        await logEvent({ status: 'quota_exceeded' });
+        return json(
+          {
+            error: 'daily_limit',
+            detail: `Você atingiu o limite de ${DAILY_USER_MESSAGE_LIMIT} mensagens hoje. Volta amanhã!`,
+            limit: DAILY_USER_MESSAGE_LIMIT,
+          },
+          429,
+        );
+      }
+    }
+
+    // Cota diária de Sanity Check (conta só os sucessos — quota_exceeded
+    // e error não consomem cota).
+    if (!isChatMode) {
+      const { count: sanityCount, error: sanityErr } = await supabase
+        .from('ai_usage_log')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('day', today)
+        .eq('feature', 'sanity_check')
+        .eq('status', 'success');
+      if (sanityErr) {
+        console.error('[chat-ai] sanity count error:', sanityErr);
+      }
+      if ((sanityCount ?? 0) >= DAILY_SANITY_CHECK_LIMIT) {
+        await logEvent({ status: 'quota_exceeded' });
+        return json(
+          {
+            error: 'daily_limit',
+            detail: `Você atingiu o limite de ${DAILY_SANITY_CHECK_LIMIT} análises de prato hoje. Volta amanhã!`,
+            limit: DAILY_SANITY_CHECK_LIMIT,
+          },
+          429,
+        );
+      }
+    }
+
+    // Contexto rico (perfil + logs) — usado em ambos os modos.
+    const [profileRes, foodRes, workoutRes, historyRes] = await Promise.all([
       supabase
         .from('profiles')
         .select('full_name, weight_kg, height_cm, goal_weight_kg, daily_calorie_goal, protein_goal_g')
@@ -135,24 +234,31 @@ serve(async (req: Request) => {
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(5),
+      isChatMode
+        ? supabase
+            .from('chat_messages')
+            .select('role, content')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(HISTORY_MESSAGES)
+        : Promise.resolve({ data: [] as { role: string; content: string }[] }),
     ]);
 
     const profile = (profileRes.data ?? null) as Profile | null;
     const foods = (foodRes.data ?? []) as FoodLog[];
     const workouts = (workoutRes.data ?? []) as WorkoutLog[];
+    const history = ((historyRes.data ?? []) as { role: string; content: string }[])
+      .reverse(); // banco vem desc; modelo precisa cronológico asc
 
     const todayTotals = aggregateToday(foods);
     const contextBlock = buildContext(profile, todayTotals, workouts);
 
     const userText =
-      body.mode === 'sanity_check' ? buildSanityPrompt(body) : body.message;
+      body.mode === 'sanity_check' ? buildSanityPrompt(body) : userMessage;
 
     const isMultimodal = !!body.imageBase64;
     const modelToUse = isMultimodal ? VISION_MODEL : TEXT_MODEL;
 
-    // Groq (formato OpenAI):
-    // Texto: content é string.
-    // Multimodal: content é array de { type, text | image_url }.
     const userContent = isMultimodal
       ? [
           { type: 'text', text: userText },
@@ -165,6 +271,30 @@ serve(async (req: Request) => {
         ]
       : userText;
 
+    // Persiste a mensagem do usuário ANTES de chamar o Groq — assim, mesmo se
+    // a IA falhar, a msg do user fica registrada e a próxima tentativa não
+    // precisa repetir o input.
+    if (isChatMode) {
+      const { error: insertErr } = await supabase.from('chat_messages').insert({
+        user_id: user.id,
+        role: 'user',
+        content: userMessage,
+      });
+      if (insertErr) {
+        console.error('[chat-ai] insert user msg error:', insertErr);
+      }
+    }
+
+    const messages: { role: string; content: unknown }[] = [
+      { role: 'system', content: `${PERSONA_PROMPT}\n\n${contextBlock}` },
+      ...history.map((h) => ({ role: h.role, content: h.content })),
+      { role: 'user', content: userContent },
+    ];
+
+    // Streaming só faz sentido no chat texto. Sanity check + multimodal
+    // continuam síncronos (devolvem JSON estrito de uma vez).
+    const useStream = !!body.stream && isChatMode && !isMultimodal;
+
     const groqRes = await fetch(GROQ_URL, {
       method: 'POST',
       headers: {
@@ -173,13 +303,11 @@ serve(async (req: Request) => {
       },
       body: JSON.stringify({
         model: modelToUse,
-        messages: [
-          { role: 'system', content: `${PERSONA_PROMPT}\n\n${contextBlock}` },
-          { role: 'user', content: userContent },
-        ],
+        messages,
         temperature: 0.6,
         max_tokens: 700,
         top_p: 0.9,
+        stream: useStream,
       }),
     });
 
@@ -195,6 +323,7 @@ serve(async (req: Request) => {
       }
 
       if (groqRes.status === 429) {
+        await logEvent({ status: 'error', errorCode: 'rate_limit' });
         return json(
           {
             error: 'rate_limit',
@@ -206,6 +335,7 @@ serve(async (req: Request) => {
         );
       }
 
+      await logEvent({ status: 'error', errorCode: 'groq_api_error' });
       return json(
         {
           error: 'groq_api_error',
@@ -216,11 +346,32 @@ serve(async (req: Request) => {
       );
     }
 
+    if (useStream && groqRes.body) {
+      return streamProxy(groqRes.body, async (fullText, totalTokens) => {
+        if (fullText.trim()) {
+          const { error: insertErr } = await supabase
+            .from('chat_messages')
+            .insert({
+              user_id: user.id,
+              role: 'assistant',
+              content: fullText,
+            });
+          if (insertErr) {
+            console.error('[chat-ai] insert assistant msg error:', insertErr);
+          }
+          await logEvent({ status: 'success', tokens: totalTokens });
+        } else {
+          await logEvent({ status: 'error', errorCode: 'empty_response' });
+        }
+      });
+    }
+
     const groqJson = await groqRes.json();
     const aiText: string = groqJson?.choices?.[0]?.message?.content ?? '';
 
     if (!aiText.trim()) {
       console.error('[chat-ai] empty response:', groqJson);
+      await logEvent({ status: 'error', errorCode: 'empty_response' });
       return json(
         {
           error: 'empty_response',
@@ -229,6 +380,24 @@ serve(async (req: Request) => {
         502,
       );
     }
+
+    // Persiste resposta da IA no histórico do chat (somente modo chat).
+    if (isChatMode) {
+      const { error: insertErr } = await supabase.from('chat_messages').insert({
+        user_id: user.id,
+        role: 'assistant',
+        content: aiText,
+      });
+      if (insertErr) {
+        console.error('[chat-ai] insert assistant msg error:', insertErr);
+      }
+    }
+
+    const usedTokens =
+      typeof groqJson?.usage?.total_tokens === 'number'
+        ? groqJson.usage.total_tokens
+        : null;
+    await logEvent({ status: 'success', tokens: usedTokens });
 
     return json({
       text: aiText,
@@ -313,5 +482,92 @@ function json(payload: unknown, status = 200) {
   return new Response(JSON.stringify(payload), {
     status,
     headers: { ...CORS, 'Content-Type': 'application/json' },
+  });
+}
+
+/**
+ * Faz proxy do stream SSE do Groq (formato OpenAI) pro client. Acumula o
+ * conteúdo dos deltas e chama `onComplete(fullText)` ao detectar [DONE] —
+ * usado pra persistir a assistant msg no banco quando o stream encerra.
+ *
+ * Os chunks são reemitidos exatamente como vieram (cada `data: {...}\n\n`),
+ * compatível com clientes EventSource padrão (react-native-sse no app).
+ */
+function streamProxy(
+  source: ReadableStream<Uint8Array>,
+  onComplete: (
+    fullText: string,
+    totalTokens: number | null,
+  ) => Promise<void> | void,
+): Response {
+  const decoder = new TextDecoder();
+  const encoder = new TextEncoder();
+  let buffer = '';
+  let fullText = '';
+  let totalTokens: number | null = null;
+
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const reader = source.getReader();
+      try {
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+
+          // Quebra em mensagens completas (SSE separa por linha em branco).
+          const parts = buffer.split('\n\n');
+          buffer = parts.pop() ?? '';
+
+          for (const part of parts) {
+            const trimmed = part.trim();
+            if (!trimmed) continue;
+
+            // Reemite o chunk pro client (padrão SSE).
+            controller.enqueue(encoder.encode(part + '\n\n'));
+
+            const dataLine = trimmed
+              .split('\n')
+              .find((l) => l.startsWith('data:'));
+            if (!dataLine) continue;
+
+            const data = dataLine.slice(5).trim();
+            if (data === '[DONE]') continue;
+
+            try {
+              const json = JSON.parse(data);
+              const delta = json?.choices?.[0]?.delta?.content;
+              if (typeof delta === 'string') fullText += delta;
+              // Groq inclui usage no último chunk antes do [DONE].
+              if (typeof json?.usage?.total_tokens === 'number') {
+                totalTokens = json.usage.total_tokens;
+              }
+            } catch {
+              // chunks parciais ou linhas de keepalive — ignora silenciosamente
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[chat-ai] stream proxy error:', err);
+      } finally {
+        try {
+          await onComplete(fullText, totalTokens);
+        } catch (err) {
+          console.error('[chat-ai] onComplete error:', err);
+        }
+        controller.close();
+        reader.releaseLock();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      ...CORS,
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive',
+    },
   });
 }

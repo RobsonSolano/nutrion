@@ -1,12 +1,17 @@
-import { Text, View } from 'react-native';
-import { Sparkles } from 'lucide-react-native';
+import { Pressable, Text, View } from 'react-native';
+import { RefreshCw, Sparkles } from 'lucide-react-native';
 import { colors } from '@/lib/theme';
+import { MarkdownText } from '@/components/ui';
 import type { ChatMessage } from '@/hooks/useChat';
 
-type Props = { message: ChatMessage };
+type Props = {
+  message: ChatMessage;
+  onRetry?: () => void;
+};
 
-export default function ChatBubble({ message }: Props) {
+export default function ChatBubble({ message, onRetry }: Props) {
   const isUser = message.role === 'user';
+  const showRetry = !!message.error && !!onRetry;
 
   if (isUser) {
     return (
@@ -50,13 +55,31 @@ export default function ChatBubble({ message }: Props) {
             : 'bg-surface border border-border'
         }`}
       >
-        <Text
-          className={`text-[15px] leading-relaxed ${
-            message.error ? 'text-danger' : 'text-text'
-          }`}
-        >
-          {message.text}
-        </Text>
+        {message.error ? (
+          <>
+            <Text className="text-danger text-[15px] leading-relaxed">
+              {message.text}
+            </Text>
+            {showRetry && (
+              <Pressable
+                onPress={onRetry}
+                hitSlop={8}
+                className="mt-2 self-start flex-row items-center gap-1.5 rounded-full border border-danger/40 bg-danger/10 px-3 py-1.5 active:opacity-70"
+              >
+                <RefreshCw size={12} color={colors.danger} />
+                <Text className="text-danger text-[12px] font-semibold">
+                  Tentar novamente
+                </Text>
+              </Pressable>
+            )}
+          </>
+        ) : (
+          <MarkdownText
+            value={message.text}
+            textColor={colors.text}
+            fontSize={15}
+          />
+        )}
       </View>
     </View>
   );
