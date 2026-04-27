@@ -66,18 +66,27 @@ export function useDailyMessageCount() {
 
 /**
  * Estado local do streaming: a msg do usuário enviada agora + a resposta da
- * IA construída chunk a chunk. Ao terminar (ou em erro), fazemos refetch e
- * limpamos o estado local — o histórico no banco vira a fonte canônica.
+ * IA construída chunk a chunk. Ao terminar, mantemos o estado local visível
+ * até o refetch confirmar que o banco tem a assistant msg — só então
+ * limpamos e a UI passa a usar `stored` (fonte canônica).
  *
- * Em erro guardamos `userText` pra permitir o user dar "Tentar novamente"
- * sem redigitar a mensagem.
+ * `finishedAt` (epoch ms) marca quando o stream técnico terminou. Enquanto
+ * for null, está streamando. Quando setar, é o momento de procurar a msg
+ * correspondente no banco.
  */
 type StreamState = {
   userText: string;
   assistantText: string;
   error: string | null;
   retryable: boolean;
+  finishedAt: number | null;
+  startedAt: number;
 } | null;
+
+/** Fallback: tempo máximo (ms) que o stream local fica visível depois de
+ * finishedAt antes de ser limpo à força. Cobre casos raros em que o refetch
+ * nunca traz a msg (rede caiu, write no banco falhou silenciosamente, etc). */
+const STREAM_GRACE_MS = 8000;
 
 export function useChat() {
   const messagesQ = useChatMessages();
@@ -98,6 +107,48 @@ export function useChat() {
     };
   }, []);
 
+  // Quando o stream terminou (finishedAt setado), monitoramos o cache
+  // de mensagens e limpamos o stream local APENAS quando o banco trouxer
+  // a assistant msg correspondente. Isso elimina a race condition entre
+  // [DONE] do Groq e o INSERT da edge function.
+  useEffect(() => {
+    if (!stream?.finishedAt) return;
+    if (stream.error) {
+      // Erro fica visível até user enviar próxima msg ou retry. Mas tem
+      // fallback de tempo abaixo pra não travar pra sempre.
+      return;
+    }
+    const stored = messagesQ.data ?? [];
+    const latest = stored[0]; // banco vem em DESC
+    if (
+      latest &&
+      latest.role === 'assistant' &&
+      new Date(latest.created_at).getTime() >= stream.startedAt
+    ) {
+      // Banco tem uma assistant msg criada DEPOIS do stream iniciar →
+      // é a nossa resposta, podemos confiar no cache.
+      setStream(null);
+    }
+  }, [messagesQ.data, stream]);
+
+  // Fallback: se passou STREAM_GRACE_MS e o cache ainda não trouxe a
+  // msg, limpa à força pra UI não ficar travada. Não deve acontecer em
+  // condição normal — só cobre falhas de rede ou DB.
+  useEffect(() => {
+    if (!stream?.finishedAt) return;
+    if (stream.error) return;
+    const elapsed = Date.now() - stream.finishedAt;
+    const remaining = STREAM_GRACE_MS - elapsed;
+    if (remaining <= 0) {
+      setStream(null);
+      return;
+    }
+    const t = setTimeout(() => {
+      setStream(null);
+    }, remaining);
+    return () => clearTimeout(t);
+  }, [stream]);
+
   const dailyCount = countQ.data ?? 0;
   const remaining = Math.max(0, DAILY_USER_MESSAGE_LIMIT - dailyCount);
   const limitReached = remaining === 0;
@@ -111,12 +162,15 @@ export function useChat() {
       const trimmed = text.trim();
       if (!trimmed) return;
       if (limitReached || isSending) return;
+      const startedAt = Date.now();
       if (trimmed.length > MAX_MESSAGE_CHARS) {
         setStream({
           userText: trimmed,
           assistantText: '',
           error: `Limite de ${MAX_MESSAGE_CHARS} caracteres por mensagem.`,
           retryable: false,
+          finishedAt: Date.now(),
+          startedAt,
         });
         return;
       }
@@ -126,6 +180,8 @@ export function useChat() {
         assistantText: '',
         error: null,
         retryable: false,
+        finishedAt: null,
+        startedAt,
       });
 
       try {
@@ -139,30 +195,27 @@ export function useChat() {
                   : prev,
               );
             },
-            onDone: async (fullText) => {
+            onDone: (fullText) => {
               handleRef.current = null;
-              // Garante que o stream local mostra a versão completa
-              // (proteção contra perda de últimos chunks).
+              // Marca o stream como finalizado mas mantém visível.
+              // Um useEffect vai monitorar o cache e limpar quando o banco
+              // confirmar que tem a assistant msg correspondente.
               setStream((prev) =>
-                prev ? { ...prev, assistantText: fullText } : prev,
+                prev
+                  ? {
+                      ...prev,
+                      assistantText: fullText,
+                      finishedAt: Date.now(),
+                    }
+                  : prev,
               );
-              if (!userId) {
-                setStream(null);
-                return;
-              }
-              // A edge function persiste a assistant msg no `onComplete` do
-              // proxy, que roda DEPOIS de mandar [DONE] pro cliente. Damos
-              // ~600ms pro servidor terminar de gravar e fazemos refetch
-              // ANTES de limpar o stream local. Sem isso, há um gap onde a
-              // resposta da IA some até o refetch trazer ela do banco.
-              await new Promise((r) => setTimeout(r, 600));
-              await qc.refetchQueries({
+              if (!userId) return;
+              void qc.invalidateQueries({
                 queryKey: queryKeys.chatMessages(userId),
               });
               void qc.invalidateQueries({
                 queryKey: queryKeys.chatDailyCount(userId, day),
               });
-              setStream(null);
             },
             onError: (err) => {
               handleRef.current = null;
@@ -173,6 +226,7 @@ export function useChat() {
                       error: err.message,
                       // Cota esgotada não é retryable; demais erros sim.
                       retryable: !/limite/i.test(err.message),
+                      finishedAt: Date.now(),
                     }
                   : null,
               );
@@ -199,6 +253,8 @@ export function useChat() {
               ? err.message
               : 'Falha ao interagir com a IA. Tenta de novo mais tarde.',
           retryable: true,
+          finishedAt: Date.now(),
+          startedAt,
         });
       }
     },
