@@ -83,10 +83,15 @@ type StreamState = {
   startedAt: number;
 } | null;
 
-/** Fallback: tempo máximo (ms) que o stream local fica visível depois de
- * finishedAt antes de ser limpo à força. Cobre casos raros em que o refetch
- * nunca traz a msg (rede caiu, write no banco falhou silenciosamente, etc). */
-const STREAM_GRACE_MS = 8000;
+/** Quanto tempo (ms) tentamos detectar a assistant msg no banco antes de
+ * desistir e limpar o stream local. Em condições normais, a edge function
+ * termina de persistir em ~500ms-1s; usamos 6s pra ter folga em rede ruim. */
+const POST_STREAM_POLL_MAX_MS = 6000;
+/** Intervalo entre tentativas de fetch durante o polling pós-stream. */
+const POST_STREAM_POLL_INTERVAL_MS = 400;
+/** Tolerância (ms) pra clock skew entre client e servidor ao comparar
+ * created_at do banco com startedAt do cliente. */
+const CLOCK_SKEW_TOLERANCE_MS = 5000;
 
 export function useChat() {
   const messagesQ = useChatMessages();
@@ -98,56 +103,18 @@ export function useChat() {
 
   const [stream, setStream] = useState<StreamState>(null);
   const handleRef = useRef<StreamHandle | null>(null);
+  /** Marca o stream "ativo" via startedAt. Usado pra detectar se um polling
+   * pós-stream antigo deve abortar porque o user já mandou outra mensagem. */
+  const activeStreamRef = useRef<number | null>(null);
 
   // Cancela qualquer stream em curso ao desmontar.
   useEffect(() => {
     return () => {
       handleRef.current?.cancel();
       handleRef.current = null;
+      activeStreamRef.current = null;
     };
   }, []);
-
-  // Quando o stream terminou (finishedAt setado), monitoramos o cache
-  // de mensagens e limpamos o stream local APENAS quando o banco trouxer
-  // a assistant msg correspondente. Isso elimina a race condition entre
-  // [DONE] do Groq e o INSERT da edge function.
-  useEffect(() => {
-    if (!stream?.finishedAt) return;
-    if (stream.error) {
-      // Erro fica visível até user enviar próxima msg ou retry. Mas tem
-      // fallback de tempo abaixo pra não travar pra sempre.
-      return;
-    }
-    const stored = messagesQ.data ?? [];
-    const latest = stored[0]; // banco vem em DESC
-    if (
-      latest &&
-      latest.role === 'assistant' &&
-      new Date(latest.created_at).getTime() >= stream.startedAt
-    ) {
-      // Banco tem uma assistant msg criada DEPOIS do stream iniciar →
-      // é a nossa resposta, podemos confiar no cache.
-      setStream(null);
-    }
-  }, [messagesQ.data, stream]);
-
-  // Fallback: se passou STREAM_GRACE_MS e o cache ainda não trouxe a
-  // msg, limpa à força pra UI não ficar travada. Não deve acontecer em
-  // condição normal — só cobre falhas de rede ou DB.
-  useEffect(() => {
-    if (!stream?.finishedAt) return;
-    if (stream.error) return;
-    const elapsed = Date.now() - stream.finishedAt;
-    const remaining = STREAM_GRACE_MS - elapsed;
-    if (remaining <= 0) {
-      setStream(null);
-      return;
-    }
-    const t = setTimeout(() => {
-      setStream(null);
-    }, remaining);
-    return () => clearTimeout(t);
-  }, [stream]);
 
   const dailyCount = countQ.data ?? 0;
   const remaining = Math.max(0, DAILY_USER_MESSAGE_LIMIT - dailyCount);
@@ -183,6 +150,7 @@ export function useChat() {
         finishedAt: null,
         startedAt,
       });
+      activeStreamRef.current = startedAt;
 
       try {
         handleRef.current = await streamChatAi(
@@ -195,11 +163,9 @@ export function useChat() {
                   : prev,
               );
             },
-            onDone: (fullText) => {
+            onDone: async (fullText) => {
               handleRef.current = null;
-              // Marca o stream como finalizado mas mantém visível.
-              // Um useEffect vai monitorar o cache e limpar quando o banco
-              // confirmar que tem a assistant msg correspondente.
+              // Mostra texto completo + marca como finalizado.
               setStream((prev) =>
                 prev
                   ? {
@@ -211,11 +177,43 @@ export function useChat() {
               );
               if (!userId) return;
               void qc.invalidateQueries({
-                queryKey: queryKeys.chatMessages(userId),
-              });
-              void qc.invalidateQueries({
                 queryKey: queryKeys.chatDailyCount(userId, day),
               });
+
+              // Polling ativo: a edge function persiste a assistant msg DEPOIS
+              // de mandar [DONE]. Um único refetch pode pegar o estado
+              // intermediário (só a user msg). Aqui fazemos refetch periódico
+              // até confirmar que a assistant msg apareceu, OU desistimos.
+              const pollStartMs = Date.now();
+              while (
+                Date.now() - pollStartMs < POST_STREAM_POLL_MAX_MS &&
+                activeStreamRef.current === startedAt
+              ) {
+                try {
+                  const fresh = await listChatMessages(userId);
+                  // Atualiza o cache do TanStack Query manualmente.
+                  qc.setQueryData(queryKeys.chatMessages(userId), fresh);
+                  const hasFreshAssistant = fresh.some(
+                    (m) =>
+                      m.role === 'assistant' &&
+                      new Date(m.created_at).getTime() >=
+                        startedAt - CLOCK_SKEW_TOLERANCE_MS,
+                  );
+                  if (hasFreshAssistant) break;
+                } catch {
+                  // Falha de rede momentânea: tenta de novo no próximo tick.
+                }
+                await new Promise((r) =>
+                  setTimeout(r, POST_STREAM_POLL_INTERVAL_MS),
+                );
+              }
+              // Só limpa se o polling era o "atual". Se o user enviou outra
+              // mensagem durante o polling, activeStreamRef já mudou e essa
+              // execução não pode mexer no stream do novo envio.
+              if (activeStreamRef.current === startedAt) {
+                activeStreamRef.current = null;
+                setStream(null);
+              }
             },
             onError: (err) => {
               handleRef.current = null;
