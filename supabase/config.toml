@@ -1,0 +1,45 @@
+project_id = "nutrion"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 17
+
+[studio]
+enabled = true
+port = 54323
+api_url = "http://127.0.0.1"
+
+[storage]
+enabled = true
+file_size_limit = "50MiB"
+
+[storage.buckets.meal-photos]
+public = false
+file_size_limit = "5MiB"
+allowed_mime_types = ["image/jpeg", "image/png", "image/webp"]
+
+[auth]
+enabled = true
+site_url = "nutrion://"
+additional_redirect_urls = ["nutrion://"]
+
+[functions.chat-ai]
+# Desativado porque o gateway do Supabase ainda não aceita JWTs ES256
+# emitidos pelas chaves sb_publishable_/sb_secret_. A função continua
+# segura: validamos o token manualmente via supabase.auth.getUser().
+verify_jwt = false
+
+[functions.onboarding-plan]
+verify_jwt = false
+
+[edge_runtime]
+enabled = true
+policy = "oneshot"
