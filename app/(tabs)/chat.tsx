@@ -33,6 +33,8 @@ export default function ChatScreen() {
     isAwaitingFirstToken,
     isLoading,
     sendMessage,
+    retryLastMessage,
+    canRetry,
     dailyCount,
     dailyLimit,
     remaining,
@@ -67,8 +69,20 @@ export default function ChatScreen() {
   );
 
   const renderItem = useCallback(
-    ({ item }: { item: ChatMessage }) => <ChatBubble message={item} />,
-    [],
+    ({ item }: { item: ChatMessage }) => (
+      <ChatBubble
+        message={item}
+        onRetry={
+          item.error && canRetry
+            ? () => {
+                void Haptics.selectionAsync();
+                retryLastMessage();
+              }
+            : undefined
+        }
+      />
+    ),
+    [canRetry, retryLastMessage],
   );
 
   const isEmpty = !isLoading && messages.length === 0;

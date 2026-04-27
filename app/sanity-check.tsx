@@ -141,9 +141,26 @@ export default function SanityCheckScreen() {
       }
     } catch (err) {
       setStage('input');
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'Falha ao interagir com a IA. Tenta de novo mais tarde.';
+      // Cota esgotada não é retryable — só fecha.
+      const isQuotaError = /limite/i.test(message);
       Alert.alert(
         'Não consegui analisar',
-        err instanceof Error ? err.message : 'Tenta de novo.',
+        message,
+        isQuotaError
+          ? [{ text: 'OK', style: 'cancel' }]
+          : [
+              { text: 'Cancelar', style: 'cancel' },
+              {
+                text: 'Tentar novamente',
+                onPress: () => {
+                  void handleAnalyze();
+                },
+              },
+            ],
       );
     }
   }

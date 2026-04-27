@@ -67,11 +67,15 @@ export function useDailyMessageCount() {
  * Estado local do streaming: a msg do usuário enviada agora + a resposta da
  * IA construída chunk a chunk. Ao terminar (ou em erro), fazemos refetch e
  * limpamos o estado local — o histórico no banco vira a fonte canônica.
+ *
+ * Em erro guardamos `userText` pra permitir o user dar "Tentar novamente"
+ * sem redigitar a mensagem.
  */
 type StreamState = {
   userText: string;
   assistantText: string;
   error: string | null;
+  retryable: boolean;
 } | null;
 
 export function useChat() {
@@ -111,11 +115,17 @@ export function useChat() {
           userText: trimmed,
           assistantText: '',
           error: `Limite de ${MAX_MESSAGE_CHARS} caracteres por mensagem.`,
+          retryable: false,
         });
         return;
       }
 
-      setStream({ userText: trimmed, assistantText: '', error: null });
+      setStream({
+        userText: trimmed,
+        assistantText: '',
+        error: null,
+        retryable: false,
+      });
 
       try {
         handleRef.current = await streamChatAi(
@@ -142,7 +152,14 @@ export function useChat() {
             onError: (err) => {
               handleRef.current = null;
               setStream((prev) =>
-                prev ? { ...prev, error: err.message } : null,
+                prev
+                  ? {
+                      ...prev,
+                      error: err.message,
+                      // Cota esgotada não é retryable; demais erros sim.
+                      retryable: !/limite/i.test(err.message),
+                    }
+                  : null,
               );
               if (!userId) return;
               // Refetch mesmo em erro: a edge function persiste a user msg
@@ -165,11 +182,19 @@ export function useChat() {
             err instanceof Error
               ? err.message
               : 'Falha ao interagir com a IA. Tenta de novo mais tarde.',
+          retryable: true,
         });
       }
     },
     [limitReached, isSending, userId, qc, day],
   );
+
+  const retryLastMessage = useCallback(() => {
+    if (!stream?.retryable) return;
+    const text = stream.userText;
+    setStream(null);
+    void sendMessage(text);
+  }, [stream, sendMessage]);
 
   const messages = useMemo<ChatMessage[]>(() => {
     const stored = (messagesQ.data ?? []).map(toUiMessage);
@@ -216,6 +241,8 @@ export function useChat() {
     isAwaitingFirstToken,
     isLoading: messagesQ.isLoading,
     sendMessage,
+    retryLastMessage,
+    canRetry: !!stream?.retryable && !!stream.error,
     dailyCount,
     dailyLimit: DAILY_USER_MESSAGE_LIMIT,
     remaining,
