@@ -26,7 +26,7 @@ import {
 import { runSanityCheck, type SanityCheckResult } from '@/services/sanityCheck';
 import { useCreateFoodLog } from '@/hooks/useLogMutations';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
-import { Button, Card, Input, Screen } from '@/components/ui';
+import { Button, Card, Input, MarkdownText, Screen } from '@/components/ui';
 import { colors } from '@/lib/theme';
 import {
   compressImageForAI,
@@ -424,9 +424,7 @@ function ResultStage({
           </Text>
         </View>
         {result.feedback ? (
-          <Text className="text-text text-sm leading-relaxed">
-            {result.feedback}
-          </Text>
+          <MarkdownText value={result.feedback} fontSize={14} />
         ) : (
           <Text className="text-text-dim text-sm leading-relaxed">
             {result.raw ?? 'Sem feedback retornado.'}

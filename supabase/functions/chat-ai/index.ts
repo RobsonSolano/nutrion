@@ -71,7 +71,10 @@ Diretrizes inegociáveis:
 - Para validação de pratos: se a imagem não for comida, explique com delicadeza. Se a descrição não bater com o volume visível, aponte a discrepância.
 - Feche sempre com um lembrete implícito da meta, de forma motivacional.
 - Evite termos clínicos ameaçadores ("erro", "problema", "falha grave") — prefira "ajuste", "oportunidade", "correção de rota".
-- Lembre, quando relevante, que orientações profissionais (médico, nutricionista, educador físico) são complementares.`;
+- Lembre, quando relevante, que orientações profissionais (médico, nutricionista, educador físico) são complementares.
+
+Formatação:
+- Use markdown leve. **Negrito** em números/métricas chave (ex: "**1850 kcal**"); listas com "- " quando enumerar pontos ou itens; parágrafos curtos separados por linha em branco. Nunca use tabelas. Não abuse — texto fluido continua sendo o padrão.`;
 
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
