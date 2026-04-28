@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { streamChatAi, type StreamHandle } from '@/services/chat';
+import { invokeChatAi } from '@/services/chat';
 import { captureError } from '@/lib/sentry';
 import {
   countTodayUserMessages,
@@ -19,7 +19,6 @@ export type ChatMessage = {
   createdAt: number;
   error?: boolean;
   pending?: boolean;
-  streaming?: boolean;
 };
 
 export { DAILY_USER_MESSAGE_LIMIT, MAX_MESSAGE_CHARS };
@@ -31,10 +30,6 @@ function toUiMessage(m: StoredChatMessage): ChatMessage {
     text: m.content,
     createdAt: new Date(m.created_at).getTime(),
   };
-}
-
-function uid() {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 export function useChatMessages() {
@@ -65,19 +60,42 @@ export function useDailyMessageCount() {
 }
 
 /**
- * Estado local do streaming: a msg do usuário enviada agora + a resposta da
- * IA construída chunk a chunk. Ao terminar (ou em erro), fazemos refetch e
- * limpamos o estado local — o histórico no banco vira a fonte canônica.
- *
- * Em erro guardamos `userText` pra permitir o user dar "Tentar novamente"
- * sem redigitar a mensagem.
+ * Mensagem em curso: aguardando resposta da edge function. UI mostra
+ * "Pensando..." até a chamada terminar.
  */
-type StreamState = {
+type PendingState = {
   userText: string;
-  assistantText: string;
-  error: string | null;
-  retryable: boolean;
+  startedAt: number;
+  abortController: AbortController;
 } | null;
+
+/**
+ * Animação visual da resposta (typewriter effect). A msg JÁ está no banco
+ * — a animação é só visual. `matchedId` é o id da msg do stored, usado pra
+ * esconder a versão completa enquanto a versão animada incrementa.
+ */
+type AnimatingState = {
+  matchedId: string;
+  fullText: string;
+  displayedLength: number;
+  startedAt: number;
+} | null;
+
+/**
+ * Erro da última tentativa, mantido até o user tentar de novo / enviar nova msg.
+ * `retryable=false` em casos como cota esgotada (não adianta retry).
+ */
+type LastError = {
+  message: string;
+  retryable: boolean;
+  userText: string;
+  startedAt: number;
+} | null;
+
+/** ~60fps. */
+const ANIMATION_TICK_MS = 16;
+/** ~250 chars/seg — natural mas não lento (resposta de 500 chars em ~2s). */
+const ANIMATION_CHARS_PER_TICK = 4;
 
 export function useChat() {
   const messagesQ = useChatMessages();
@@ -87,164 +105,221 @@ export function useChat() {
   const userId = user?.id;
   const day = todayKey();
 
-  const [stream, setStream] = useState<StreamState>(null);
-  const handleRef = useRef<StreamHandle | null>(null);
+  const [pending, setPending] = useState<PendingState>(null);
+  const [animating, setAnimating] = useState<AnimatingState>(null);
+  const [lastError, setLastError] = useState<LastError>(null);
 
-  // Cancela qualquer stream em curso ao desmontar.
-  useEffect(() => {
-    return () => {
-      handleRef.current?.cancel();
-      handleRef.current = null;
-    };
-  }, []);
+  const abortRef = useRef<AbortController | null>(null);
 
   const dailyCount = countQ.data ?? 0;
   const remaining = Math.max(0, DAILY_USER_MESSAGE_LIMIT - dailyCount);
   const limitReached = remaining === 0;
-  const isSending = stream !== null && stream.error === null;
-  // Mostrar "digitando..." só até o primeiro chunk chegar.
-  const isAwaitingFirstToken =
-    isSending && stream !== null && stream.assistantText.length === 0;
+  const isSending = pending !== null;
+
+  // Typewriter: incrementa displayedLength via setTimeout encadeado.
+  useEffect(() => {
+    if (!animating) return;
+    if (animating.displayedLength >= animating.fullText.length) {
+      // Animação terminou — pequeno delay pra suavizar transição.
+      const t = setTimeout(() => setAnimating(null), 200);
+      return () => clearTimeout(t);
+    }
+    const t = setTimeout(() => {
+      setAnimating((prev) =>
+        prev
+          ? {
+              ...prev,
+              displayedLength: Math.min(
+                prev.displayedLength + ANIMATION_CHARS_PER_TICK,
+                prev.fullText.length,
+              ),
+            }
+          : prev,
+      );
+    }, ANIMATION_TICK_MS);
+    return () => clearTimeout(t);
+  }, [animating]);
 
   const sendMessage = useCallback(
     async (text: string) => {
       const trimmed = text.trim();
       if (!trimmed) return;
       if (limitReached || isSending) return;
+
       if (trimmed.length > MAX_MESSAGE_CHARS) {
-        setStream({
-          userText: trimmed,
-          assistantText: '',
-          error: `Limite de ${MAX_MESSAGE_CHARS} caracteres por mensagem.`,
+        setLastError({
+          message: `Limite de ${MAX_MESSAGE_CHARS} caracteres por mensagem.`,
           retryable: false,
+          userText: trimmed,
+          startedAt: Date.now(),
         });
         return;
       }
 
-      setStream({
-        userText: trimmed,
-        assistantText: '',
-        error: null,
-        retryable: false,
-      });
+      // Cancela animação anterior (se rolando) — usuário começou nova msg.
+      setAnimating(null);
+      setLastError(null);
+
+      const abortController = new AbortController();
+      abortRef.current = abortController;
+      const startedAt = Date.now();
+      setPending({ userText: trimmed, startedAt, abortController });
 
       try {
-        handleRef.current = await streamChatAi(
+        await invokeChatAi(
           { message: trimmed, mode: 'chat' },
-          {
-            onDelta: (chunk) => {
-              setStream((prev) =>
-                prev
-                  ? { ...prev, assistantText: prev.assistantText + chunk }
-                  : prev,
-              );
-            },
-            onDone: () => {
-              handleRef.current = null;
-              setStream(null);
-              if (!userId) return;
-              void qc.invalidateQueries({
-                queryKey: queryKeys.chatMessages(userId),
-              });
-              void qc.invalidateQueries({
-                queryKey: queryKeys.chatDailyCount(userId, day),
-              });
-            },
-            onError: (err) => {
-              handleRef.current = null;
-              setStream((prev) =>
-                prev
-                  ? {
-                      ...prev,
-                      error: err.message,
-                      // Cota esgotada não é retryable; demais erros sim.
-                      retryable: !/limite/i.test(err.message),
-                    }
-                  : null,
-              );
-              captureError(err, { feature: 'chat' });
-              if (!userId) return;
-              // Refetch mesmo em erro: a edge function persiste a user msg
-              // antes de chamar Groq, então a cota foi consumida.
-              void qc.invalidateQueries({
-                queryKey: queryKeys.chatMessages(userId),
-              });
-              void qc.invalidateQueries({
-                queryKey: queryKeys.chatDailyCount(userId, day),
-              });
-            },
-          },
+          { signal: abortController.signal },
         );
+
+        // Edge function persistiu user + assistant antes de retornar.
+        if (userId) {
+          const fresh = await listChatMessages(userId);
+          qc.setQueryData(queryKeys.chatMessages(userId), fresh);
+          void qc.invalidateQueries({
+            queryKey: queryKeys.chatDailyCount(userId, day),
+          });
+
+          // A msg mais recente (fresh é desc) deve ser a assistant nova —
+          // dispara animação typewriter pra entrega visual progressiva.
+          const newest = fresh[0];
+          if (newest?.role === 'assistant') {
+            const createdAt = new Date(newest.created_at).getTime();
+            if (createdAt >= startedAt) {
+              setAnimating({
+                matchedId: newest.id,
+                fullText: newest.content,
+                displayedLength: Math.min(
+                  ANIMATION_CHARS_PER_TICK,
+                  newest.content.length,
+                ),
+                startedAt: Date.now(),
+              });
+            }
+          }
+        }
       } catch (err) {
-        handleRef.current = null;
-        setStream({
-          userText: trimmed,
-          assistantText: '',
-          error:
+        const wasAborted = abortController.signal.aborted;
+
+        if (!wasAborted) {
+          captureError(
+            err instanceof Error ? err : new Error(String(err)),
+            { feature: 'chat' },
+          );
+          const message =
             err instanceof Error
               ? err.message
-              : 'Falha ao interagir com a IA. Tenta de novo mais tarde.',
-          retryable: true,
-        });
+              : 'Falha ao interagir com a IA. Tenta de novo mais tarde.';
+          setLastError({
+            message,
+            retryable: !/limite/i.test(message),
+            userText: trimmed,
+            startedAt,
+          });
+        }
+
+        // Refetch mesmo em erro/cancel: edge function persiste a user msg
+        // ANTES de chamar Groq, então a cota foi consumida.
+        if (userId) {
+          void qc.invalidateQueries({
+            queryKey: queryKeys.chatMessages(userId),
+          });
+          void qc.invalidateQueries({
+            queryKey: queryKeys.chatDailyCount(userId, day),
+          });
+        }
+      } finally {
+        abortRef.current = null;
+        setPending(null);
       }
     },
     [limitReached, isSending, userId, qc, day],
   );
 
+  const cancelMessage = useCallback(() => {
+    abortRef.current?.abort();
+  }, []);
+
   const retryLastMessage = useCallback(() => {
-    if (!stream?.retryable) return;
-    const text = stream.userText;
-    setStream(null);
+    if (!lastError?.retryable) return;
+    const text = lastError.userText;
+    setLastError(null);
     void sendMessage(text);
-  }, [stream, sendMessage]);
+  }, [lastError, sendMessage]);
 
   const messages = useMemo<ChatMessage[]>(() => {
     const stored = (messagesQ.data ?? []).map(toUiMessage);
 
-    // Stream em curso: msgs locais aparecem no topo (FlatList inverted),
-    // antes do histórico do banco.
-    if (stream) {
-      const local: ChatMessage[] = [];
-      if (stream.error) {
-        local.push({
-          id: `error-${uid()}`,
+    if (pending) {
+      const userInDb = stored.some(
+        (m) => m.role === 'user' && m.text === pending.userText,
+      );
+      if (userInDb) return stored;
+      return [
+        {
+          id: `pending-user-${pending.startedAt}`,
+          role: 'user',
+          text: pending.userText,
+          createdAt: pending.startedAt,
+          pending: true,
+        },
+        ...stored,
+      ];
+    }
+
+    if (animating) {
+      // Esconde a versão completa do stored (matchedId) e mostra a animada.
+      const filteredStored = stored.filter(
+        (m) => m.id !== animating.matchedId,
+      );
+      return [
+        {
+          id: `animating-${animating.matchedId}`,
           role: 'assistant',
-          text: stream.error,
-          createdAt: Date.now(),
+          text: animating.fullText.slice(0, animating.displayedLength),
+          createdAt: animating.startedAt,
+        },
+        ...filteredStored,
+      ];
+    }
+
+    if (lastError) {
+      const local: ChatMessage[] = [
+        {
+          id: `error-${lastError.startedAt}`,
+          role: 'assistant',
+          text: lastError.message,
+          createdAt: lastError.startedAt + 1,
           error: true,
-        });
-      } else if (stream.assistantText.length > 0) {
+        },
+      ];
+      const userInDb = stored.some(
+        (m) => m.role === 'user' && m.text === lastError.userText,
+      );
+      if (!userInDb) {
         local.push({
-          id: 'streaming',
-          role: 'assistant',
-          text: stream.assistantText,
-          createdAt: Date.now(),
-          streaming: true,
+          id: `error-user-${lastError.startedAt}`,
+          role: 'user',
+          text: lastError.userText,
+          createdAt: lastError.startedAt,
+          pending: true,
         });
       }
-      // user msg só fica visível enquanto não foi persistida no banco —
-      // após onDone o refetch traz a versão real e o stream é limpo.
-      local.push({
-        id: 'pending-user',
-        role: 'user',
-        text: stream.userText,
-        createdAt: Date.now() - 1,
-        pending: true,
-      });
       return [...local, ...stored];
     }
 
     return stored;
-  }, [messagesQ.data, stream]);
+  }, [messagesQ.data, pending, animating, lastError]);
 
   return {
     messages,
     isSending,
-    isAwaitingFirstToken,
+    /** True só durante pending — typing indicator aparece antes da animação. */
+    isAwaitingFirstToken: isSending,
     isLoading: messagesQ.isLoading,
     sendMessage,
+    cancelMessage,
     retryLastMessage,
-    canRetry: !!stream?.retryable && !!stream.error,
+    canRetry: !!lastError?.retryable,
     dailyCount,
     dailyLimit: DAILY_USER_MESSAGE_LIMIT,
     remaining,
