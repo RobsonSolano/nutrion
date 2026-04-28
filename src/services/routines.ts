@@ -1,22 +1,36 @@
 import { supabase } from './supabase';
 import type {
+  Modality,
   RoutineExercise,
   RoutineExerciseInsert,
   RoutineWithExercises,
   WorkoutRoutine,
+  WorkoutRoutineListItem,
   WorkoutSession,
 } from '@/types/database';
 
-export async function listRoutines(userId: string): Promise<WorkoutRoutine[]> {
+export async function listRoutines(
+  userId: string,
+): Promise<WorkoutRoutineListItem[]> {
+  // PostgREST aggregate: traz o count de exercícios numa única round-trip.
   const { data, error } = await supabase
     .from('workout_routines')
-    .select('*')
+    .select('*, exercises:workout_routine_exercises(count)')
     .eq('user_id', userId)
     .eq('is_archived', false)
     .order('created_at', { ascending: false });
 
   if (error) throw error;
-  return data ?? [];
+
+  return (data ?? []).map((r) => {
+    const { exercises, ...rest } = r as WorkoutRoutine & {
+      exercises: { count: number }[] | null;
+    };
+    return {
+      ...rest,
+      exercises_count: exercises?.[0]?.count ?? 0,
+    };
+  });
 }
 
 export async function fetchRoutineDetail(
@@ -46,6 +60,7 @@ export async function fetchRoutineDetail(
 export async function createRoutine(params: {
   userId: string;
   name: string;
+  modality: Modality;
   groupId: string | null;
   description: string | null;
   exercises: RoutineExerciseInsert[];
@@ -55,6 +70,7 @@ export async function createRoutine(params: {
     .insert({
       user_id: params.userId,
       name: params.name,
+      modality: params.modality,
       group_id: params.groupId,
       description: params.description,
     })
@@ -79,7 +95,12 @@ export async function createRoutine(params: {
 
 export async function updateRoutine(
   routineId: string,
-  patch: Partial<Pick<WorkoutRoutine, 'name' | 'group_id' | 'description' | 'is_archived'>>,
+  patch: Partial<
+    Pick<
+      WorkoutRoutine,
+      'name' | 'group_id' | 'modality' | 'description' | 'is_archived'
+    >
+  >,
 ): Promise<WorkoutRoutine> {
   const { data, error } = await supabase
     .from('workout_routines')

@@ -68,6 +68,21 @@ export type ExerciseGroup = {
   sort_order: number;
 };
 
+export type Modality =
+  | 'musculacao'
+  | 'calistenia'
+  | 'crossfit'
+  | 'corrida'
+  | 'generico';
+
+export const MODALITY_LABELS: Record<Modality, string> = {
+  musculacao: 'Musculação',
+  calistenia: 'Calistenia',
+  crossfit: 'CrossFit',
+  corrida: 'Corrida',
+  generico: 'Genérico',
+};
+
 export type Exercise = {
   id: string;
   group_id: string;
@@ -75,6 +90,7 @@ export type Exercise = {
   equipment: string | null;
   is_compound: boolean | null;
   image_urls: string[] | null;
+  modality: Modality;
 };
 
 export type WaterLog = {
@@ -90,10 +106,16 @@ export type WorkoutRoutine = {
   user_id: string;
   name: string;
   group_id: string | null;
+  modality: Modality;
   description: string | null;
   is_archived: boolean;
   created_at: string;
   updated_at: string;
+};
+
+/** Versão do listItem com contagem de exercícios (via PostgREST aggregate). */
+export type WorkoutRoutineListItem = WorkoutRoutine & {
+  exercises_count: number;
 };
 
 export type RoutineExercise = {

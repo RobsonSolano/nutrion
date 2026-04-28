@@ -28,25 +28,37 @@ import {
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { Button, Card, Input } from '@/components/ui';
 import { colors } from '@/lib/theme';
-import type {
-  Exercise,
-  ExerciseGroup,
-  RoutineExerciseInsert,
+import {
+  MODALITY_LABELS,
+  type Exercise,
+  type ExerciseGroup,
+  type Modality,
+  type RoutineExerciseInsert,
 } from '@/types/database';
 import ExerciseImagesModal from './ExerciseImagesModal';
 import PreviewEyeButton from './PreviewEyeButton';
 
 type Draft = RoutineExerciseInsert & { localId: string };
 
+const MODALITIES: Modality[] = [
+  'musculacao',
+  'calistenia',
+  'crossfit',
+  'corrida',
+  'generico',
+];
+
 type Props = {
   initialName?: string;
   initialDescription?: string;
+  initialModality?: Modality;
   initialGroupId?: string | null;
   initialExercises?: RoutineExerciseInsert[];
   submitLabel: string;
   loading?: boolean;
   onSubmit: (payload: {
     name: string;
+    modality: Modality;
     groupId: string | null;
     description: string | null;
     exercises: RoutineExerciseInsert[];
@@ -76,6 +88,9 @@ export default function RoutineEditor(props: Props) {
 
   const [name, setName] = useState(props.initialName ?? '');
   const [description, setDescription] = useState(props.initialDescription ?? '');
+  const [modality, setModality] = useState<Modality>(
+    props.initialModality ?? 'musculacao',
+  );
   const [groupId, setGroupId] = useState<string | null>(
     props.initialGroupId ?? null,
   );
@@ -180,6 +195,7 @@ export default function RoutineEditor(props: Props) {
     try {
       await props.onSubmit({
         name: cleanName,
+        modality,
         groupId,
         description: description.trim() || null,
         exercises,
@@ -209,6 +225,31 @@ export default function RoutineEditor(props: Props) {
           Dados do treino
         </Text>
         <View className="gap-3">
+          <ModalityPicker
+            selected={modality}
+            onSelect={(m) => {
+              if (m === modality) return;
+              if (drafts.length > 0) {
+                Alert.alert(
+                  'Trocar modalidade',
+                  `Os ${drafts.length} exercício(s) adicionado(s) serão removidos porque pertencem à modalidade ${MODALITY_LABELS[modality]}.`,
+                  [
+                    { text: 'Cancelar', style: 'cancel' },
+                    {
+                      text: 'Trocar',
+                      style: 'destructive',
+                      onPress: () => {
+                        setDrafts([]);
+                        setModality(m);
+                      },
+                    },
+                  ],
+                );
+              } else {
+                setModality(m);
+              }
+            }}
+          />
           <Input
             label="Nome"
             value={name}
@@ -294,6 +335,7 @@ export default function RoutineEditor(props: Props) {
       <ExercisePickerModal
         visible={pickerOpen}
         onClose={() => setPickerOpen(false)}
+        modality={modality}
         preferredGroupId={groupId}
         addedExerciseIds={addedExerciseIds}
         onSelect={handleAddExercise}
@@ -311,6 +353,43 @@ export default function RoutineEditor(props: Props) {
 }
 
 // ---------- Subcomponents ----------
+
+function ModalityPicker({
+  selected,
+  onSelect,
+}: {
+  selected: Modality;
+  onSelect: (m: Modality) => void;
+}) {
+  return (
+    <View>
+      <Text className="text-text-dim text-xs uppercase tracking-widest mb-2">
+        Modalidade
+      </Text>
+      <View className="flex-row flex-wrap gap-2">
+        {MODALITIES.map((m) => (
+          <Pressable
+            key={m}
+            onPress={() => onSelect(m)}
+            className={`rounded-full border px-3 py-1.5 ${
+              selected === m
+                ? 'bg-accent/10 border-accent/40'
+                : 'bg-surface-muted border-border'
+            }`}
+          >
+            <Text
+              className={`text-xs ${
+                selected === m ? 'text-accent' : 'text-text-dim'
+              }`}
+            >
+              {MODALITY_LABELS[m]}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+}
 
 function GroupPicker({
   groups,
@@ -498,12 +577,14 @@ const SmallInput = forwardRef<TextInput, SmallInputProps>(function SmallInput(
 function ExercisePickerModal({
   visible,
   onClose,
+  modality,
   preferredGroupId,
   addedExerciseIds,
   onSelect,
 }: {
   visible: boolean;
   onClose: () => void;
+  modality: Modality;
   preferredGroupId: string | null;
   addedExerciseIds: Set<string>;
   onSelect: (ex: Exercise) => void;
@@ -511,7 +592,7 @@ function ExercisePickerModal({
   const [groupId, setGroupId] = useState<string | null>(preferredGroupId);
   const [search, setSearch] = useState('');
   const groupsQ = useExerciseGroups();
-  const exercisesQ = useExercisesByGroup(groupId);
+  const exercisesQ = useExercisesByGroup(groupId, modality);
 
   // Sempre que o modal abre, sincroniza o grupo com o preferido do form
   // e limpa a busca anterior — evita confusão de estado antigo.
@@ -548,7 +629,12 @@ function ExercisePickerModal({
           >
             <X size={18} color={colors.textDim} />
           </Pressable>
-          <Text className="text-text font-semibold">Escolher exercício</Text>
+          <View className="items-center">
+            <Text className="text-text font-semibold">Escolher exercício</Text>
+            <Text className="text-text-muted text-[10px] mt-0.5">
+              {MODALITY_LABELS[modality]}
+            </Text>
+          </View>
           <View style={{ width: 40 }} />
         </View>
 
@@ -609,7 +695,8 @@ function ExercisePickerModal({
 
           {groupId && !exercisesQ.isLoading && filtered.length === 0 && (
             <Text className="text-text-muted text-sm text-center py-4">
-              Nenhum exercício encontrado.
+              Nenhum exercício de {MODALITY_LABELS[modality]} nesse grupo.
+              {'\n'}Tenta outro grupo ou outra modalidade.
             </Text>
           )}
 

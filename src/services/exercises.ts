@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import type { Exercise, ExerciseGroup } from '@/types/database';
+import type { Exercise, ExerciseGroup, Modality } from '@/types/database';
 
 export async function listExerciseGroups(): Promise<ExerciseGroup[]> {
   const { data, error } = await supabase
@@ -11,11 +11,15 @@ export async function listExerciseGroups(): Promise<ExerciseGroup[]> {
   return data ?? [];
 }
 
-export async function listExercisesByGroup(groupId: string): Promise<Exercise[]> {
+export async function listExercisesByGroup(
+  groupId: string,
+  modality: Modality,
+): Promise<Exercise[]> {
   const { data, error } = await supabase
     .from('exercises')
     .select('*')
     .eq('group_id', groupId)
+    .eq('modality', modality)
     .order('name', { ascending: true });
 
   if (error) throw error;
