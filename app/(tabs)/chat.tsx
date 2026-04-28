@@ -9,7 +9,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Send, Sparkles, MessageCircle } from 'lucide-react-native';
+import { Send, Sparkles, MessageCircle, X } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useChat, type ChatMessage } from '@/hooks/useChat';
@@ -34,6 +34,7 @@ export default function ChatScreen() {
     isAwaitingFirstToken,
     isLoading,
     sendMessage,
+    cancelMessage,
     retryLastMessage,
     canRetry,
     dailyCount,
@@ -240,34 +241,57 @@ export default function ChatScreen() {
                 />
               </View>
               <Pressable
-                onPress={handleSend}
-                disabled={!text.trim() || isSending}
+                onPress={() => {
+                  if (isSending) {
+                    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    cancelMessage();
+                  } else {
+                    handleSend();
+                  }
+                }}
+                disabled={!isSending && !text.trim()}
                 className={`h-12 w-12 rounded-full items-center justify-center ${
-                  !text.trim() || isSending
-                    ? 'bg-surface-raised'
-                    : 'bg-accent active:opacity-80'
+                  isSending
+                    ? 'bg-danger active:opacity-80'
+                    : !text.trim()
+                      ? 'bg-surface-raised'
+                      : 'bg-accent active:opacity-80'
                 }`}
                 style={
-                  text.trim() && !isSending
+                  isSending
                     ? {
-                        shadowColor: colors.accent,
+                        shadowColor: colors.danger,
                         shadowOffset: { width: 0, height: 3 },
                         shadowOpacity: 0.4,
                         shadowRadius: 10,
                         elevation: 4,
                       }
-                    : undefined
+                    : text.trim()
+                      ? {
+                          shadowColor: colors.accent,
+                          shadowOffset: { width: 0, height: 3 },
+                          shadowOpacity: 0.4,
+                          shadowRadius: 10,
+                          elevation: 4,
+                        }
+                      : undefined
                 }
               >
-                <Send
-                  size={18}
-                  color={
-                    !text.trim() || isSending
-                      ? colors.textMuted
-                      : colors.textInverse
-                  }
-                  strokeWidth={2.5}
-                />
+                {isSending ? (
+                  <X
+                    size={18}
+                    color={colors.textInverse}
+                    strokeWidth={2.5}
+                  />
+                ) : (
+                  <Send
+                    size={18}
+                    color={
+                      !text.trim() ? colors.textMuted : colors.textInverse
+                    }
+                    strokeWidth={2.5}
+                  />
+                )}
               </Pressable>
             </View>
           )}
