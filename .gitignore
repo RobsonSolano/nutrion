@@ -45,3 +45,6 @@ yarn-error.*
 # planejamento / segredos
 plan/*
 .plan/*
+
+# supabase CLI cache local
+supabase/.temp/
