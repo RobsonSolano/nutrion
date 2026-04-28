@@ -30,7 +30,7 @@ import { useExerciseImagesMap } from '@/hooks/useExercises';
 import { Button, Card, Screen } from '@/components/ui';
 import Disclaimer from '@/components/Disclaimer';
 import { colors } from '@/lib/theme';
-import type { RoutineExercise } from '@/types/database';
+import { MODALITY_LABELS, type RoutineExercise } from '@/types/database';
 
 export default function RotinaDetalheScreen() {
   const router = useRouter();
@@ -113,6 +113,7 @@ export default function RotinaDetalheScreen() {
             <RoutineEditor
               initialName={detailQ.data.name}
               initialDescription={detailQ.data.description ?? ''}
+              initialModality={detailQ.data.modality}
               initialGroupId={detailQ.data.group_id}
               initialExercises={detailQ.data.exercises.map((e) => ({
                 exercise_id: e.exercise_id,
@@ -134,6 +135,7 @@ export default function RotinaDetalheScreen() {
                   id: id!,
                   patch: {
                     name: payload.name,
+                    modality: payload.modality,
                     group_id: payload.groupId,
                     description: payload.description,
                   },
@@ -162,6 +164,7 @@ export default function RotinaDetalheScreen() {
                       {detailQ.data.name}
                     </Text>
                     <Text className="text-text-dim text-xs mt-0.5">
+                      {MODALITY_LABELS[detailQ.data.modality]} ·{' '}
                       {detailQ.data.group?.name ?? 'Treino livre'} ·{' '}
                       {detailQ.data.exercises.length} exercícios
                     </Text>

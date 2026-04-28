@@ -17,13 +17,18 @@ const plugins: ExpoConfig['plugins'] = [
         'O NutriOn precisa da câmera para registrar pratos em tempo real.',
     },
   ],
-  [
-    '@sentry/react-native/expo',
-    {
-      organization: 'solanusdev',
-      project: 'nutrion',
-    },
-  ],
+  // Sentry plugin desabilitado temporariamente — upload de source maps
+  // estava falhando no build EAS (sentry-cli exit 1). SDK do Sentry no JS
+  // (src/lib/sentry.ts) continua funcionando e capturando exceptions; só
+  // perdemos source map mapping de stack traces nativos. Reativar quando
+  // o token tiver escopo correto (project:releases + org:read).
+  // [
+  //   '@sentry/react-native/expo',
+  //   {
+  //     organization: 'solanusdev',
+  //     project: 'nutrion',
+  //   },
+  // ],
 ];
 
 // @react-native-google-signin tem código nativo customizado: só entra

@@ -9,8 +9,8 @@ export const queryKeys = {
   waterToday: (userId: string, day: string) =>
     ['water-today', userId, day] as const,
   exerciseGroups: () => ['exercise-groups'] as const,
-  exercisesByGroup: (groupId: string) =>
-    ['exercises-by-group', groupId] as const,
+  exercisesByGroup: (groupId: string, modality: string) =>
+    ['exercises-by-group', groupId, modality] as const,
   allExercises: () => ['all-exercises'] as const,
   weeklyActivity: (userId: string, anchor: string) =>
     ['weekly-activity', userId, anchor] as const,
