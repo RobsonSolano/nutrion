@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import type {
   GoalType,
+  Modality,
   Profile,
   RoutineExerciseInsert,
   Sex,
@@ -45,6 +46,7 @@ export type PlanRoutineExercise = {
 
 export type PlanRoutine = {
   name: string;
+  modality: Modality;
   group_slug: string | null;
   description?: string | null;
   exercises: PlanRoutineExercise[];
@@ -161,6 +163,18 @@ export async function saveOnboardingResult(params: {
     .single();
   if (pErr) throw pErr;
 
+  // 1.5) Arquiva rotinas existentes do usuário antes de criar as novas.
+  // Senão, refazer onboarding empilha rotinas antigas (musculação) com as
+  // novas (calistenia/crossfit/etc), poluindo a lista. is_archived=true
+  // preserva o histórico (sessions antigas continuam funcionando) mas tira
+  // da listagem ativa.
+  const { error: archiveErr } = await supabase
+    .from('workout_routines')
+    .update({ is_archived: true })
+    .eq('user_id', userId)
+    .eq('is_archived', false);
+  if (archiveErr) throw archiveErr;
+
   // 2) Rotinas — precisa resolver group_slug → group_id
   const slugs = Array.from(
     new Set(plan.routines.map((r) => r.group_slug).filter((s): s is string => !!s)),
@@ -184,6 +198,7 @@ export async function saveOnboardingResult(params: {
         .insert({
           user_id: userId,
           name: r.name,
+          modality: r.modality,
           group_id: r.group_slug
             ? groupIdBySlug.get(r.group_slug) ?? null
             : null,

@@ -12,7 +12,11 @@ import {
 } from '@/services/routines';
 import { queryKeys, todayKey } from '@/lib/queryKeys';
 import { useAuth } from './useAuth';
-import type { RoutineExerciseInsert, WorkoutRoutine } from '@/types/database';
+import type {
+  Modality,
+  RoutineExerciseInsert,
+  WorkoutRoutine,
+} from '@/types/database';
 
 export function useRoutines() {
   const { user } = useAuth();
@@ -40,6 +44,7 @@ export function useCreateRoutine() {
   return useMutation({
     mutationFn: async (params: {
       name: string;
+      modality: Modality;
       groupId: string | null;
       description: string | null;
       exercises: RoutineExerciseInsert[];
@@ -61,7 +66,10 @@ export function useUpdateRoutine() {
     mutationFn: async (params: {
       id: string;
       patch: Partial<
-        Pick<WorkoutRoutine, 'name' | 'group_id' | 'description' | 'is_archived'>
+        Pick<
+          WorkoutRoutine,
+          'name' | 'group_id' | 'modality' | 'description' | 'is_archived'
+        >
       >;
       exercises?: RoutineExerciseInsert[];
     }) => {
