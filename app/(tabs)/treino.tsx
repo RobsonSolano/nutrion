@@ -17,7 +17,10 @@ import { useExerciseGroups } from '@/hooks/useExercises';
 import { queryKeys } from '@/lib/queryKeys';
 import { Button, Card, Screen } from '@/components/ui';
 import { colors } from '@/lib/theme';
-import type { WorkoutRoutine, ExerciseGroup } from '@/types/database';
+import type {
+  WorkoutRoutineListItem,
+  ExerciseGroup,
+} from '@/types/database';
 
 export default function TreinoScreen() {
   const router = useRouter();
@@ -50,7 +53,7 @@ export default function TreinoScreen() {
   }
 
   const renderItem = useCallback(
-    ({ item }: { item: WorkoutRoutine }) => (
+    ({ item }: { item: WorkoutRoutineListItem }) => (
       <RoutineCard
         routine={item}
         group={item.group_id ? groupsById.get(item.group_id) ?? null : null}
@@ -130,10 +133,14 @@ function RoutineCard({
   group,
   onPress,
 }: {
-  routine: WorkoutRoutine;
+  routine: WorkoutRoutineListItem;
   group: ExerciseGroup | null;
   onPress: () => void;
 }) {
+  const exercisesLabel =
+    routine.exercises_count === 1
+      ? '1 exercício'
+      : `${routine.exercises_count} exercícios`;
   return (
     <Pressable onPress={onPress} className="active:opacity-80">
       <Card padding="md">
@@ -145,8 +152,8 @@ function RoutineCard({
             <Text className="text-text text-base font-semibold" numberOfLines={1}>
               {routine.name}
             </Text>
-            <Text className="text-text-dim text-xs mt-0.5">
-              {group?.name ?? 'Treino livre'}
+            <Text className="text-text-dim text-xs mt-0.5" numberOfLines={1}>
+              {group?.name ?? 'Treino livre'} · {exercisesLabel}
               {routine.description ? ` · ${routine.description}` : ''}
             </Text>
           </View>
