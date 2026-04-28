@@ -30,6 +30,8 @@ export type Profile = {
   weekly_frequency: WeeklyFrequency | null;
   onboarding_completed_at: string | null;
   onboarding_skipped_at: string | null;
+  user_number: number | null;
+  is_early_adopter: boolean | null;
   created_at: string;
   updated_at: string;
 };

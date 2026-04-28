@@ -26,12 +26,17 @@ import {
 import { runSanityCheck, type SanityCheckResult } from '@/services/sanityCheck';
 import { useCreateFoodLog } from '@/hooks/useLogMutations';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
-import { Button, Card, Input, Screen } from '@/components/ui';
+import { useDailySanityUsage } from '@/hooks/useAiUsage';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys, todayKey } from '@/lib/queryKeys';
+import { useAuth } from '@/hooks/useAuth';
+import { Button, Card, Input, MarkdownText, Screen } from '@/components/ui';
 import { colors } from '@/lib/theme';
 import {
   compressImageForAI,
   ImageTooLargeError,
 } from '@/lib/imageCompress';
+import { captureError } from '@/lib/sentry';
 
 type Stage = 'input' | 'analyzing' | 'result';
 
@@ -39,6 +44,9 @@ export default function SanityCheckScreen() {
   const router = useRouter();
   const createFood = useCreateFoodLog();
   const kbHeight = useKeyboardHeight();
+  const sanityUsage = useDailySanityUsage();
+  const qc = useQueryClient();
+  const { user } = useAuth();
 
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [photoBase64, setPhotoBase64] = useState<string | null>(null);
@@ -109,6 +117,13 @@ export default function SanityCheckScreen() {
       );
       return;
     }
+    if (sanityUsage.limitReached) {
+      Alert.alert(
+        'Limite diário',
+        `Você já analisou ${sanityUsage.limit} pratos hoje. Volta amanhã!`,
+      );
+      return;
+    }
 
     setStage('analyzing');
     try {
@@ -120,11 +135,36 @@ export default function SanityCheckScreen() {
       setResult(res);
       setStage('result');
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      if (user?.id) {
+        void qc.invalidateQueries({
+          queryKey: queryKeys.aiUsage(user.id, 'sanity_check', todayKey()),
+        });
+      }
     } catch (err) {
       setStage('input');
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'Falha ao interagir com a IA. Tenta de novo mais tarde.';
+      // Cota esgotada não é retryable — só fecha.
+      const isQuotaError = /limite/i.test(message);
+      if (!isQuotaError) {
+        captureError(err, { feature: 'sanity_check' });
+      }
       Alert.alert(
         'Não consegui analisar',
-        err instanceof Error ? err.message : 'Tenta de novo.',
+        message,
+        isQuotaError
+          ? [{ text: 'OK', style: 'cancel' }]
+          : [
+              { text: 'Cancelar', style: 'cancel' },
+              {
+                text: 'Tentar novamente',
+                onPress: () => {
+                  void handleAnalyze();
+                },
+              },
+            ],
       );
     }
   }
@@ -185,7 +225,28 @@ export default function SanityCheckScreen() {
               <X size={18} color={colors.textDim} />
             </Pressable>
             <Text className="text-text font-semibold">Sanity Check</Text>
-            <View style={{ width: 40 }} />
+            <View
+              className="rounded-full border px-2.5 py-1"
+              style={{
+                borderColor: sanityUsage.limitReached
+                  ? `${colors.danger}55`
+                  : `${colors.violetSoft}55`,
+                backgroundColor: sanityUsage.limitReached
+                  ? `${colors.danger}15`
+                  : `${colors.violetSoft}15`,
+              }}
+            >
+              <Text
+                className="text-[11px] font-semibold"
+                style={{
+                  color: sanityUsage.limitReached
+                    ? colors.danger
+                    : colors.violetSoft,
+                }}
+              >
+                {sanityUsage.used}/{sanityUsage.limit}
+              </Text>
+            </View>
           </View>
 
           <ScrollView
@@ -424,9 +485,7 @@ function ResultStage({
           </Text>
         </View>
         {result.feedback ? (
-          <Text className="text-text text-sm leading-relaxed">
-            {result.feedback}
-          </Text>
+          <MarkdownText value={result.feedback} fontSize={14} />
         ) : (
           <Text className="text-text-dim text-sm leading-relaxed">
             {result.raw ?? 'Sem feedback retornado.'}
