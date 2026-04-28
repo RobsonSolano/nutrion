@@ -38,7 +38,13 @@ export default function NovaRotinaScreen() {
             submitLabel="Criar treino"
             loading={create.isPending}
             onSubmit={async (payload) => {
-              await create.mutateAsync(payload);
+              await create.mutateAsync({
+                name: payload.name,
+                modality: payload.modality,
+                groupId: payload.groupId,
+                description: payload.description,
+                exercises: payload.exercises,
+              });
               void Haptics.notificationAsync(
                 Haptics.NotificationFeedbackType.Success,
               );
