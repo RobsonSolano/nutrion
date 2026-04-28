@@ -3,14 +3,15 @@ import {
   ActivityIndicator,
   FlatList,
   KeyboardAvoidingView,
+  Platform,
   Pressable,
   Text,
   TextInput,
   View,
 } from 'react-native';
-import { Send, Sparkles, MessageCircle } from 'lucide-react-native';
+import { Send, Sparkles, MessageCircle, X } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useChat, type ChatMessage } from '@/hooks/useChat';
 import { useProfile } from '@/hooks/useProfile';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
@@ -33,6 +34,7 @@ export default function ChatScreen() {
     isAwaitingFirstToken,
     isLoading,
     sendMessage,
+    cancelMessage,
     retryLastMessage,
     canRetry,
     dailyCount,
@@ -42,9 +44,14 @@ export default function ChatScreen() {
     maxChars,
   } = useChat();
   const profileQ = useProfile();
-  const tabBarHeight = useBottomTabBarHeight();
+  const insets = useSafeAreaInsets();
   const kbHeight = useKeyboardHeight();
   const isKeyboardOpen = kbHeight > 0;
+  // Calcula a altura da tab bar a partir dos insets (mesma fórmula do
+  // (tabs)/_layout.tsx). useBottomTabBarHeight pode retornar valores
+  // dessincronizados em Android com edge-to-edge depois do teclado abrir
+  // e fechar — usar insets direto é estável.
+  const tabBarHeight = 78 + insets.bottom;
 
   const [text, setText] = useState('');
   const inputRef = useRef<TextInput>(null);
@@ -100,6 +107,11 @@ export default function ChatScreen() {
   return (
     <Screen variant="violet" edges={['top']}>
       <KeyboardAvoidingView
+        // behavior="padding" em ambas plataformas: edge-to-edge no Android
+        // desabilita o adjustResize automático, então precisamos do padding
+        // manual via KAV pra empurrar o input acima do teclado. O fantasma
+        // anterior vinha do useBottomTabBarHeight desincronizado — agora
+        // calculamos via insets, que é estável.
         behavior="padding"
         keyboardVerticalOffset={0}
         className="flex-1"
@@ -229,34 +241,57 @@ export default function ChatScreen() {
                 />
               </View>
               <Pressable
-                onPress={handleSend}
-                disabled={!text.trim() || isSending}
+                onPress={() => {
+                  if (isSending) {
+                    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    cancelMessage();
+                  } else {
+                    handleSend();
+                  }
+                }}
+                disabled={!isSending && !text.trim()}
                 className={`h-12 w-12 rounded-full items-center justify-center ${
-                  !text.trim() || isSending
-                    ? 'bg-surface-raised'
-                    : 'bg-accent active:opacity-80'
+                  isSending
+                    ? 'bg-danger active:opacity-80'
+                    : !text.trim()
+                      ? 'bg-surface-raised'
+                      : 'bg-accent active:opacity-80'
                 }`}
                 style={
-                  text.trim() && !isSending
+                  isSending
                     ? {
-                        shadowColor: colors.accent,
+                        shadowColor: colors.danger,
                         shadowOffset: { width: 0, height: 3 },
                         shadowOpacity: 0.4,
                         shadowRadius: 10,
                         elevation: 4,
                       }
-                    : undefined
+                    : text.trim()
+                      ? {
+                          shadowColor: colors.accent,
+                          shadowOffset: { width: 0, height: 3 },
+                          shadowOpacity: 0.4,
+                          shadowRadius: 10,
+                          elevation: 4,
+                        }
+                      : undefined
                 }
               >
-                <Send
-                  size={18}
-                  color={
-                    !text.trim() || isSending
-                      ? colors.textMuted
-                      : colors.textInverse
-                  }
-                  strokeWidth={2.5}
-                />
+                {isSending ? (
+                  <X
+                    size={18}
+                    color={colors.textInverse}
+                    strokeWidth={2.5}
+                  />
+                ) : (
+                  <Send
+                    size={18}
+                    color={
+                      !text.trim() ? colors.textMuted : colors.textInverse
+                    }
+                    strokeWidth={2.5}
+                  />
+                )}
               </Pressable>
             </View>
           )}
