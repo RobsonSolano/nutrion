@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { streamChatAi, type StreamHandle } from '@/services/chat';
+import { invokeChatAi } from '@/services/chat';
 import { captureError } from '@/lib/sentry';
 import {
   countTodayUserMessages,
@@ -19,7 +19,6 @@ export type ChatMessage = {
   createdAt: number;
   error?: boolean;
   pending?: boolean;
-  streaming?: boolean;
 };
 
 export { DAILY_USER_MESSAGE_LIMIT, MAX_MESSAGE_CHARS };
@@ -31,10 +30,6 @@ function toUiMessage(m: StoredChatMessage): ChatMessage {
     text: m.content,
     createdAt: new Date(m.created_at).getTime(),
   };
-}
-
-function uid() {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 export function useChatMessages() {
@@ -65,33 +60,42 @@ export function useDailyMessageCount() {
 }
 
 /**
- * Estado local do streaming: a msg do usuário enviada agora + a resposta da
- * IA construída chunk a chunk. Ao terminar, mantemos o estado local visível
- * até o refetch confirmar que o banco tem a assistant msg — só então
- * limpamos e a UI passa a usar `stored` (fonte canônica).
- *
- * `finishedAt` (epoch ms) marca quando o stream técnico terminou. Enquanto
- * for null, está streamando. Quando setar, é o momento de procurar a msg
- * correspondente no banco.
+ * Mensagem em curso: aguardando resposta da edge function. UI mostra
+ * "Pensando..." até a chamada terminar.
  */
-type StreamState = {
+type PendingState = {
   userText: string;
-  assistantText: string;
-  error: string | null;
-  retryable: boolean;
-  finishedAt: number | null;
+  startedAt: number;
+  abortController: AbortController;
+} | null;
+
+/**
+ * Animação visual da resposta (typewriter effect). A msg JÁ está no banco
+ * — a animação é só visual. `matchedId` é o id da msg do stored, usado pra
+ * esconder a versão completa enquanto a versão animada incrementa.
+ */
+type AnimatingState = {
+  matchedId: string;
+  fullText: string;
+  displayedLength: number;
   startedAt: number;
 } | null;
 
-/** Quanto tempo (ms) tentamos detectar a assistant msg no banco antes de
- * desistir e limpar o stream local. Em condições normais, a edge function
- * termina de persistir em ~500ms-1s; usamos 6s pra ter folga em rede ruim. */
-const POST_STREAM_POLL_MAX_MS = 6000;
-/** Intervalo entre tentativas de fetch durante o polling pós-stream. */
-const POST_STREAM_POLL_INTERVAL_MS = 400;
-/** Tolerância (ms) pra clock skew entre client e servidor ao comparar
- * created_at do banco com startedAt do cliente. */
-const CLOCK_SKEW_TOLERANCE_MS = 5000;
+/**
+ * Erro da última tentativa, mantido até o user tentar de novo / enviar nova msg.
+ * `retryable=false` em casos como cota esgotada (não adianta retry).
+ */
+type LastError = {
+  message: string;
+  retryable: boolean;
+  userText: string;
+  startedAt: number;
+} | null;
+
+/** ~60fps. */
+const ANIMATION_TICK_MS = 16;
+/** ~250 chars/seg — natural mas não lento (resposta de 500 chars em ~2s). */
+const ANIMATION_CHARS_PER_TICK = 4;
 
 export function useChat() {
   const messagesQ = useChatMessages();
@@ -101,255 +105,221 @@ export function useChat() {
   const userId = user?.id;
   const day = todayKey();
 
-  const [stream, setStream] = useState<StreamState>(null);
-  const handleRef = useRef<StreamHandle | null>(null);
-  /** Marca o stream "ativo" via startedAt. Usado pra detectar se um polling
-   * pós-stream antigo deve abortar porque o user já mandou outra mensagem. */
-  const activeStreamRef = useRef<number | null>(null);
+  const [pending, setPending] = useState<PendingState>(null);
+  const [animating, setAnimating] = useState<AnimatingState>(null);
+  const [lastError, setLastError] = useState<LastError>(null);
 
-  // Cancela qualquer stream em curso ao desmontar.
-  useEffect(() => {
-    return () => {
-      handleRef.current?.cancel();
-      handleRef.current = null;
-      activeStreamRef.current = null;
-    };
-  }, []);
-
-  // Quando o banco trouxer (via refetch ou setQueryData do polling) tanto a
-  // user quanto a assistant msg do stream atual, podemos limpar o stream
-  // local — a UI vai usar exclusivamente o `stored`. Isso elimina a janela
-  // em que a resposta poderia "sumir" entre o setStream(null) e o cache
-  // estar atualizado.
-  useEffect(() => {
-    if (!stream || stream.error || stream.finishedAt === null) return;
-    const stored = messagesQ.data ?? [];
-    const cutoff = stream.startedAt - CLOCK_SKEW_TOLERANCE_MS;
-    const userInDb = stored.some(
-      (m) =>
-        m.role === 'user' && new Date(m.created_at).getTime() >= cutoff,
-    );
-    const assistantInDb = stored.some(
-      (m) =>
-        m.role === 'assistant' && new Date(m.created_at).getTime() >= cutoff,
-    );
-    if (userInDb && assistantInDb) {
-      activeStreamRef.current = null;
-      setStream(null);
-    }
-  }, [stream, messagesQ.data]);
+  const abortRef = useRef<AbortController | null>(null);
 
   const dailyCount = countQ.data ?? 0;
   const remaining = Math.max(0, DAILY_USER_MESSAGE_LIMIT - dailyCount);
   const limitReached = remaining === 0;
-  // isSending = true só enquanto o stream técnico está rodando (antes de
-  // finishedAt). Depois disso, mesmo que o stream local ainda esteja visível
-  // aguardando confirmação do banco, o user já pode enviar nova mensagem
-  // (sendMessage substitui o stream).
-  const isStreaming =
-    stream !== null && stream.error === null && stream.finishedAt === null;
-  const isSending = isStreaming;
-  // Mostrar "digitando..." só até o primeiro chunk chegar.
-  const isAwaitingFirstToken =
-    isStreaming && stream !== null && stream.assistantText.length === 0;
+  const isSending = pending !== null;
+
+  // Typewriter: incrementa displayedLength via setTimeout encadeado.
+  useEffect(() => {
+    if (!animating) return;
+    if (animating.displayedLength >= animating.fullText.length) {
+      // Animação terminou — pequeno delay pra suavizar transição.
+      const t = setTimeout(() => setAnimating(null), 200);
+      return () => clearTimeout(t);
+    }
+    const t = setTimeout(() => {
+      setAnimating((prev) =>
+        prev
+          ? {
+              ...prev,
+              displayedLength: Math.min(
+                prev.displayedLength + ANIMATION_CHARS_PER_TICK,
+                prev.fullText.length,
+              ),
+            }
+          : prev,
+      );
+    }, ANIMATION_TICK_MS);
+    return () => clearTimeout(t);
+  }, [animating]);
 
   const sendMessage = useCallback(
     async (text: string) => {
       const trimmed = text.trim();
       if (!trimmed) return;
       if (limitReached || isSending) return;
-      const startedAt = Date.now();
+
       if (trimmed.length > MAX_MESSAGE_CHARS) {
-        setStream({
-          userText: trimmed,
-          assistantText: '',
-          error: `Limite de ${MAX_MESSAGE_CHARS} caracteres por mensagem.`,
+        setLastError({
+          message: `Limite de ${MAX_MESSAGE_CHARS} caracteres por mensagem.`,
           retryable: false,
-          finishedAt: Date.now(),
-          startedAt,
+          userText: trimmed,
+          startedAt: Date.now(),
         });
         return;
       }
 
-      setStream({
-        userText: trimmed,
-        assistantText: '',
-        error: null,
-        retryable: false,
-        finishedAt: null,
-        startedAt,
-      });
-      activeStreamRef.current = startedAt;
+      // Cancela animação anterior (se rolando) — usuário começou nova msg.
+      setAnimating(null);
+      setLastError(null);
+
+      const abortController = new AbortController();
+      abortRef.current = abortController;
+      const startedAt = Date.now();
+      setPending({ userText: trimmed, startedAt, abortController });
 
       try {
-        handleRef.current = await streamChatAi(
+        await invokeChatAi(
           { message: trimmed, mode: 'chat' },
-          {
-            onDelta: (chunk) => {
-              setStream((prev) =>
-                prev
-                  ? { ...prev, assistantText: prev.assistantText + chunk }
-                  : prev,
-              );
-            },
-            onDone: async (fullText) => {
-              handleRef.current = null;
-              // Mostra texto completo + marca como finalizado. Importante:
-              // NÃO limpamos o stream ainda — o useMemo já evita duplicar
-              // com o stored quando o banco trouxer. Limpamos só via o
-              // useEffect que monitora o cache (abaixo).
-              setStream((prev) =>
-                prev
-                  ? {
-                      ...prev,
-                      assistantText: fullText,
-                      finishedAt: Date.now(),
-                    }
-                  : prev,
-              );
-              if (!userId) return;
-              void qc.invalidateQueries({
-                queryKey: queryKeys.chatDailyCount(userId, day),
-              });
-
-              // Polling: refetcha periodicamente pra forçar o cache a ver
-              // a assistant msg quando a edge function terminar de gravar.
-              // Sem timeout de "limpa à força": se o servidor falhar em
-              // persistir, o stream local fica visível pra sempre na sessão
-              // atual. A nova mensagem do user vai substituí-lo.
-              const pollStartMs = Date.now();
-              while (
-                Date.now() - pollStartMs < POST_STREAM_POLL_MAX_MS &&
-                activeStreamRef.current === startedAt
-              ) {
-                try {
-                  const fresh = await listChatMessages(userId);
-                  qc.setQueryData(queryKeys.chatMessages(userId), fresh);
-                  const hasFreshAssistant = fresh.some(
-                    (m) =>
-                      m.role === 'assistant' &&
-                      new Date(m.created_at).getTime() >=
-                        startedAt - CLOCK_SKEW_TOLERANCE_MS,
-                  );
-                  if (hasFreshAssistant) return; // useEffect cuida da limpeza
-                } catch {
-                  // Falha de rede momentânea: tenta no próximo tick.
-                }
-                await new Promise((r) =>
-                  setTimeout(r, POST_STREAM_POLL_INTERVAL_MS),
-                );
-              }
-              // Timeout sem confirmação: stream local fica visível.
-              // Não limpamos — o user vê a resposta até enviar outra msg.
-            },
-            onError: (err) => {
-              handleRef.current = null;
-              setStream((prev) =>
-                prev
-                  ? {
-                      ...prev,
-                      error: err.message,
-                      // Cota esgotada não é retryable; demais erros sim.
-                      retryable: !/limite/i.test(err.message),
-                      finishedAt: Date.now(),
-                    }
-                  : null,
-              );
-              captureError(err, { feature: 'chat' });
-              if (!userId) return;
-              // Refetch mesmo em erro: a edge function persiste a user msg
-              // antes de chamar Groq, então a cota foi consumida.
-              void qc.invalidateQueries({
-                queryKey: queryKeys.chatMessages(userId),
-              });
-              void qc.invalidateQueries({
-                queryKey: queryKeys.chatDailyCount(userId, day),
-              });
-            },
-          },
+          { signal: abortController.signal },
         );
+
+        // Edge function persistiu user + assistant antes de retornar.
+        if (userId) {
+          const fresh = await listChatMessages(userId);
+          qc.setQueryData(queryKeys.chatMessages(userId), fresh);
+          void qc.invalidateQueries({
+            queryKey: queryKeys.chatDailyCount(userId, day),
+          });
+
+          // A msg mais recente (fresh é desc) deve ser a assistant nova —
+          // dispara animação typewriter pra entrega visual progressiva.
+          const newest = fresh[0];
+          if (newest?.role === 'assistant') {
+            const createdAt = new Date(newest.created_at).getTime();
+            if (createdAt >= startedAt) {
+              setAnimating({
+                matchedId: newest.id,
+                fullText: newest.content,
+                displayedLength: Math.min(
+                  ANIMATION_CHARS_PER_TICK,
+                  newest.content.length,
+                ),
+                startedAt: Date.now(),
+              });
+            }
+          }
+        }
       } catch (err) {
-        handleRef.current = null;
-        setStream({
-          userText: trimmed,
-          assistantText: '',
-          error:
+        const wasAborted = abortController.signal.aborted;
+
+        if (!wasAborted) {
+          captureError(
+            err instanceof Error ? err : new Error(String(err)),
+            { feature: 'chat' },
+          );
+          const message =
             err instanceof Error
               ? err.message
-              : 'Falha ao interagir com a IA. Tenta de novo mais tarde.',
-          retryable: true,
-          finishedAt: Date.now(),
-          startedAt,
-        });
+              : 'Falha ao interagir com a IA. Tenta de novo mais tarde.';
+          setLastError({
+            message,
+            retryable: !/limite/i.test(message),
+            userText: trimmed,
+            startedAt,
+          });
+        }
+
+        // Refetch mesmo em erro/cancel: edge function persiste a user msg
+        // ANTES de chamar Groq, então a cota foi consumida.
+        if (userId) {
+          void qc.invalidateQueries({
+            queryKey: queryKeys.chatMessages(userId),
+          });
+          void qc.invalidateQueries({
+            queryKey: queryKeys.chatDailyCount(userId, day),
+          });
+        }
+      } finally {
+        abortRef.current = null;
+        setPending(null);
       }
     },
     [limitReached, isSending, userId, qc, day],
   );
 
+  const cancelMessage = useCallback(() => {
+    abortRef.current?.abort();
+  }, []);
+
   const retryLastMessage = useCallback(() => {
-    if (!stream?.retryable) return;
-    const text = stream.userText;
-    setStream(null);
+    if (!lastError?.retryable) return;
+    const text = lastError.userText;
+    setLastError(null);
     void sendMessage(text);
-  }, [stream, sendMessage]);
+  }, [lastError, sendMessage]);
 
   const messages = useMemo<ChatMessage[]>(() => {
     const stored = (messagesQ.data ?? []).map(toUiMessage);
-    if (!stream) return stored;
 
-    // Detecta se a user msg e/ou assistant msg do stream atual já apareceram
-    // no `stored` (= banco trouxe via refetch). Se sim, não duplicamos com
-    // a versão local — usamos a do banco. A comparação é por timestamp:
-    // qualquer msg criada depois do startedAt (com tolerância de skew) é
-    // considerada "do stream atual".
-    const cutoff = stream.startedAt - CLOCK_SKEW_TOLERANCE_MS;
-    const userInDb = stored.some(
-      (m) => m.role === 'user' && m.createdAt >= cutoff,
-    );
-    const assistantInDb = stored.some(
-      (m) => m.role === 'assistant' && m.createdAt >= cutoff,
-    );
+    if (pending) {
+      const userInDb = stored.some(
+        (m) => m.role === 'user' && m.text === pending.userText,
+      );
+      if (userInDb) return stored;
+      return [
+        {
+          id: `pending-user-${pending.startedAt}`,
+          role: 'user',
+          text: pending.userText,
+          createdAt: pending.startedAt,
+          pending: true,
+        },
+        ...stored,
+      ];
+    }
 
-    const local: ChatMessage[] = [];
-    if (stream.error) {
-      local.push({
-        id: `error-${uid()}`,
-        role: 'assistant',
-        text: stream.error,
-        createdAt: Date.now(),
-        error: true,
-      });
-    } else if (stream.assistantText.length > 0 && !assistantInDb) {
-      // Mostra a versão local da resposta APENAS enquanto o banco ainda
-      // não trouxe a oficial. Quando trouxer, vem do `stored`.
-      local.push({
-        id: 'streaming',
-        role: 'assistant',
-        text: stream.assistantText,
-        createdAt: Date.now(),
-        streaming: stream.finishedAt === null,
-      });
+    if (animating) {
+      // Esconde a versão completa do stored (matchedId) e mostra a animada.
+      const filteredStored = stored.filter(
+        (m) => m.id !== animating.matchedId,
+      );
+      return [
+        {
+          id: `animating-${animating.matchedId}`,
+          role: 'assistant',
+          text: animating.fullText.slice(0, animating.displayedLength),
+          createdAt: animating.startedAt,
+        },
+        ...filteredStored,
+      ];
     }
-    if (!userInDb) {
-      local.push({
-        id: 'pending-user',
-        role: 'user',
-        text: stream.userText,
-        createdAt: Date.now() - 1,
-        pending: true,
-      });
+
+    if (lastError) {
+      const local: ChatMessage[] = [
+        {
+          id: `error-${lastError.startedAt}`,
+          role: 'assistant',
+          text: lastError.message,
+          createdAt: lastError.startedAt + 1,
+          error: true,
+        },
+      ];
+      const userInDb = stored.some(
+        (m) => m.role === 'user' && m.text === lastError.userText,
+      );
+      if (!userInDb) {
+        local.push({
+          id: `error-user-${lastError.startedAt}`,
+          role: 'user',
+          text: lastError.userText,
+          createdAt: lastError.startedAt,
+          pending: true,
+        });
+      }
+      return [...local, ...stored];
     }
-    return [...local, ...stored];
-  }, [messagesQ.data, stream]);
+
+    return stored;
+  }, [messagesQ.data, pending, animating, lastError]);
 
   return {
     messages,
     isSending,
-    isAwaitingFirstToken,
+    /** True só durante pending — typing indicator aparece antes da animação. */
+    isAwaitingFirstToken: isSending,
     isLoading: messagesQ.isLoading,
     sendMessage,
+    cancelMessage,
     retryLastMessage,
-    canRetry: !!stream?.retryable && !!stream.error,
+    canRetry: !!lastError?.retryable,
     dailyCount,
     dailyLimit: DAILY_USER_MESSAGE_LIMIT,
     remaining,
