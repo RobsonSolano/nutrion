@@ -237,7 +237,7 @@ export default function PerfilScreen() {
             <View className="flex-1">
               <Text className="text-text font-semibold">Conta conectada</Text>
               <Text className="text-text-dim text-xs mt-1">
-                Sessão Supabase ativa. Dados protegidos por Row Level Security.
+                Sessão ativa. Dados protegidos por Row Level Security.
               </Text>
             </View>
           </View>
