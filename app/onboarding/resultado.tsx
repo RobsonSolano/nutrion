@@ -9,7 +9,7 @@ import {
   CheckCircle2,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import { Button, Card, Screen } from '@/components/ui';
+import { Button, Card, MarkdownText, Screen } from '@/components/ui';
 import { colors } from '@/lib/theme';
 import { useOnboardingResultStore } from '@/stores/useOnboardingResultStore';
 import { useOnboardingStore } from '@/stores/useOnboardingStore';
@@ -63,9 +63,13 @@ export default function OnboardingResultado() {
             Seu plano está pronto
           </Text>
           {plan.rationale && (
-            <Text className="text-text-dim text-sm text-center mt-2 leading-relaxed px-2">
-              {plan.rationale}
-            </Text>
+            <View className="mt-2 px-2">
+              <MarkdownText
+                value={plan.rationale}
+                textColor={colors.textDim}
+                fontSize={14}
+              />
+            </View>
           )}
         </View>
 
