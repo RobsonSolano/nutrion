@@ -6,6 +6,7 @@ import {
   listExercisesByGroup,
 } from '@/services/exercises';
 import { queryKeys } from '@/lib/queryKeys';
+import type { Modality } from '@/types/database';
 
 export function useExerciseGroups() {
   return useQuery({
@@ -15,12 +16,15 @@ export function useExerciseGroups() {
   });
 }
 
-export function useExercisesByGroup(groupId: string | null | undefined) {
+export function useExercisesByGroup(
+  groupId: string | null | undefined,
+  modality: Modality,
+) {
   return useQuery({
     queryKey: groupId
-      ? queryKeys.exercisesByGroup(groupId)
-      : ['exercises-by-group', 'none'],
-    queryFn: () => listExercisesByGroup(groupId!),
+      ? queryKeys.exercisesByGroup(groupId, modality)
+      : ['exercises-by-group', 'none', modality],
+    queryFn: () => listExercisesByGroup(groupId!, modality),
     enabled: !!groupId,
     staleTime: 5 * 60 * 1000,
   });
