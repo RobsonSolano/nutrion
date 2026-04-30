@@ -61,8 +61,13 @@ export default function LogScreen() {
             <View style={{ width: 40 }} />
           </View>
 
-          <View className="px-5 pt-4">
-            <SegmentedControl options={TABS} value={tab} onChange={setTab} />
+          <View className="px-5 pt-2">
+            <SegmentedControl
+              options={TABS}
+              value={tab}
+              onChange={setTab}
+              variant="tabs"
+            />
           </View>
 
           {tab === 'meal' && <MealForm />}
