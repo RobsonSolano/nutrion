@@ -31,7 +31,9 @@ export default function OptionCard({
         selected
           ? 'bg-accent/10 border-accent'
           : 'bg-surface border-border active:opacity-70'
-      } ${compact ? 'px-3 py-3' : 'px-4 py-4'}`}
+      } ${compact ? 'px-3.5 py-3.5' : 'px-4 py-5'}`}
+      style={{ minHeight: compact ? 56 : 64 }}
+      hitSlop={4}
     >
       <View className="flex-row items-center gap-3">
         {icon && (
