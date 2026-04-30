@@ -2,6 +2,8 @@ export { default as Screen } from './Screen';
 export { default as Logo } from './Logo';
 export { default as Button } from './Button';
 export { default as Card } from './Card';
+export { default as ConfirmModal } from './ConfirmModal';
+export type { ConfirmAction } from './ConfirmModal';
 export { default as Input } from './Input';
 export { default as MarkdownText } from './MarkdownText';
 export { default as SegmentedControl } from './SegmentedControl';
