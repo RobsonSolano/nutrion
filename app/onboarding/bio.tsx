@@ -4,7 +4,7 @@ import { OnboardingLayout, CharCounter } from '@/components/onboarding';
 import { Input } from '@/components/ui';
 import { useOnboardingStore } from '@/stores/useOnboardingStore';
 
-const MAX_BIO = 255;
+const MAX_BIO = 500;
 
 export default function OnboardingBio() {
   const router = useRouter();
@@ -31,7 +31,7 @@ export default function OnboardingBio() {
           onChangeText={setBio}
           placeholder="Ex: trabalho sentado 8h, durmo ~6h, treino à noite. Busco hipertrofia com foco em peito e ombro."
           multiline
-          style={{ minHeight: 140, textAlignVertical: 'top' }}
+          style={{ minHeight: 180, textAlignVertical: 'top' }}
         />
         <CharCounter value={bio} max={MAX_BIO} />
         <Text className="text-text-muted text-[11px] leading-relaxed">
