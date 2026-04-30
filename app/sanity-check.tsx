@@ -10,7 +10,6 @@ import {
   View,
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
-import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import {
   X,
@@ -27,15 +26,12 @@ import { runSanityCheck, type SanityCheckResult } from '@/services/sanityCheck';
 import { useCreateFoodLog } from '@/hooks/useLogMutations';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { useDailySanityUsage } from '@/hooks/useAiUsage';
+import { useImagePicker } from '@/hooks/useImagePicker';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys, todayKey } from '@/lib/queryKeys';
 import { useAuth } from '@/hooks/useAuth';
 import { Button, Card, Input, MarkdownText, Screen } from '@/components/ui';
 import { colors } from '@/lib/theme';
-import {
-  compressImageForAI,
-  ImageTooLargeError,
-} from '@/lib/imageCompress';
 import { captureError } from '@/lib/sentry';
 
 type Stage = 'input' | 'analyzing' | 'result';
@@ -48,65 +44,14 @@ export default function SanityCheckScreen() {
   const qc = useQueryClient();
   const { user } = useAuth();
 
-  const [photoUri, setPhotoUri] = useState<string | null>(null);
-  const [photoBase64, setPhotoBase64] = useState<string | null>(null);
+  const photo = useImagePicker({ purpose: 'analisar o prato' });
   const [description, setDescription] = useState('');
   const [scaleWeight, setScaleWeight] = useState('');
   const [stage, setStage] = useState<Stage>('input');
   const [result, setResult] = useState<SanityCheckResult | null>(null);
-  const [preparing, setPreparing] = useState(false);
-
-  async function pickImage(source: 'camera' | 'library') {
-    const permission =
-      source === 'camera'
-        ? await ImagePicker.requestCameraPermissionsAsync()
-        : await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-    if (!permission.granted) {
-      Alert.alert(
-        'Permissão necessária',
-        'Precisamos da permissão de ' +
-          (source === 'camera' ? 'câmera' : 'galeria') +
-          ' pra analisar o prato.',
-      );
-      return;
-    }
-
-    const launcher =
-      source === 'camera'
-        ? ImagePicker.launchCameraAsync
-        : ImagePicker.launchImageLibraryAsync;
-
-    const picked = await launcher({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 1,
-      allowsEditing: false,
-    });
-
-    if (picked.canceled || !picked.assets?.[0]) return;
-    const asset = picked.assets[0];
-
-    setPreparing(true);
-    try {
-      const compressed = await compressImageForAI(asset.uri);
-      setPhotoUri(compressed.uri);
-      setPhotoBase64(compressed.base64);
-      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    } catch (err) {
-      const message =
-        err instanceof ImageTooLargeError
-          ? err.message
-          : err instanceof Error
-            ? err.message
-            : 'Não consegui preparar essa foto. Tenta outra.';
-      Alert.alert('Foto muito pesada', message);
-    } finally {
-      setPreparing(false);
-    }
-  }
 
   async function handleAnalyze() {
-    if (!photoBase64) {
+    if (!photo.base64) {
       Alert.alert('Foto do prato', 'Tire ou escolha uma foto primeiro.');
       return;
     }
@@ -129,7 +74,7 @@ export default function SanityCheckScreen() {
     try {
       const res = await runSanityCheck({
         description: description.trim(),
-        imageBase64: photoBase64,
+        imageBase64: photo.base64,
         scaleWeightG: scaleWeight ? Number(scaleWeight) : undefined,
       });
       setResult(res);
@@ -193,8 +138,7 @@ export default function SanityCheckScreen() {
   }
 
   function handleReset() {
-    setPhotoUri(null);
-    setPhotoBase64(null);
+    photo.clear();
     setDescription('');
     setScaleWeight('');
     setResult(null);
@@ -261,31 +205,31 @@ export default function SanityCheckScreen() {
           >
             {stage === 'input' && (
               <InputStage
-                photoUri={photoUri}
+                photoUri={photo.uri}
                 description={description}
                 scaleWeight={scaleWeight}
-                preparing={preparing}
-                onPickCamera={() => pickImage('camera')}
-                onPickLibrary={() => pickImage('library')}
+                preparing={photo.preparing}
+                onPickCamera={() => photo.pick('camera')}
+                onPickLibrary={() => photo.pick('library')}
                 onDescriptionChange={setDescription}
                 onScaleWeightChange={setScaleWeight}
                 onAnalyze={handleAnalyze}
                 canAnalyze={
-                  !!photoBase64 &&
+                  !!photo.base64 &&
                   description.trim().length >= 3 &&
-                  !preparing
+                  !photo.preparing
                 }
               />
             )}
 
             {stage === 'analyzing' && (
-              <AnalyzingStage photoUri={photoUri ?? undefined} />
+              <AnalyzingStage photoUri={photo.uri ?? undefined} />
             )}
 
             {stage === 'result' && result && (
               <ResultStage
                 result={result}
-                photoUri={photoUri ?? undefined}
+                photoUri={photo.uri ?? undefined}
                 onReset={handleReset}
                 onSave={handleSaveAsFoodLog}
                 saving={createFood.isPending}
