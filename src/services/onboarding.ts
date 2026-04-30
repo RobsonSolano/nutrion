@@ -237,11 +237,26 @@ export async function saveOnboardingResult(params: {
   return { profile: profile as Profile, routines: createdRoutines };
 }
 
+export type ResetOnboardingMode = 'merge' | 'discard';
+
 /**
  * Marca o perfil para refazer o onboarding — zera `onboarding_completed_at`
  * para o gate de redirect disparar novamente.
+ *
+ * mode='merge'  → mantém rotinas existentes; o saveOnboardingResult posterior
+ *                 arquivará as ativas e criará as novas (comportamento padrão).
+ * mode='discard'→ deleta TODAS as rotinas (ativas + arquivadas) antes de zerar
+ *                 o onboarding. workout_sessions referenciam routine_id com
+ *                 ON DELETE SET NULL — histórico de sessões é preservado.
  */
-export async function resetOnboarding(userId: string): Promise<Profile> {
+export async function resetOnboarding(
+  userId: string,
+  mode: ResetOnboardingMode = 'merge',
+): Promise<Profile> {
+  // Update profile primeiro: se o delete falhar depois, o usuário já vê
+  // "completar onboarding" no perfil (estado consistente). Sem transação
+  // disponível no client; essa ordem minimiza o risco de ficar com rotinas
+  // ativas + onboarding marcado como completo.
   const { data, error } = await supabase
     .from('profiles')
     .update({
@@ -252,5 +267,14 @@ export async function resetOnboarding(userId: string): Promise<Profile> {
     .select('*')
     .single();
   if (error) throw error;
+
+  if (mode === 'discard') {
+    const { error: delErr } = await supabase
+      .from('workout_routines')
+      .delete()
+      .eq('user_id', userId);
+    if (delErr) throw delErr;
+  }
+
   return data as Profile;
 }

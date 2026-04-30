@@ -28,11 +28,13 @@ export default function MultiSelectChips({
               if (single && on) return;
               onToggle(opt.value);
             }}
-            className={`rounded-full border px-3.5 py-2 ${
+            className={`rounded-full border px-4 py-3 items-center justify-center ${
               on
                 ? 'bg-accent/10 border-accent'
                 : 'bg-surface-muted border-border active:opacity-70'
             }`}
+            style={{ minHeight: 44 }}
+            hitSlop={6}
           >
             <Text
               className={`text-[13px] font-semibold ${

@@ -23,13 +23,15 @@ export default function SegmentedControl<T extends string>({
             key={opt.value}
             onPress={() => onChange(opt.value)}
             className="flex-1"
+            hitSlop={4}
           >
             <View
-              className={`items-center justify-center py-2.5 rounded-xl ${
+              className={`items-center justify-center py-3.5 rounded-xl ${
                 active ? 'bg-surface-raised' : ''
               }`}
-              style={
-                active
+              style={{
+                minHeight: 44,
+                ...(active
                   ? {
                       shadowColor: colors.accent,
                       shadowOffset: { width: 0, height: 0 },
@@ -37,8 +39,8 @@ export default function SegmentedControl<T extends string>({
                       shadowRadius: 10,
                       elevation: 2,
                     }
-                  : undefined
-              }
+                  : null),
+              }}
             >
               <Text
                 className={`text-sm font-semibold ${
