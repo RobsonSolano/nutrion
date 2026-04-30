@@ -15,6 +15,7 @@ import {
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
 import { useResetOnboarding } from '@/hooks/useOnboarding';
+import type { ResetOnboardingMode } from '@/services/onboarding';
 import { useDailyOnboardingUsage } from '@/hooks/useAiUsage';
 import { useOnboardingStore } from '@/stores/useOnboardingStore';
 import { Button, Card, Screen } from '@/components/ui';
@@ -31,22 +32,17 @@ export default function PerfilScreen() {
   const resetOnboardingStore = useOnboardingStore((s) => s.reset);
   const onboardingUsage = useDailyOnboardingUsage();
 
-  // Refazer só conta cota se o user já completou ao menos uma vez.
+  const hasCompletedOnboarding = !!profile?.onboarding_completed_at;
+  // Refazer bloqueado só quando não há mais cota diária (limit acumulado por
+  // dia já cobre o caso "completou + refez 1x").
   const refazerBlocked =
-    !!profile?.onboarding_completed_at && onboardingUsage.limitReached;
+    hasCompletedOnboarding && onboardingUsage.limitReached;
   const isEarlyAdopter = profile?.is_early_adopter === true;
 
-  async function handleRedoOnboarding() {
-    if (refazerBlocked) {
-      Alert.alert(
-        'Limite diário',
-        'Você já refez seu plano hoje. Tenta de novo amanhã.',
-      );
-      return;
-    }
+  async function executeReset(mode: ResetOnboardingMode) {
     try {
       resetOnboardingStore();
-      await resetOnboardingM.mutateAsync();
+      await resetOnboardingM.mutateAsync(mode);
       router.push('/onboarding' as Href);
     } catch (err) {
       Alert.alert(
@@ -54,6 +50,53 @@ export default function PerfilScreen() {
         err instanceof Error ? err.message : 'Tenta de novo.',
       );
     }
+  }
+
+  function handleRedoOnboarding() {
+    if (refazerBlocked) {
+      Alert.alert(
+        'Limite diário',
+        'Você já refez seu plano hoje. Tenta de novo amanhã.',
+      );
+      return;
+    }
+    if (!hasCompletedOnboarding) {
+      void executeReset('merge');
+      return;
+    }
+    Alert.alert(
+      'Refazer plano',
+      'O que fazer com o plano atual?\n\n• Mesclar: arquiva as rotinas atuais (mantém histórico) e cria as novas ao lado.\n• Descartar: apaga todas as rotinas (histórico de sessões é preservado).',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Mesclar',
+          onPress: () => {
+            void executeReset('merge');
+          },
+        },
+        {
+          text: 'Descartar',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert(
+              'Descartar tudo?',
+              'Todas as suas rotinas serão apagadas. Sessões já registradas continuam no histórico.',
+              [
+                { text: 'Cancelar', style: 'cancel' },
+                {
+                  text: 'Descartar',
+                  style: 'destructive',
+                  onPress: () => {
+                    void executeReset('discard');
+                  },
+                },
+              ],
+            );
+          },
+        },
+      ],
+    );
   }
 
   const displayName =
