@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Alert, ScrollView, Text, View } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
 import {
@@ -11,6 +12,8 @@ import {
   Sparkles,
   Crown,
   Gift,
+  RefreshCw,
+  AlertTriangle,
 } from 'lucide-react-native';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
@@ -18,10 +21,12 @@ import { useResetOnboarding } from '@/hooks/useOnboarding';
 import type { ResetOnboardingMode } from '@/services/onboarding';
 import { useDailyOnboardingUsage } from '@/hooks/useAiUsage';
 import { useOnboardingStore } from '@/stores/useOnboardingStore';
-import { Button, Card, Screen } from '@/components/ui';
+import { Button, Card, ConfirmModal, Screen } from '@/components/ui';
 import Disclaimer from '@/components/Disclaimer';
 import { colors } from '@/lib/theme';
 import { bmi, bmiCategory } from '@/lib/biometrics';
+
+type RedoStep = 'closed' | 'choose' | 'confirmDiscard';
 
 export default function PerfilScreen() {
   const { user, logout } = useAuth();
@@ -32,14 +37,16 @@ export default function PerfilScreen() {
   const resetOnboardingStore = useOnboardingStore((s) => s.reset);
   const onboardingUsage = useDailyOnboardingUsage();
 
+  const [redoStep, setRedoStep] = useState<RedoStep>('closed');
+  const [logoutOpen, setLogoutOpen] = useState(false);
+
   const hasCompletedOnboarding = !!profile?.onboarding_completed_at;
-  // Refazer bloqueado só quando não há mais cota diária (limit acumulado por
-  // dia já cobre o caso "completou + refez 1x").
   const refazerBlocked =
     hasCompletedOnboarding && onboardingUsage.limitReached;
   const isEarlyAdopter = profile?.is_early_adopter === true;
 
   async function executeReset(mode: ResetOnboardingMode) {
+    setRedoStep('closed');
     try {
       resetOnboardingStore();
       await resetOnboardingM.mutateAsync(mode);
@@ -64,39 +71,7 @@ export default function PerfilScreen() {
       void executeReset('merge');
       return;
     }
-    Alert.alert(
-      'Refazer plano',
-      'O que fazer com o plano atual?\n\n• Mesclar: arquiva as rotinas atuais (mantém histórico) e cria as novas ao lado.\n• Descartar: apaga todas as rotinas (histórico de sessões é preservado).',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Mesclar',
-          onPress: () => {
-            void executeReset('merge');
-          },
-        },
-        {
-          text: 'Descartar',
-          style: 'destructive',
-          onPress: () => {
-            Alert.alert(
-              'Descartar tudo?',
-              'Todas as suas rotinas serão apagadas. Sessões já registradas continuam no histórico.',
-              [
-                { text: 'Cancelar', style: 'cancel' },
-                {
-                  text: 'Descartar',
-                  style: 'destructive',
-                  onPress: () => {
-                    void executeReset('discard');
-                  },
-                },
-              ],
-            );
-          },
-        },
-      ],
-    );
+    setRedoStep('choose');
   }
 
   const displayName =
@@ -108,19 +83,6 @@ export default function PerfilScreen() {
 
   const initial = displayName.charAt(0).toUpperCase();
 
-  function handleLogout() {
-    Alert.alert('Sair da conta', 'Tem certeza que quer sair?', [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Sair',
-        style: 'destructive',
-        onPress: () => {
-          void logout();
-        },
-      },
-    ]);
-  }
-
   const formatKg = (v: number | null | undefined) =>
     v == null ? '—' : `${v.toLocaleString('pt-BR')} kg`;
   const formatCm = (v: number | null | undefined) =>
@@ -131,6 +93,8 @@ export default function PerfilScreen() {
       ? bmi(profile.weight_kg, profile.height_cm)
       : null;
   const imcCat = imcValue != null ? bmiCategory(imcValue) : null;
+
+  const resetPending = resetOnboardingM.isPending;
 
   return (
     <Screen variant="violet">
@@ -295,7 +259,7 @@ export default function PerfilScreen() {
                 : 'Gerar novo plano com IA'
           }
           onPress={handleRedoOnboarding}
-          loading={resetOnboardingM.isPending}
+          loading={resetPending}
           disabled={refazerBlocked}
           variant="secondary"
           size="md"
@@ -304,7 +268,7 @@ export default function PerfilScreen() {
 
         <Button
           label="Sair da conta"
-          onPress={handleLogout}
+          onPress={() => setLogoutOpen(true)}
           variant="danger"
           size="md"
           icon={<LogOut size={16} color={colors.danger} />}
@@ -312,6 +276,85 @@ export default function PerfilScreen() {
 
         <Disclaimer />
       </ScrollView>
+
+      <ConfirmModal
+        visible={redoStep === 'choose'}
+        onClose={() => setRedoStep('closed')}
+        title="Refazer plano?"
+        message="O que fazer com o plano atual? Mesclar arquiva as rotinas (mantém histórico) e cria as novas ao lado. Descartar apaga todas as rotinas — sessões já registradas continuam no histórico."
+        icon={<RefreshCw size={26} color={colors.violetSoft} />}
+        dismissable={!resetPending}
+        actions={[
+          {
+            label: 'Mesclar com o atual',
+            variant: 'primary',
+            onPress: () => {
+              void executeReset('merge');
+            },
+            loading: resetPending,
+          },
+          {
+            label: 'Descartar e começar do zero',
+            variant: 'danger',
+            onPress: () => setRedoStep('confirmDiscard'),
+            disabled: resetPending,
+          },
+          {
+            label: 'Cancelar',
+            variant: 'ghost',
+            onPress: () => setRedoStep('closed'),
+            disabled: resetPending,
+          },
+        ]}
+      />
+
+      <ConfirmModal
+        visible={redoStep === 'confirmDiscard'}
+        onClose={() => setRedoStep('choose')}
+        title="Descartar tudo?"
+        message="Todas as suas rotinas serão apagadas. Sessões já registradas continuam no histórico, mas as referências de rotina serão perdidas."
+        icon={<AlertTriangle size={26} color={colors.danger} />}
+        dismissable={!resetPending}
+        actions={[
+          {
+            label: 'Sim, descartar',
+            variant: 'danger',
+            onPress: () => {
+              void executeReset('discard');
+            },
+            loading: resetPending,
+          },
+          {
+            label: 'Voltar',
+            variant: 'ghost',
+            onPress: () => setRedoStep('choose'),
+            disabled: resetPending,
+          },
+        ]}
+      />
+
+      <ConfirmModal
+        visible={logoutOpen}
+        onClose={() => setLogoutOpen(false)}
+        title="Sair da conta?"
+        message="Você precisará fazer login de novo para acessar seus dados."
+        icon={<LogOut size={26} color={colors.danger} />}
+        actions={[
+          {
+            label: 'Sair',
+            variant: 'danger',
+            onPress: () => {
+              setLogoutOpen(false);
+              void logout();
+            },
+          },
+          {
+            label: 'Cancelar',
+            variant: 'ghost',
+            onPress: () => setLogoutOpen(false),
+          },
+        ]}
+      />
     </Screen>
   );
 }
