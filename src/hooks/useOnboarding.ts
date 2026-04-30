@@ -6,6 +6,7 @@ import {
   saveOnboardingResult,
   type OnboardingInput,
   type OnboardingPlan,
+  type ResetOnboardingMode,
 } from '@/services/onboarding';
 import { queryKeys } from '@/lib/queryKeys';
 import { useAuth } from './useAuth';
@@ -51,13 +52,14 @@ export function useResetOnboarding() {
   const { user } = useAuth();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async () => {
+    mutationFn: async (mode: ResetOnboardingMode = 'merge') => {
       if (!user?.id) throw new Error('Sessão expirada.');
-      return resetOnboarding(user.id);
+      return resetOnboarding(user.id, mode);
     },
     onSuccess: (profile) => {
       if (!user?.id) return;
       qc.setQueryData(queryKeys.profile(user.id), profile);
+      void qc.invalidateQueries({ queryKey: queryKeys.routines(user.id) });
     },
   });
 }

@@ -3,7 +3,8 @@ import { supabase } from './supabase';
 export type AiFeature = 'sanity_check' | 'onboarding_plan';
 
 export const DAILY_SANITY_CHECK_LIMIT = 5;
-export const DAILY_ONBOARDING_LIMIT = 1;
+// 2 = onboarding inicial + 1 refazer no mesmo dia. Limite acumulado por dia.
+export const DAILY_ONBOARDING_LIMIT = 2;
 
 export async function countTodayAiUsage(
   userId: string,
