@@ -40,6 +40,9 @@ export function useNotificationRouter() {
       } else if (payload.event === 'plan_updated') {
         // Aluno foi notificado que o plano dele foi atualizado.
         target = '/(tabs)/treino' as Href;
+      } else if (payload.event === 'inactivity_reminder') {
+        // Lembrete de log — leva pro log rápido.
+        target = '/log' as Href;
       }
       if (!target) return;
       // Pequeno delay deixa o gate de role/onboarding finalizar antes.
