@@ -8,10 +8,11 @@ import {
 } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter, type Href } from 'expo-router';
-import { Dumbbell, Plus, ChevronRight, BookOpen, Activity } from 'lucide-react-native';
+import { Dumbbell, Plus, ChevronRight, BookOpen, Activity, GraduationCap } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useAuth } from '@/hooks/useAuth';
+import { useProfile } from '@/hooks/useProfile';
 import { useRoutines } from '@/hooks/useRoutines';
 import { useExerciseGroups } from '@/hooks/useExercises';
 import { queryKeys } from '@/lib/queryKeys';
@@ -25,12 +26,15 @@ import type {
 export default function TreinoScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const profileQ = useProfile();
   const qc = useQueryClient();
   const tabBarHeight = useBottomTabBarHeight();
   const [refreshing, setRefreshing] = useState(false);
 
   const routinesQ = useRoutines();
   const groupsQ = useExerciseGroups();
+
+  const isStudent = profileQ.data?.role === 'aluno';
 
   const routines = routinesQ.data ?? [];
   const groupsById = new Map<string, ExerciseGroup>(
@@ -87,7 +91,11 @@ export default function TreinoScreen() {
       </View>
 
       {isEmpty ? (
-        <EmptyState onCreate={openNew} />
+        isStudent ? (
+          <EmptyStudentState />
+        ) : (
+          <EmptyState onCreate={openNew} />
+        )
       ) : (
         <FlatList
           data={routines}
@@ -110,20 +118,22 @@ export default function TreinoScreen() {
         />
       )}
 
-      <Pressable
-        onPress={openNew}
-        className="absolute right-6 h-14 w-14 rounded-full bg-accent items-center justify-center active:opacity-80"
-        style={{
-          bottom: tabBarHeight + 16,
-          shadowColor: colors.accent,
-          shadowOffset: { width: 0, height: 6 },
-          shadowOpacity: 0.6,
-          shadowRadius: 18,
-          elevation: 12,
-        }}
-      >
-        <Plus size={26} color={colors.textInverse} strokeWidth={3} />
-      </Pressable>
+      {!isStudent && (
+        <Pressable
+          onPress={openNew}
+          className="absolute right-6 h-14 w-14 rounded-full bg-accent items-center justify-center active:opacity-80"
+          style={{
+            bottom: tabBarHeight + 16,
+            shadowColor: colors.accent,
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: 0.6,
+            shadowRadius: 18,
+            elevation: 12,
+          }}
+        >
+          <Plus size={26} color={colors.textInverse} strokeWidth={3} />
+        </Pressable>
+      )}
     </Screen>
   );
 }
@@ -141,6 +151,7 @@ function RoutineCard({
     routine.exercises_count === 1
       ? '1 exercício'
       : `${routine.exercises_count} exercícios`;
+  const fromCoach = !!routine.created_by_coach;
   return (
     <Pressable onPress={onPress} className="active:opacity-80">
       <Card padding="md">
@@ -156,11 +167,39 @@ function RoutineCard({
               {group?.name ?? 'Treino livre'} · {exercisesLabel}
               {routine.description ? ` · ${routine.description}` : ''}
             </Text>
+            {fromCoach && (
+              <View className="flex-row items-center gap-1 mt-1.5">
+                <View className="rounded-full border border-violet/40 bg-violet/10 px-2 py-0.5 flex-row items-center gap-1">
+                  <GraduationCap size={9} color={colors.violetSoft} />
+                  <Text className="text-violet-soft text-[10px] font-semibold">
+                    do seu professor
+                  </Text>
+                </View>
+              </View>
+            )}
           </View>
           <ChevronRight size={16} color={colors.textMuted} />
         </View>
       </Card>
     </Pressable>
+  );
+}
+
+function EmptyStudentState() {
+  return (
+    <View className="flex-1 items-center justify-center px-8 pb-20 gap-4">
+      <View className="h-16 w-16 rounded-full bg-violet/10 border border-violet/30 items-center justify-center">
+        <GraduationCap size={26} color={colors.violetSoft} />
+      </View>
+      <Text className="text-text text-xl font-semibold text-center">
+        Aguardando seu professor
+      </Text>
+      <Text className="text-text-dim text-sm text-center leading-relaxed">
+        Seu professor ainda não criou treinos pra você. Quando ele montar o
+        plano, eles aparecem aqui. Se quiser pedir algo, abre uma solicitação
+        no perfil.
+      </Text>
+    </View>
   );
 }
 
