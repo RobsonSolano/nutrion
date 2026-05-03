@@ -25,6 +25,7 @@ import {
   Trash2,
   AlertTriangle,
   NotebookPen,
+  History,
 } from 'lucide-react-native';
 import {
   Button,
@@ -403,6 +404,30 @@ export default function AlunoDetalheScreen() {
                   {notesQ.data && notesQ.data.length > 0
                     ? `${notesQ.data.length} anotação${notesQ.data.length === 1 ? '' : 'ões'} · só você vê`
                     : 'Nenhuma anotação · só você vê'}
+                </Text>
+              </View>
+              <ChevronRight size={16} color={colors.textDim} />
+            </View>
+          </Card>
+        </Pressable>
+
+        <Pressable
+          onPress={() =>
+            router.push(`/(coach)/aluno/${id}/historico` as Href)
+          }
+          className="active:opacity-80"
+        >
+          <Card padding="md">
+            <View className="flex-row items-center gap-3">
+              <View className="h-11 w-11 rounded-2xl bg-accent/10 border border-accent/30 items-center justify-center">
+                <History size={20} color={colors.accent} />
+              </View>
+              <View className="flex-1">
+                <Text className="text-text text-sm font-semibold">
+                  Histórico de planos
+                </Text>
+                <Text className="text-text-muted text-[11px] mt-0.5">
+                  Cada plano gerado fica registrado pra consulta
                 </Text>
               </View>
               <ChevronRight size={16} color={colors.textDim} />
