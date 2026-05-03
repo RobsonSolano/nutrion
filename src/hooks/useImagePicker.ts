@@ -34,9 +34,13 @@ export function useImagePicker(options: Options = {}) {
       source === 'camera'
         ? ImagePicker.launchCameraAsync
         : ImagePicker.launchImageLibraryAsync;
+    // quality 0.7 reduz drasticamente o JPEG bruto antes mesmo de chegar na
+    // compressão — em câmeras 100MP+ a diferença é entre ~30MB e ~10MB.
+    // exif=false economiza alguns bytes e evita metadados desnecessários.
     const picked = await launcher({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 1,
+      quality: 0.7,
+      exif: false,
       allowsEditing: false,
     });
     if (picked.canceled || !picked.assets?.[0]) return;
