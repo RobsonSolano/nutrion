@@ -3,11 +3,13 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import { useRouter, type Href } from 'expo-router';
 import {
   Mail,
   Lock,
@@ -15,6 +17,7 @@ import {
   Eye,
   EyeOff,
   Sparkles,
+  GraduationCap,
 } from 'lucide-react-native';
 import { useAuth } from '@/hooks/useAuth';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
@@ -52,6 +55,7 @@ function GoogleMark() {
 }
 
 export default function LoginScreen() {
+  const router = useRouter();
   const { loginWithGoogle, loginWithEmail, signUp } = useAuth();
   const [mode, setMode] = useState<Mode>('login');
   const [loading, setLoading] = useState(false);
@@ -240,6 +244,33 @@ export default function LoginScreen() {
               </Text>
             </View>
           )}
+
+          <View className="flex-row items-center gap-3 mt-7">
+            <View className="flex-1 h-px bg-border" />
+            <Text className="text-text-muted text-[10px] uppercase tracking-widest">
+              Sou professor
+            </Text>
+            <View className="flex-1 h-px bg-border" />
+          </View>
+
+          <Pressable
+            onPress={() => router.push('/(auth)/signup-professor' as Href)}
+            className="mt-3 rounded-2xl border border-violet/40 bg-violet/5 px-4 py-3 active:opacity-70"
+          >
+            <View className="flex-row items-center gap-3">
+              <View className="h-9 w-9 rounded-xl bg-violet/15 border border-violet/40 items-center justify-center">
+                <GraduationCap size={16} color={colors.violetSoft} />
+              </View>
+              <View className="flex-1">
+                <Text className="text-text text-sm font-semibold">
+                  Criar conta de professor
+                </Text>
+                <Text className="text-text-muted text-[11px] mt-0.5">
+                  Cadastre alunos e monte treinos com a IA.
+                </Text>
+              </View>
+            </View>
+          </Pressable>
 
           <Text className="text-text-muted text-[11px] text-center mt-8 leading-relaxed px-2">
             Ao continuar, você concorda em tratar as recomendações como

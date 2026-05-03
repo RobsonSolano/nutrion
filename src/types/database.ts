@@ -8,6 +8,8 @@ export type GoalType =
   | 'reduce_body_fat';
 export type WeeklyFrequency = '1-2' | '2-3' | '3-4' | '4-5' | '5-6' | '6-7';
 
+export type ProfileRole = 'comum' | 'aluno' | 'professor';
+
 export type Profile = {
   id: string;
   full_name: string | null;
@@ -32,8 +34,18 @@ export type Profile = {
   onboarding_skipped_at: string | null;
   user_number: number | null;
   is_early_adopter: boolean | null;
+  role: ProfileRole;
+  coach_id: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type Coach = {
+  id: string;
+  bio: string | null;
+  cref: string | null;
+  max_students: number;
+  created_at: string;
 };
 
 export type ProfileUpdate = Partial<
