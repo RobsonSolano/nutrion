@@ -14,6 +14,7 @@ import {
   Gift,
   RefreshCw,
   AlertTriangle,
+  MessagesSquare,
 } from 'lucide-react-native';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
@@ -44,6 +45,7 @@ export default function PerfilScreen() {
   const refazerBlocked =
     hasCompletedOnboarding && onboardingUsage.limitReached;
   const isEarlyAdopter = profile?.is_early_adopter === true;
+  const isStudent = profile?.role === 'aluno';
 
   async function executeReset(mode: ResetOnboardingMode) {
     setRedoStep('closed');
@@ -160,6 +162,16 @@ export default function PerfilScreen() {
           icon={<Pencil size={16} color={colors.text} />}
         />
 
+        {isStudent && (
+          <Button
+            label="Minhas solicitações"
+            onPress={() => router.push('/solicitacoes' as Href)}
+            variant="secondary"
+            size="md"
+            icon={<MessagesSquare size={16} color={colors.violetSoft} />}
+          />
+        )}
+
         <Card>
           <Text className="text-text-dim text-[11px] uppercase tracking-widest mb-4">
             Medidas
@@ -250,21 +262,23 @@ export default function PerfilScreen() {
           </View>
         </Card>
 
-        <Button
-          label={
-            !profile?.onboarding_completed_at
-              ? 'Completar onboarding com IA'
-              : refazerBlocked
-                ? 'Refazer disponível amanhã'
-                : 'Gerar novo plano com IA'
-          }
-          onPress={handleRedoOnboarding}
-          loading={resetPending}
-          disabled={refazerBlocked}
-          variant="secondary"
-          size="md"
-          icon={<Sparkles size={16} color={colors.accent} />}
-        />
+        {!isStudent && (
+          <Button
+            label={
+              !profile?.onboarding_completed_at
+                ? 'Completar onboarding com IA'
+                : refazerBlocked
+                  ? 'Refazer disponível amanhã'
+                  : 'Gerar novo plano com IA'
+            }
+            onPress={handleRedoOnboarding}
+            loading={resetPending}
+            disabled={refazerBlocked}
+            variant="secondary"
+            size="md"
+            icon={<Sparkles size={16} color={colors.accent} />}
+          />
+        )}
 
         <Button
           label="Sair da conta"
