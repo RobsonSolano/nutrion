@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   createStudent,
   generatePlanForStudent,
@@ -12,6 +12,7 @@ import {
   replaceRoutineExercises,
   updateRoutine,
 } from '@/services/routines';
+import { getStudentTracking } from '@/services/studentTracking';
 import type { OnboardingPlan } from '@/services/onboarding';
 import type {
   RoutineExerciseInsert,
@@ -23,6 +24,8 @@ import { useAuth } from './useAuth';
 const studentsKey = (coachId: string) => ['students', coachId] as const;
 const studentDetailKey = (studentId: string) =>
   ['student_detail', studentId] as const;
+const studentTrackingKey = (studentId: string) =>
+  ['student_tracking', studentId] as const;
 
 export function useStudents() {
   const { user } = useAuth();
@@ -43,6 +46,39 @@ export function useStudentDetail(studentId: string | null) {
     },
     enabled: !!studentId,
     staleTime: 15_000,
+  });
+}
+
+/**
+ * Aderência semanal + snapshot do dia. Buscado em paralelo com o
+ * detail do aluno; staleTime curto pra refletir logs frescos quando
+ * o professor abre a tela.
+ */
+export function useStudentTracking(studentId: string | null) {
+  return useQuery({
+    queryKey: studentTrackingKey(studentId ?? 'none'),
+    queryFn: () => {
+      if (!studentId) throw new Error('student_id ausente');
+      return getStudentTracking(studentId);
+    },
+    enabled: !!studentId,
+    staleTime: 30_000,
+  });
+}
+
+/**
+ * Versão batch — pega tracking de N alunos em paralelo via useQueries.
+ * Usado na lista pra mostrar % de aderência por aluno sem fan-out de
+ * mutations. Cada query tem cache próprio compartilhado com
+ * useStudentTracking individual.
+ */
+export function useStudentsTracking(studentIds: string[]) {
+  return useQueries({
+    queries: studentIds.map((id) => ({
+      queryKey: studentTrackingKey(id),
+      queryFn: () => getStudentTracking(id),
+      staleTime: 30_000,
+    })),
   });
 }
 

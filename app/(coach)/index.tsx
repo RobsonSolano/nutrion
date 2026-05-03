@@ -13,9 +13,10 @@ import { Button, Card, Screen } from '@/components/ui';
 import { colors } from '@/lib/theme';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
-import { useStudents } from '@/hooks/useStudents';
+import { useStudents, useStudentsTracking } from '@/hooks/useStudents';
 import { useCoachRequests } from '@/hooks/useRequests';
 import type { StudentLite } from '@/services/students';
+import type { StudentTracking } from '@/services/studentTracking';
 
 const GOAL_LABEL: Record<string, string> = {
   lose_fat: 'Emagrecer',
@@ -32,6 +33,12 @@ export default function CoachHome() {
   const openRequestsQ = useCoachRequests('open');
   const fullName = profileQ.data?.full_name ?? 'Professor';
   const openRequestsCount = openRequestsQ.data?.length ?? 0;
+
+  const studentIds = (studentsQ.data ?? []).map((s) => s.id);
+  const trackingResults = useStudentsTracking(studentIds);
+  const trackingByStudent = new Map<string, StudentTracking | undefined>(
+    studentIds.map((id, i) => [id, trackingResults[i]?.data]),
+  );
 
   return (
     <Screen variant="hero" edges={['top', 'bottom']}>
@@ -92,6 +99,7 @@ export default function CoachHome() {
                 <StudentRow
                   key={s.id}
                   student={s}
+                  tracking={trackingByStudent.get(s.id)}
                   onPress={() =>
                     router.push(`/(coach)/aluno/${s.id}` as Href)
                   }
@@ -152,13 +160,16 @@ export default function CoachHome() {
 
 function StudentRow({
   student,
+  tracking,
   onPress,
 }: {
   student: StudentLite;
+  tracking: StudentTracking | undefined;
   onPress: () => void;
 }) {
   const initial = (student.full_name ?? '?').slice(0, 1).toUpperCase();
   const goalLabel = student.goal_type ? GOAL_LABEL[student.goal_type] : null;
+  const adherence = tracking?.adherenceLast7;
 
   return (
     <Pressable
@@ -186,7 +197,31 @@ function StudentRow({
           )}
         </View>
       </View>
+      {adherence != null && <AdherenceBadge percent={adherence} />}
       <ChevronRight size={16} color={colors.textDim} />
     </Pressable>
   );
+}
+
+function AdherenceBadge({ percent }: { percent: number }) {
+  const tone = adherenceTone(percent);
+  return (
+    <View
+      className="rounded-full border px-2 py-0.5"
+      style={{ borderColor: `${tone}55`, backgroundColor: `${tone}15` }}
+    >
+      <Text
+        className="text-[10px] font-bold"
+        style={{ color: tone }}
+      >
+        {percent}%
+      </Text>
+    </View>
+  );
+}
+
+function adherenceTone(percent: number): string {
+  if (percent >= 70) return colors.accent;
+  if (percent >= 40) return colors.warn;
+  return colors.danger;
 }
