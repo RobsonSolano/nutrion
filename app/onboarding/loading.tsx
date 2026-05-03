@@ -1,30 +1,45 @@
-import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Text, View } from 'react-native';
-import { useRouter, type Href } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, BackHandler, Text, View } from 'react-native';
+import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import { Sparkles } from 'lucide-react-native';
-import { Button, Card, Screen } from '@/components/ui';
+import { Card, Screen } from '@/components/ui';
 import { colors } from '@/lib/theme';
 import { useOnboardingStore } from '@/stores/useOnboardingStore';
 import { useOnboardingResultStore } from '@/stores/useOnboardingResultStore';
-import { useGenerateOnboardingPlan } from '@/hooks/useOnboarding';
+import {
+  useGenerateOnboardingPlan,
+  useSaveOnboardingResult,
+} from '@/hooks/useOnboarding';
 import { useProfile } from '@/hooks/useProfile';
 import { captureError } from '@/lib/sentry';
-import type { OnboardingInput } from '@/services/onboarding';
+import type { OnboardingInput, OnboardingPlan } from '@/services/onboarding';
 
 const STAGES = [
   'Analisando seu perfil...',
   'Calculando metas nutricionais...',
   'Selecionando exercícios seguros...',
   'Montando suas rotinas...',
+  'Salvando seu plano...',
 ];
 
 export default function OnboardingLoading() {
   const router = useRouter();
   const generate = useGenerateOnboardingPlan();
+  const save = useSaveOnboardingResult();
   const profile = useProfile();
   const state = useOnboardingStore();
   const [stage, setStage] = useState(0);
+  const inputRef = useRef<OnboardingInput | null>(null);
+  const planRef = useRef<OnboardingPlan | null>(null);
   const triggeredRef = useRef(false);
+
+  // Bloqueia o back hardware: gerar plano é definitivo.
+  useFocusEffect(
+    useCallback(() => {
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => true);
+      return () => sub.remove();
+    }, []),
+  );
 
   useEffect(() => {
     const t = setInterval(() => {
@@ -33,64 +48,73 @@ export default function OnboardingLoading() {
     return () => clearInterval(t);
   }, []);
 
+  const runStep = useCallback(async () => {
+    // Snapshot do input só na primeira tentativa — retry mantém os dados.
+    if (!inputRef.current) {
+      inputRef.current = {
+        full_name: profile.data?.full_name ?? null,
+        sex: state.sex,
+        birth_year: state.birth_year,
+        weight_kg: state.weight_kg,
+        height_cm: state.height_cm,
+        goal_type: state.goal_type,
+        goal_weight_kg: state.goal_weight_kg,
+        goal_target_date: state.goal_target_date,
+        practices_sport: state.practices_sport,
+        sports: state.sports.length ? state.sports : null,
+        weekly_frequency: state.weekly_frequency,
+        water_goal_ml: state.water_goal_ml,
+        allergies: state.allergies.trim() || null,
+        physical_limitations: state.physical_limitations.trim() || null,
+        bio: state.bio.trim() || null,
+      };
+    }
+
+    try {
+      if (!planRef.current) {
+        planRef.current = await generate.mutateAsync(inputRef.current);
+      }
+      await save.mutateAsync({
+        input: inputRef.current,
+        plan: planRef.current,
+      });
+      useOnboardingResultStore.setState({
+        plan: planRef.current,
+        input: inputRef.current,
+      });
+      router.replace('/onboarding/resultado' as Href);
+    } catch (err) {
+      const phase: 'generate' | 'save' = planRef.current ? 'save' : 'generate';
+      const message =
+        err instanceof Error ? err.message : 'Tenta de novo em instantes.';
+      if (!/limite/i.test(message)) {
+        captureError(err, {
+          feature: phase === 'save' ? 'onboarding_save' : 'onboarding_plan',
+        });
+      }
+      Alert.alert(
+        phase === 'save' ? 'Não consegui salvar' : 'Não consegui gerar o plano',
+        message,
+        [
+          {
+            text: 'Tentar de novo',
+            onPress: () => {
+              void runStep();
+            },
+          },
+        ],
+        { cancelable: false },
+      );
+    }
+    // generate/save são estáveis (mutations); profile/state via closure intencional.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     if (triggeredRef.current) return;
     triggeredRef.current = true;
-
-    const input: OnboardingInput = {
-      full_name: profile.data?.full_name ?? null,
-      sex: state.sex,
-      birth_year: state.birth_year,
-      weight_kg: state.weight_kg,
-      height_cm: state.height_cm,
-      goal_type: state.goal_type,
-      goal_weight_kg: state.goal_weight_kg,
-      goal_target_date: state.goal_target_date,
-      practices_sport: state.practices_sport,
-      sports: state.sports.length ? state.sports : null,
-      weekly_frequency: state.weekly_frequency,
-      water_goal_ml: state.water_goal_ml,
-      allergies: state.allergies.trim() || null,
-      physical_limitations: state.physical_limitations.trim() || null,
-      bio: state.bio.trim() || null,
-    };
-
-    generate
-      .mutateAsync(input)
-      .then((plan) => {
-        useOnboardingResultStore.setState({ plan, input });
-        router.replace('/onboarding/resultado' as Href);
-      })
-      .catch((err) => {
-        const message =
-          err instanceof Error
-            ? err.message
-            : 'Tenta de novo em instantes.';
-        if (!/limite/i.test(message)) {
-          captureError(err, { feature: 'onboarding_plan' });
-        }
-        Alert.alert(
-          'Não consegui gerar o plano',
-          message,
-          [
-            {
-              text: 'Tentar de novo',
-              onPress: () => {
-                triggeredRef.current = false;
-                router.replace('/onboarding/loading' as Href);
-              },
-            },
-            {
-              text: 'Voltar',
-              style: 'cancel',
-              onPress: () => router.back(),
-            },
-          ],
-        );
-      });
-    // Roda uma vez só ao montar — state via closures.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    void runStep();
+  }, [runStep]);
 
   return (
     <Screen variant="hero" edges={['top', 'bottom']}>
@@ -118,12 +142,6 @@ export default function OnboardingLoading() {
           Uso informativo. As recomendações não substituem orientação
           profissional.
         </Text>
-
-        <Button
-          label="Cancelar"
-          onPress={() => router.back()}
-          variant="ghost"
-        />
       </View>
     </Screen>
   );
