@@ -10,12 +10,11 @@
 
 import { serve } from 'std/http/server.ts';
 import { createClient } from '@supabase/supabase-js';
+import { sendExpoPush } from '../_shared/expoPush.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-
-const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -112,48 +111,15 @@ serve(async (req: Request) => {
       return json({ error: 'unknown_event' }, 400);
     }
 
-    // Token do destinatário.
-    const { data: recipient, error: rErr } = await supabaseService
-      .from('profiles')
-      .select('expo_push_token')
-      .eq('id', recipientId)
-      .single();
-    if (rErr || !recipient?.expo_push_token) {
-      // Sem token = não tem push habilitado. Não é erro.
-      return json({ ok: true, skipped: 'no_token' });
-    }
-
-    // Manda pro Expo Push API.
-    const pushRes = await fetch(EXPO_PUSH_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        'Accept-Encoding': 'gzip, deflate',
-      },
-      body: JSON.stringify({
-        to: recipient.expo_push_token,
-        title,
-        body: bodyText,
-        sound: 'default',
-        data: {
-          event: body.event,
-          request_id: body.request_id,
-        },
-      }),
+    const result = await sendExpoPush(supabaseService, recipientId, {
+      title,
+      body: bodyText,
+      data: { event: body.event, request_id: body.request_id },
     });
-
-    if (!pushRes.ok) {
-      const text = await pushRes.text();
-      console.error('[send-push] Expo Push error:', pushRes.status, text);
-      return json(
-        { error: 'expo_push_failed', detail: `${pushRes.status}: ${text}` },
-        502,
-      );
+    if (!result.ok) {
+      return json({ error: 'expo_push_failed', detail: result.error }, 502);
     }
-
-    const pushJson = await pushRes.json();
-    return json({ ok: true, expo: pushJson });
+    return json(result);
   } catch (err) {
     console.error('[send-push-notification] unexpected error:', err);
     return json(
