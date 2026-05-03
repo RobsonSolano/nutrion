@@ -78,8 +78,9 @@ export default function SignupProfessorScreen() {
     email.length > 3 &&
     password.length >= 6 &&
     fullName.trim().length >= 2 &&
-    bio.length <= MAX_BIO &&
-    cref.length <= MAX_CREF;
+    cref.trim().length >= 4 &&
+    cref.length <= MAX_CREF &&
+    bio.length <= MAX_BIO;
 
   return (
     <Screen variant="hero" edges={['top', 'bottom']}>
@@ -171,11 +172,15 @@ export default function SignupProfessorScreen() {
             <Input
               value={cref}
               onChangeText={setCref}
-              placeholder="CREF / CRN (opcional)"
+              placeholder="CREF (Ed. Física) ou CRN (Nutrição)"
               autoCapitalize="characters"
               autoCorrect={false}
               leftIcon={<IdCard size={18} color={colors.textMuted} />}
             />
+            <Text className="text-text-muted text-[11px] px-1">
+              Obrigatório — credencial profissional. Aparece no seu perfil
+              pra você e seus alunos identificarem.
+            </Text>
 
             <Input
               value={bio}
