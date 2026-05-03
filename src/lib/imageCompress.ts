@@ -4,9 +4,13 @@ import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 /**
  * Limite rígido do arquivo original que aceitamos do usuário. Arquivos maiores
  * disparam erro amigável; não tentamos comprimir (o processamento em RAM de
- * um arquivo >8MB pode travar dispositivos low-end).
+ * um arquivo gigante pode travar dispositivos low-end).
+ *
+ * 32MB cobre câmeras de até ~120MP em quality 0.7 com folga. Inputs maiores
+ * são raros e geralmente fruto de modo "ultra HD" propositalmente alto — o
+ * usuário consegue ajustar nas configurações da câmera do celular.
  */
-export const MAX_INPUT_BYTES = 8 * 1024 * 1024; // 8 MB
+export const MAX_INPUT_BYTES = 32 * 1024 * 1024; // 32 MB
 
 /**
  * Target de saída depois da compressão. Base64 é ~1.33x o tamanho binário,
@@ -17,8 +21,9 @@ const TARGET_BYTES = 700 * 1024;
 
 export class ImageTooLargeError extends Error {
   constructor(public readonly sizeBytes: number) {
+    const limitMb = (MAX_INPUT_BYTES / 1024 / 1024).toFixed(0);
     super(
-      `A foto está muito grande (${(sizeBytes / 1024 / 1024).toFixed(1)} MB). O limite é 8 MB — escolha uma menor ou tire uma nova.`,
+      `A foto está muito grande (${(sizeBytes / 1024 / 1024).toFixed(1)} MB, limite ${limitMb} MB). Tente outra foto, ou abra as configurações da câmera do seu celular e diminua a resolução.`,
     );
     this.name = 'ImageTooLargeError';
   }
