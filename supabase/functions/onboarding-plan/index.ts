@@ -285,19 +285,23 @@ serve(async (req: Request) => {
       return json({ error: 'invalid_body' }, 400);
     }
 
-    // Cota: 1ª vez (lifetime) é livre, refazer custa 1 uso por dia.
-    const { count: lifetimeSuccesses, error: lifetimeErr } = await supabase
-      .from('ai_usage_log')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-      .eq('feature', 'onboarding_plan')
-      .eq('status', 'success');
-    if (lifetimeErr) {
-      console.error('[onboarding-plan] lifetime count error:', lifetimeErr);
+    // Cota: onboarding inicial (até completar pela 1ª vez) é livre — o user
+    // pode regenerar quantas vezes precisar. Refazer (após
+    // onboarding_completed_at) custa 1 uso por dia.
+    // Sinal anterior (count em ai_usage_log) bloqueava cancelamento + retry
+    // dentro do próprio onboarding inicial.
+    const { data: profile, error: profileErr } = await supabase
+      .from('profiles')
+      .select('onboarding_completed_at')
+      .eq('id', user.id)
+      .single();
+    if (profileErr) {
+      console.error('[onboarding-plan] profile fetch error:', profileErr);
     }
-    const isFirstTime = (lifetimeSuccesses ?? 0) === 0;
 
-    if (!isFirstTime) {
+    const isInitialOnboarding = !profile?.onboarding_completed_at;
+
+    if (!isInitialOnboarding) {
       const today = new Date().toISOString().slice(0, 10);
       const { count: usedToday, error: usageErr } = await supabase
         .from('ai_usage_log')
