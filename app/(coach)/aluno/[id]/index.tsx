@@ -7,7 +7,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import {
   ArrowLeft,
   Activity,
@@ -20,6 +20,8 @@ import {
   Dumbbell,
   Target,
   Ruler,
+  Pencil,
+  ChevronRight,
 } from 'lucide-react-native';
 import {
   Button,
@@ -290,21 +292,35 @@ export default function AlunoDetalheScreen() {
           ) : (
             <View className="gap-2">
               {routines.map((r) => (
-                <View
+                <Pressable
                   key={r.id}
-                  className="rounded-2xl border border-border bg-surface-muted px-3 py-2.5"
+                  onPress={() =>
+                    router.push(
+                      `/(coach)/aluno/${id}/rotina/${r.id}` as Href,
+                    )
+                  }
+                  className="flex-row items-center gap-2 rounded-2xl border border-border bg-surface-muted px-3 py-2.5 active:opacity-70"
                 >
-                  <Text
-                    className="text-text text-sm font-semibold"
-                    numberOfLines={1}
-                  >
-                    {r.name}
-                  </Text>
-                  <Text className="text-text-muted text-[11px] mt-0.5">
-                    {r.exercises_count} exercícios
-                    {r.description ? ` · ${r.description}` : ''}
-                  </Text>
-                </View>
+                  <View className="flex-1">
+                    <Text
+                      className="text-text text-sm font-semibold"
+                      numberOfLines={1}
+                    >
+                      {r.name}
+                    </Text>
+                    <Text className="text-text-muted text-[11px] mt-0.5">
+                      {r.exercises_count} exercícios
+                      {r.description ? ` · ${r.description}` : ''}
+                    </Text>
+                  </View>
+                  <View className="flex-row items-center gap-1 rounded-full border border-violet/40 bg-violet/10 px-2 py-1">
+                    <Pencil size={10} color={colors.violetSoft} />
+                    <Text className="text-violet-soft text-[10px] font-semibold">
+                      Editar
+                    </Text>
+                  </View>
+                  <ChevronRight size={14} color={colors.textDim} />
+                </Pressable>
               ))}
             </View>
           )}
