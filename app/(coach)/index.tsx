@@ -8,6 +8,8 @@ import {
   ChevronRight,
   Target,
   MessagesSquare,
+  Lock,
+  Download,
 } from 'lucide-react-native';
 import { Button, Card, Screen } from '@/components/ui';
 import { colors } from '@/lib/theme';
@@ -146,6 +148,27 @@ export default function CoachHome() {
             </View>
           </Card>
         </Pressable>
+
+        <View className="flex-row gap-2">
+          <View className="flex-1">
+            <Button
+              label="Trocar senha"
+              onPress={() => router.push('/trocar-senha' as Href)}
+              variant="ghost"
+              size="md"
+              icon={<Lock size={16} color={colors.textDim} />}
+            />
+          </View>
+          <View className="flex-1">
+            <Button
+              label="Exportar dados"
+              onPress={() => router.push('/exportar-dados' as Href)}
+              variant="ghost"
+              size="md"
+              icon={<Download size={16} color={colors.textDim} />}
+            />
+          </View>
+        </View>
 
         <Button
           label="Sair"
