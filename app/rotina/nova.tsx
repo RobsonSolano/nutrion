@@ -1,15 +1,22 @@
 import { KeyboardAvoidingView, Pressable, Text, View } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import { Redirect, Stack, useRouter, type Href } from 'expo-router';
 import { X } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import RoutineEditor from '@/components/routine/RoutineEditor';
 import { useCreateRoutine } from '@/hooks/useRoutines';
+import { useProfile } from '@/hooks/useProfile';
 import { Screen } from '@/components/ui';
 import { colors } from '@/lib/theme';
 
 export default function NovaRotinaScreen() {
   const router = useRouter();
   const create = useCreateRoutine();
+  const profileQ = useProfile();
+
+  // Aluno não cria rotinas próprias — pode solicitar ao professor.
+  if (profileQ.data?.role === 'aluno') {
+    return <Redirect href={'/(tabs)/treino' as Href} />;
+  }
 
   return (
     <>

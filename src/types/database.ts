@@ -121,6 +121,7 @@ export type WorkoutRoutine = {
   modality: Modality;
   description: string | null;
   is_archived: boolean;
+  created_by_coach: string | null;
   created_at: string;
   updated_at: string;
 };
