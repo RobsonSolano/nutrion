@@ -10,6 +10,8 @@ import {
   MessagesSquare,
   Lock,
   Download,
+  Bell,
+  BellOff,
 } from 'lucide-react-native';
 import { Button, Card, Screen } from '@/components/ui';
 import { colors } from '@/lib/theme';
@@ -17,6 +19,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
 import { useStudents, useStudentsTracking } from '@/hooks/useStudents';
 import { useCoachRequests } from '@/hooks/useRequests';
+import { usePushToggle } from '@/hooks/usePushToggle';
 import type { StudentLite } from '@/services/students';
 import type { StudentTracking } from '@/services/studentTracking';
 
@@ -33,6 +36,7 @@ export default function CoachHome() {
   const profileQ = useProfile();
   const studentsQ = useStudents();
   const openRequestsQ = useCoachRequests('open');
+  const push = usePushToggle();
   const fullName = profileQ.data?.full_name ?? 'Professor';
   const openRequestsCount = openRequestsQ.data?.length ?? 0;
 
@@ -148,6 +152,21 @@ export default function CoachHome() {
             </View>
           </Card>
         </Pressable>
+
+        <Button
+          label={push.enabled ? 'Desativar notificações' : 'Ativar notificações'}
+          onPress={push.toggle}
+          loading={push.loading}
+          variant="ghost"
+          size="md"
+          icon={
+            push.enabled ? (
+              <BellOff size={16} color={colors.textDim} />
+            ) : (
+              <Bell size={16} color={colors.textDim} />
+            )
+          }
+        />
 
         <View className="flex-row gap-2">
           <View className="flex-1">
