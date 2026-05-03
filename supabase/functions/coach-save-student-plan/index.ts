@@ -114,6 +114,30 @@ serve(async (req: Request) => {
       );
     }
 
+    // 2.5. Cria a linha de revisão (snapshot das metas + rationale).
+    // As rotinas que vamos inserir abaixo apontam pra ela via
+    // plan_revision_id, permitindo reconstruir o plano completo no
+    // historico depois.
+    const { data: revision, error: revisionErr } = await supabaseService
+      .from('student_plan_revisions')
+      .insert({
+        student_id: body.student_id,
+        coach_id: caller.id,
+        rationale: plan.rationale ?? null,
+        calorie_goal: plan.calorie_goal,
+        protein_goal_g: plan.protein_goal_g,
+        water_goal_ml: plan.water_goal_ml,
+      })
+      .select('id')
+      .single();
+    if (revisionErr) {
+      return json(
+        { error: 'revision_insert_failed', detail: revisionErr.message },
+        500,
+      );
+    }
+    const planRevisionId = revision.id as string;
+
     // 3. Resolve group_slug → group_id (catálogo global).
     const slugs = Array.from(
       new Set(
@@ -147,6 +171,7 @@ serve(async (req: Request) => {
         .insert({
           user_id: body.student_id,
           created_by_coach: caller.id,
+          plan_revision_id: planRevisionId,
           name: r.name,
           modality: r.modality,
           group_id: r.group_slug
