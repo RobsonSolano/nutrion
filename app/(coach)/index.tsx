@@ -89,7 +89,13 @@ export default function CoachHome() {
           ) : studentsQ.data && studentsQ.data.length > 0 ? (
             <View className="gap-2 mt-2">
               {studentsQ.data.map((s) => (
-                <StudentRow key={s.id} student={s} />
+                <StudentRow
+                  key={s.id}
+                  student={s}
+                  onPress={() =>
+                    router.push(`/(coach)/aluno/${s.id}` as Href)
+                  }
+                />
               ))}
             </View>
           ) : (
@@ -144,12 +150,21 @@ export default function CoachHome() {
   );
 }
 
-function StudentRow({ student }: { student: StudentLite }) {
+function StudentRow({
+  student,
+  onPress,
+}: {
+  student: StudentLite;
+  onPress: () => void;
+}) {
   const initial = (student.full_name ?? '?').slice(0, 1).toUpperCase();
   const goalLabel = student.goal_type ? GOAL_LABEL[student.goal_type] : null;
 
   return (
-    <View className="flex-row items-center gap-3 rounded-2xl border border-border bg-surface-muted px-3 py-3">
+    <Pressable
+      onPress={onPress}
+      className="flex-row items-center gap-3 rounded-2xl border border-border bg-surface-muted px-3 py-3 active:opacity-70"
+    >
       <View className="h-10 w-10 rounded-xl bg-violet/15 border border-violet/40 items-center justify-center">
         <Text className="text-violet-soft text-base font-bold">{initial}</Text>
       </View>
@@ -172,6 +187,6 @@ function StudentRow({ student }: { student: StudentLite }) {
         </View>
       </View>
       <ChevronRight size={16} color={colors.textDim} />
-    </View>
+    </Pressable>
   );
 }

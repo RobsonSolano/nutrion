@@ -1,0 +1,520 @@
+import { useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import {
+  ArrowLeft,
+  Activity,
+  Droplet,
+  Flame,
+  Beef,
+  Sparkles,
+  RefreshCcw,
+  Send,
+  Dumbbell,
+  Target,
+  Ruler,
+} from 'lucide-react-native';
+import {
+  Button,
+  Card,
+  ConfirmModal,
+  MarkdownText,
+  Screen,
+} from '@/components/ui';
+import { colors } from '@/lib/theme';
+import {
+  useGenerateStudentPlan,
+  useSaveStudentPlan,
+  useStudentDetail,
+} from '@/hooks/useStudents';
+import { bmi, bmiCategory } from '@/lib/biometrics';
+import type { OnboardingPlan } from '@/services/onboarding';
+import { captureError } from '@/lib/sentry';
+
+const GOAL_LABEL: Record<string, string> = {
+  lose_fat: 'Emagrecer',
+  maintain: 'Manter peso',
+  gain_muscle: 'Ganhar massa',
+  reduce_body_fat: 'Reduzir gordura',
+};
+
+type Phase = 'idle' | 'confirm_regenerate' | 'generating' | 'preview' | 'saving';
+
+export default function AlunoDetalheScreen() {
+  const router = useRouter();
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const detailQ = useStudentDetail(id ?? null);
+  const generateMutation = useGenerateStudentPlan();
+  const saveMutation = useSaveStudentPlan();
+
+  const [phase, setPhase] = useState<Phase>('idle');
+  const [plan, setPlan] = useState<OnboardingPlan | null>(null);
+
+  if (!id) return null;
+
+  async function handleRegenerate() {
+    if (!id) return;
+    setPhase('generating');
+    try {
+      const { plan: generated } = await generateMutation.mutateAsync(id);
+      setPlan(generated);
+      setPhase('preview');
+    } catch (err) {
+      captureError(err, { feature: 'coach_regenerate_existing_student' });
+      setPhase('idle');
+      Alert.alert(
+        'Não consegui gerar',
+        err instanceof Error ? err.message : 'Tenta de novo.',
+      );
+    }
+  }
+
+  async function handleSavePlan() {
+    if (!id || !plan) return;
+    setPhase('saving');
+    try {
+      await saveMutation.mutateAsync({ studentId: id, plan });
+      setPhase('idle');
+      setPlan(null);
+      Alert.alert('Plano atualizado', 'As rotinas anteriores foram arquivadas.');
+    } catch (err) {
+      captureError(err, { feature: 'coach_save_existing_student' });
+      setPhase('preview');
+      Alert.alert(
+        'Não consegui salvar',
+        err instanceof Error ? err.message : 'Tenta de novo.',
+      );
+    }
+  }
+
+  if (phase === 'generating') {
+    return <FullScreenLoading title="Gerando novo plano com IA" />;
+  }
+  if (phase === 'saving') {
+    return <FullScreenLoading title="Salvando..." />;
+  }
+  if (phase === 'preview' && plan) {
+    return (
+      <PlanPreview
+        plan={plan}
+        onSave={handleSavePlan}
+        onRegenerate={handleRegenerate}
+        onCancel={() => {
+          setPhase('idle');
+          setPlan(null);
+        }}
+        saving={saveMutation.isPending}
+      />
+    );
+  }
+
+  if (detailQ.isLoading) {
+    return <FullScreenLoading title="Carregando aluno..." />;
+  }
+  if (detailQ.error || !detailQ.data) {
+    return (
+      <Screen variant="hero" edges={['top', 'bottom']}>
+        <View className="flex-1 items-center justify-center px-8 gap-4">
+          <Text className="text-text">Aluno não encontrado.</Text>
+          <Button label="Voltar" onPress={() => router.back()} variant="ghost" />
+        </View>
+      </Screen>
+    );
+  }
+
+  const { profile, routines } = detailQ.data;
+  const initial = (profile.full_name ?? '?').slice(0, 1).toUpperCase();
+  const age =
+    profile.birth_year != null
+      ? new Date().getFullYear() - profile.birth_year
+      : null;
+  const goalLabel = profile.goal_type
+    ? GOAL_LABEL[profile.goal_type] ?? null
+    : null;
+  const imcValue =
+    profile.weight_kg && profile.height_cm
+      ? bmi(profile.weight_kg, profile.height_cm)
+      : null;
+  const imcCat = imcValue != null ? bmiCategory(imcValue) : null;
+
+  return (
+    <Screen variant="hero" edges={['top', 'bottom']}>
+      <View className="flex-row items-center gap-3 px-5 py-3 border-b border-border-subtle">
+        <Pressable
+          onPress={() => router.back()}
+          hitSlop={12}
+          className="h-10 w-10 rounded-2xl bg-surface-raised border border-border items-center justify-center active:opacity-70"
+        >
+          <ArrowLeft size={18} color={colors.textDim} />
+        </Pressable>
+        <Text className="text-text font-semibold text-base flex-1" numberOfLines={1}>
+          {profile.full_name ?? 'Aluno'}
+        </Text>
+      </View>
+
+      <ScrollView
+        contentContainerStyle={{
+          paddingHorizontal: 20,
+          paddingTop: 20,
+          paddingBottom: 80,
+          gap: 14,
+        }}
+        showsVerticalScrollIndicator={false}
+      >
+        <Card glow accent="violet" padding="md">
+          <View className="flex-row items-center gap-3">
+            <View className="h-14 w-14 rounded-2xl bg-violet/15 border border-violet/40 items-center justify-center">
+              <Text className="text-violet-soft text-xl font-bold">
+                {initial}
+              </Text>
+            </View>
+            <View className="flex-1">
+              <Text className="text-text text-lg font-bold" numberOfLines={1}>
+                {profile.full_name ?? 'Sem nome'}
+              </Text>
+              <View className="flex-row flex-wrap items-center gap-2 mt-1">
+                {age != null && (
+                  <Text className="text-text-dim text-xs">{age} anos</Text>
+                )}
+                {profile.weight_kg != null && (
+                  <Text className="text-text-dim text-xs">
+                    {profile.weight_kg}kg
+                  </Text>
+                )}
+                {profile.height_cm != null && (
+                  <Text className="text-text-dim text-xs">
+                    {profile.height_cm}cm
+                  </Text>
+                )}
+              </View>
+              {goalLabel && (
+                <View className="flex-row items-center gap-1 mt-1.5">
+                  <Target size={11} color={colors.violetSoft} />
+                  <Text className="text-violet-soft text-[11px] font-semibold">
+                    {goalLabel}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+        </Card>
+
+        {imcValue && imcCat && (
+          <Card padding="md">
+            <Text className="text-text-dim text-[11px] uppercase tracking-widest mb-2">
+              IMC
+            </Text>
+            <View className="flex-row items-end gap-3">
+              <Text className="text-text text-3xl font-bold">
+                {imcValue.toFixed(1)}
+              </Text>
+              <View
+                className="rounded-full px-2.5 py-0.5 border mb-1"
+                style={{
+                  backgroundColor: `${imcCat.color}15`,
+                  borderColor: `${imcCat.color}60`,
+                }}
+              >
+                <Text
+                  className="text-xs font-semibold"
+                  style={{ color: imcCat.color }}
+                >
+                  {imcCat.label}
+                </Text>
+              </View>
+            </View>
+          </Card>
+        )}
+
+        <Card padding="md">
+          <Text className="text-text-dim text-[11px] uppercase tracking-widest mb-3">
+            Metas atuais
+          </Text>
+          <View className="gap-2.5">
+            <MetaRow
+              icon={<Flame size={14} color={colors.accent} />}
+              label="Calorias"
+              value={`${(profile.daily_calorie_goal ?? 0).toLocaleString('pt-BR')} kcal`}
+            />
+            <MetaRow
+              icon={<Beef size={14} color={colors.violetSoft} />}
+              label="Proteína"
+              value={`${profile.protein_goal_g ?? 0} g`}
+            />
+            <MetaRow
+              icon={<Droplet size={14} color={colors.info} />}
+              label="Água"
+              value={`${((profile.water_goal_ml ?? 0) / 1000).toFixed(1)} L`}
+            />
+          </View>
+        </Card>
+
+        {(profile.allergies || profile.physical_limitations || profile.bio) && (
+          <Card padding="md">
+            <Text className="text-text-dim text-[11px] uppercase tracking-widest mb-3">
+              Saúde / contexto
+            </Text>
+            <View className="gap-2">
+              {profile.allergies && (
+                <InfoLine label="Alergias" value={profile.allergies} />
+              )}
+              {profile.physical_limitations && (
+                <InfoLine
+                  label="Limitações"
+                  value={profile.physical_limitations}
+                />
+              )}
+              {profile.bio && <InfoLine label="Bio" value={profile.bio} />}
+            </View>
+          </Card>
+        )}
+
+        <Card padding="md">
+          <View className="flex-row items-center gap-2 mb-3">
+            <Dumbbell size={14} color={colors.accent} />
+            <Text className="text-text-dim text-[11px] uppercase tracking-widest">
+              Treinos prescritos ({routines.length})
+            </Text>
+          </View>
+          {routines.length === 0 ? (
+            <Text className="text-text-muted text-xs py-3">
+              Sem rotinas ativas. Gere um plano novo abaixo.
+            </Text>
+          ) : (
+            <View className="gap-2">
+              {routines.map((r) => (
+                <View
+                  key={r.id}
+                  className="rounded-2xl border border-border bg-surface-muted px-3 py-2.5"
+                >
+                  <Text
+                    className="text-text text-sm font-semibold"
+                    numberOfLines={1}
+                  >
+                    {r.name}
+                  </Text>
+                  <Text className="text-text-muted text-[11px] mt-0.5">
+                    {r.exercises_count} exercícios
+                    {r.description ? ` · ${r.description}` : ''}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </Card>
+
+        <Button
+          label="Gerar novo plano com IA"
+          onPress={() => setPhase('confirm_regenerate')}
+          variant="primary"
+          icon={<Sparkles size={16} color={colors.textInverse} />}
+        />
+
+        <Text className="text-text-muted text-[11px] text-center px-2 leading-relaxed">
+          Gerar novo plano arquiva as rotinas atuais (histórico preservado) e
+          cria as novas baseadas na ficha. Edição individual de exercícios
+          virá em breve.
+        </Text>
+      </ScrollView>
+
+      <ConfirmModal
+        visible={phase === 'confirm_regenerate'}
+        onClose={() => setPhase('idle')}
+        title="Gerar novo plano?"
+        message={
+          'A IA vai gerar metas e treinos novos com base na ficha atual. As rotinas ativas serão arquivadas (histórico de execuções preservado).'
+        }
+        icon={<RefreshCcw size={26} color={colors.violetSoft} />}
+        actions={[
+          {
+            label: 'Gerar com IA',
+            variant: 'primary',
+            onPress: handleRegenerate,
+          },
+          {
+            label: 'Cancelar',
+            variant: 'ghost',
+            onPress: () => setPhase('idle'),
+          },
+        ]}
+      />
+    </Screen>
+  );
+}
+
+function MetaRow({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <View className="flex-row items-center justify-between">
+      <View className="flex-row items-center gap-2">
+        {icon}
+        <Text className="text-text-dim text-sm">{label}</Text>
+      </View>
+      <Text className="text-text text-sm font-bold">{value}</Text>
+    </View>
+  );
+}
+
+function InfoLine({ label, value }: { label: string; value: string }) {
+  return (
+    <View>
+      <Text className="text-text-muted text-[10px] uppercase tracking-widest">
+        {label}
+      </Text>
+      <Text className="text-text-dim text-xs mt-0.5 leading-relaxed">
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+function FullScreenLoading({ title }: { title: string }) {
+  return (
+    <Screen variant="hero" edges={['top', 'bottom']}>
+      <View className="flex-1 items-center justify-center px-8 gap-4">
+        <ActivityIndicator color={colors.violetSoft} />
+        <Text className="text-text-dim text-sm">{title}</Text>
+      </View>
+    </Screen>
+  );
+}
+
+function PlanPreview({
+  plan,
+  onSave,
+  onRegenerate,
+  onCancel,
+  saving,
+}: {
+  plan: OnboardingPlan;
+  onSave: () => void;
+  onRegenerate: () => void;
+  onCancel: () => void;
+  saving: boolean;
+}) {
+  return (
+    <Screen variant="hero" edges={['top', 'bottom']}>
+      <View className="flex-row items-center gap-3 px-5 py-3 border-b border-border-subtle">
+        <Pressable
+          onPress={onCancel}
+          hitSlop={12}
+          className="h-10 w-10 rounded-2xl bg-surface-raised border border-border items-center justify-center active:opacity-70"
+        >
+          <ArrowLeft size={18} color={colors.textDim} />
+        </Pressable>
+        <Text className="text-text font-semibold text-base flex-1">
+          Revisar plano novo
+        </Text>
+      </View>
+
+      <ScrollView
+        contentContainerStyle={{
+          paddingHorizontal: 20,
+          paddingTop: 20,
+          paddingBottom: 60,
+          gap: 14,
+        }}
+        showsVerticalScrollIndicator={false}
+      >
+        <View className="items-center">
+          <View className="h-12 w-12 rounded-2xl bg-accent/10 border border-accent/30 items-center justify-center mb-2">
+            <Sparkles size={22} color={colors.accent} />
+          </View>
+          {plan.rationale && (
+            <View className="mt-2 px-2">
+              <MarkdownText
+                value={plan.rationale}
+                textColor={colors.textDim}
+                fontSize={13}
+              />
+            </View>
+          )}
+        </View>
+
+        <Card glow accent="green" padding="md">
+          <Text className="text-text-dim text-[11px] uppercase tracking-widest mb-3">
+            Novas metas
+          </Text>
+          <View className="gap-2">
+            <MetaRow
+              icon={<Flame size={14} color={colors.accent} />}
+              label="Calorias"
+              value={`${plan.calorie_goal} kcal`}
+            />
+            <MetaRow
+              icon={<Beef size={14} color={colors.violetSoft} />}
+              label="Proteína"
+              value={`${plan.protein_goal_g} g`}
+            />
+            <MetaRow
+              icon={<Droplet size={14} color={colors.info} />}
+              label="Água"
+              value={`${plan.water_goal_ml} ml`}
+            />
+          </View>
+        </Card>
+
+        {plan.routines.length > 0 && (
+          <View className="gap-2">
+            <Text className="text-text-dim text-[11px] uppercase tracking-widest px-1">
+              {plan.routines.length} treinos sugeridos
+            </Text>
+            {plan.routines.map((r, i) => (
+              <Card key={i} padding="md">
+                <Text className="text-text text-sm font-semibold">{r.name}</Text>
+                {r.description && (
+                  <Text className="text-text-muted text-[11px] mt-0.5">
+                    {r.description}
+                  </Text>
+                )}
+                <View className="gap-1 mt-2">
+                  {r.exercises.slice(0, 5).map((ex, j) => (
+                    <Text
+                      key={j}
+                      className="text-text-dim text-[12px]"
+                      numberOfLines={1}
+                    >
+                      • {ex.exercise_name} — {ex.sets}×{ex.reps_min}-{ex.reps_max}
+                    </Text>
+                  ))}
+                  {r.exercises.length > 5 && (
+                    <Text className="text-text-muted text-[11px]">
+                      + {r.exercises.length - 5} outros
+                    </Text>
+                  )}
+                </View>
+              </Card>
+            ))}
+          </View>
+        )}
+
+        <Button
+          label="Salvar plano novo"
+          onPress={onSave}
+          loading={saving}
+          icon={<Send size={18} color={colors.textInverse} />}
+        />
+        <Button
+          label="Gerar outro"
+          onPress={onRegenerate}
+          variant="ghost"
+          icon={<RefreshCcw size={16} color={colors.textDim} />}
+        />
+      </ScrollView>
+    </Screen>
+  );
+}

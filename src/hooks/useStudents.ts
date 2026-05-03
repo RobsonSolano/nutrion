@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   createStudent,
   generatePlanForStudent,
+  getStudentDetail,
   listStudents,
   saveStudentPlan,
   sendStudentCredentials,
@@ -11,6 +12,8 @@ import type { OnboardingPlan } from '@/services/onboarding';
 import { useAuth } from './useAuth';
 
 const studentsKey = (coachId: string) => ['students', coachId] as const;
+const studentDetailKey = (studentId: string) =>
+  ['student_detail', studentId] as const;
 
 export function useStudents() {
   const { user } = useAuth();
@@ -19,6 +22,18 @@ export function useStudents() {
     queryFn: listStudents,
     enabled: !!user?.id,
     staleTime: 30_000,
+  });
+}
+
+export function useStudentDetail(studentId: string | null) {
+  return useQuery({
+    queryKey: studentDetailKey(studentId ?? 'none'),
+    queryFn: () => {
+      if (!studentId) throw new Error('student_id ausente');
+      return getStudentDetail(studentId);
+    },
+    enabled: !!studentId,
+    staleTime: 15_000,
   });
 }
 
@@ -47,10 +62,13 @@ export function useSaveStudentPlan() {
   return useMutation({
     mutationFn: (params: { studentId: string; plan: OnboardingPlan }) =>
       saveStudentPlan(params.studentId, params.plan),
-    onSuccess: () => {
+    onSuccess: (_data, vars) => {
       if (user?.id) {
         void qc.invalidateQueries({ queryKey: studentsKey(user.id) });
       }
+      void qc.invalidateQueries({
+        queryKey: studentDetailKey(vars.studentId),
+      });
     },
   });
 }

@@ -25,6 +25,59 @@ export type StudentLite = Pick<
 
 export type StudentDetailed = Profile;
 
+export type StudentRoutineLite = {
+  id: string;
+  name: string;
+  modality: string;
+  description: string | null;
+  exercises_count: number;
+  created_at: string;
+};
+
+export type StudentDetail = {
+  profile: Profile;
+  routines: StudentRoutineLite[];
+};
+
+export async function getStudentDetail(
+  studentId: string,
+): Promise<StudentDetail> {
+  const { data: profile, error: pErr } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', studentId)
+    .single();
+  if (pErr) throw pErr;
+
+  const { data: routines, error: rErr } = await supabase
+    .from('workout_routines')
+    .select('id, name, modality, description, created_at, exercises:workout_routine_exercises(count)')
+    .eq('user_id', studentId)
+    .eq('is_archived', false)
+    .order('created_at', { ascending: false });
+  if (rErr) throw rErr;
+
+  const routinesLite = (routines ?? []).map((r) => {
+    const { exercises, ...rest } = r as {
+      id: string;
+      name: string;
+      modality: string;
+      description: string | null;
+      created_at: string;
+      exercises: { count: number }[] | null;
+    };
+    return {
+      ...rest,
+      exercises_count: exercises?.[0]?.count ?? 0,
+    };
+  });
+
+  return {
+    profile: profile as Profile,
+    routines: routinesLite,
+  };
+}
+
 export type CreateStudentInput = {
   email: string;
   password: string;
