@@ -180,3 +180,39 @@ export async function sendStudentCredentials(
     password,
   });
 }
+
+export type UpdateStudentPatch = Partial<{
+  full_name: string | null;
+  sex: 'm' | 'f' | 'o' | null;
+  birth_year: number | null;
+  weight_kg: number | null;
+  height_cm: number | null;
+  goal_type: 'lose_fat' | 'maintain' | 'gain_muscle' | 'reduce_body_fat' | null;
+  goal_weight_kg: number | null;
+  goal_target_date: string | null;
+  practices_sport: boolean | null;
+  sports: string[] | null;
+  weekly_frequency: string | null;
+  water_goal_ml: number | null;
+  daily_calorie_goal: number | null;
+  protein_goal_g: number | null;
+  allergies: string | null;
+  physical_limitations: string | null;
+  bio: string | null;
+}>;
+
+export async function updateStudent(
+  studentId: string,
+  patch: UpdateStudentPatch,
+): Promise<{ student: Profile }> {
+  return callFn<{ student: Profile }>('coach-update-student', {
+    student_id: studentId,
+    patch,
+  });
+}
+
+export async function deleteStudent(studentId: string): Promise<{ ok: true }> {
+  return callFn<{ ok: true }>('coach-delete-student', {
+    student_id: studentId,
+  });
+}
