@@ -166,3 +166,16 @@ export async function signInWithEmailPassword(params: {
   if (error) throw error;
   return data;
 }
+
+export async function changePassword(newPassword: string) {
+  validatePassword(newPassword);
+  const { error } = await supabase.auth.updateUser({ password: newPassword });
+  if (error) throw error;
+}
+
+export async function requestPasswordReset(rawEmail: string) {
+  const email = normalizeEmail(rawEmail);
+  // Supabase manda email com link nativo (template configuravel no dashboard).
+  const { error } = await supabase.auth.resetPasswordForEmail(email);
+  if (error) throw error;
+}

@@ -21,10 +21,12 @@ import {
 } from 'lucide-react-native';
 import { useAuth } from '@/hooks/useAuth';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
+import { requestPasswordReset } from '@/services/auth';
 import { colors } from '@/lib/theme';
 import { IS_EXPO_GO } from '@/lib/platform';
 import {
   Button,
+  ConfirmModal,
   Input,
   Logo,
   Screen,
@@ -64,6 +66,35 @@ export default function LoginScreen() {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [forgotLoading, setForgotLoading] = useState(false);
+
+  async function handleForgotPassword() {
+    if (!email.trim()) {
+      Alert.alert(
+        'Informe o email',
+        'Digite seu email no campo acima e tente "Esqueci a senha" de novo.',
+      );
+      return;
+    }
+    setForgotLoading(true);
+    try {
+      await requestPasswordReset(email);
+      setForgotOpen(false);
+      Alert.alert(
+        'Email enviado',
+        'Se o email estiver cadastrado, você vai receber um link pra definir nova senha em alguns minutos.',
+      );
+    } catch (err) {
+      Alert.alert(
+        'Não consegui enviar',
+        err instanceof Error ? err.message : 'Tenta de novo.',
+      );
+    } finally {
+      setForgotLoading(false);
+    }
+  }
 
   const emailRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
@@ -234,6 +265,18 @@ export default function LoginScreen() {
                 disabled={!canSubmit}
               />
             </View>
+
+            {mode === 'login' && (
+              <Pressable
+                onPress={() => setForgotOpen(true)}
+                hitSlop={6}
+                className="self-center mt-1 px-2 py-1 active:opacity-70"
+              >
+                <Text className="text-violet-soft text-[12px] font-semibold">
+                  Esqueci a senha
+                </Text>
+              </Pressable>
+            )}
           </View>
 
           {IS_EXPO_GO && (
@@ -279,6 +322,31 @@ export default function LoginScreen() {
           </Text>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <ConfirmModal
+        visible={forgotOpen}
+        onClose={() => setForgotOpen(false)}
+        title="Esqueci a senha"
+        message={
+          email.trim()
+            ? `Vamos enviar um link pra "${email.trim()}" definir uma nova senha.`
+            : 'Digite seu email no campo de login antes de continuar.'
+        }
+        actions={[
+          {
+            label: 'Enviar link',
+            variant: 'primary',
+            onPress: handleForgotPassword,
+            loading: forgotLoading,
+            disabled: !email.trim(),
+          },
+          {
+            label: 'Cancelar',
+            variant: 'ghost',
+            onPress: () => setForgotOpen(false),
+          },
+        ]}
+      />
     </Screen>
   );
 }
