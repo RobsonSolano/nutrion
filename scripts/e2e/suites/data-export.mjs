@@ -8,6 +8,7 @@ suite('Data export', ({ test }) => {
 
     // Cria 1 food_log + 1 water_log pra ter o que exportar.
     await user.client.from('food_logs').insert({
+      user_id: user.id,
       meal_name: 'Café',
       description: 'Café preto + ovos',
       calories: 250,
@@ -49,6 +50,7 @@ suite('Data export', ({ test }) => {
     ctx.defer(() => cleanupUser(userB));
 
     await userA.client.from('food_logs').insert({
+      user_id: userA.id,
       meal_name: 'Privado',
       calories: 999,
     });
