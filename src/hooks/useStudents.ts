@@ -1,12 +1,15 @@
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   createStudent,
+  deleteStudent,
   generatePlanForStudent,
   getStudentDetail,
   listStudents,
   saveStudentPlan,
   sendStudentCredentials,
+  updateStudent,
   type CreateStudentInput,
+  type UpdateStudentPatch,
 } from '@/services/students';
 import {
   replaceRoutineExercises,
@@ -122,6 +125,38 @@ export function useSendStudentCredentials() {
   return useMutation({
     mutationFn: (params: { studentId: string; password: string }) =>
       sendStudentCredentials(params.studentId, params.password),
+  });
+}
+
+export function useUpdateStudent() {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (params: {
+      studentId: string;
+      patch: UpdateStudentPatch;
+    }) => updateStudent(params.studentId, params.patch),
+    onSuccess: (_data, vars) => {
+      if (user?.id) {
+        void qc.invalidateQueries({ queryKey: studentsKey(user.id) });
+      }
+      void qc.invalidateQueries({
+        queryKey: studentDetailKey(vars.studentId),
+      });
+    },
+  });
+}
+
+export function useDeleteStudent() {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (studentId: string) => deleteStudent(studentId),
+    onSuccess: () => {
+      if (user?.id) {
+        void qc.invalidateQueries({ queryKey: studentsKey(user.id) });
+      }
+    },
   });
 }
 
