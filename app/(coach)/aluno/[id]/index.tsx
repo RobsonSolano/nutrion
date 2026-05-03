@@ -162,6 +162,20 @@ export default function AlunoDetalheScreen() {
         <Text className="text-text font-semibold text-base flex-1" numberOfLines={1}>
           {profile.full_name ?? 'Aluno'}
         </Text>
+        <Pressable
+          onPress={() =>
+            router.push(`/(coach)/aluno/${id}/editar` as Href)
+          }
+          hitSlop={8}
+          className="rounded-full border border-border bg-surface-muted px-3 py-1.5 active:opacity-70"
+        >
+          <View className="flex-row items-center gap-1.5">
+            <Pencil size={11} color={colors.textDim} />
+            <Text className="text-text-dim text-[11px] font-semibold">
+              Editar
+            </Text>
+          </View>
+        </Pressable>
       </View>
 
       <ScrollView
