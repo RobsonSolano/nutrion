@@ -9,6 +9,7 @@ suite('Logs (food / water / workout_session)', ({ test }) => {
     const { data: created, error: insErr } = await user.client
       .from('food_logs')
       .insert({
+        user_id: user.id,
         meal_name: 'Almoço de teste',
         description: '150g arroz, 120g frango',
         calories: 600,
@@ -101,7 +102,7 @@ suite('Logs (food / water / workout_session)', ({ test }) => {
 
     await userA.client
       .from('food_logs')
-      .insert({ meal_name: 'Privado de A', calories: 100 });
+      .insert({ user_id: userA.id, meal_name: 'Privado de A', calories: 100 });
 
     const { data: visibleToB } = await userB.client.from('food_logs').select('*');
     expect(visibleToB.length).toBe(0);
