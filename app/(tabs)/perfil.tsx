@@ -15,6 +15,7 @@ import {
   RefreshCw,
   AlertTriangle,
   MessagesSquare,
+  Lock,
 } from 'lucide-react-native';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
@@ -171,6 +172,14 @@ export default function PerfilScreen() {
             icon={<MessagesSquare size={16} color={colors.violetSoft} />}
           />
         )}
+
+        <Button
+          label="Trocar senha"
+          onPress={() => router.push('/trocar-senha' as Href)}
+          variant="secondary"
+          size="md"
+          icon={<Lock size={16} color={colors.text} />}
+        />
 
         <Card>
           <Text className="text-text-dim text-[11px] uppercase tracking-widest mb-4">
