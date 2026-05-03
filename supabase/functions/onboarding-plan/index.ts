@@ -12,6 +12,10 @@
 
 import { serve } from 'std/http/server.ts';
 import { createClient } from '@supabase/supabase-js';
+import {
+  fetchReferences,
+  formatReferencesForPrompt,
+} from '../_shared/references.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
@@ -328,7 +332,10 @@ serve(async (req: Request) => {
     }
 
     const { modalities, onlyFood } = pickRelevantModalities(body);
-    const catalog = onlyFood ? [] : await fetchCatalog(supabase, modalities);
+    const [catalog, references] = await Promise.all([
+      onlyFood ? Promise.resolve([]) : fetchCatalog(supabase, modalities),
+      fetchReferences(supabase, ['nutricao', 'treino', 'geral']),
+    ]);
 
     if (!onlyFood && catalog.length === 0) {
       await logEvent({ status: 'error', errorCode: 'empty_catalog' });
@@ -344,6 +351,12 @@ serve(async (req: Request) => {
 
     const systemPrompt = buildSystemPrompt(modalities, onlyFood);
     const userBlock = buildUserBlock(body, catalog, modalities, onlyFood);
+    // Injetadas DENTRO do `rationale` da resposta JSON (não como campo
+    // separado pra não quebrar o shape do PlanOut consumido pelo client).
+    const referencesBlock = formatReferencesForPrompt(references, {
+      mode: 'json_field',
+      jsonField: 'rationale',
+    });
 
     const groqRes = await fetch(GROQ_URL, {
       method: 'POST',
@@ -354,7 +367,7 @@ serve(async (req: Request) => {
       body: JSON.stringify({
         model: MODEL,
         messages: [
-          { role: 'system', content: systemPrompt },
+          { role: 'system', content: `${systemPrompt}${referencesBlock}` },
           { role: 'user', content: userBlock },
         ],
         temperature: 0.4,
