@@ -5,6 +5,10 @@
 
 import { serve } from 'std/http/server.ts';
 import { createClient } from '@supabase/supabase-js';
+import {
+  fetchReferences,
+  formatReferencesForPrompt,
+} from '../_shared/references.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
@@ -238,6 +242,14 @@ serve(async (req: Request) => {
       }
     }
 
+    // Tags de referências bibliográficas relevantes pro modo. Chat livre
+    // pega tudo (nutrição + treino + geral); sanity_check de prato foca
+    // em nutrição. As referências entram no system prompt e a IA é
+    // instruída a citar no final da resposta.
+    const referenceTags = isChatMode
+      ? ['nutricao', 'treino', 'geral']
+      : ['nutricao', 'geral'];
+
     // Contexto rico (perfil + logs) — usado em ambos os modos.
     const [
       profileRes,
@@ -246,6 +258,7 @@ serve(async (req: Request) => {
       sessionRes,
       waterRes,
       historyRes,
+      references,
     ] = await Promise.all([
       supabase
         .from('profiles')
@@ -286,6 +299,7 @@ serve(async (req: Request) => {
             .order('created_at', { ascending: false })
             .limit(HISTORY_MESSAGES)
         : Promise.resolve({ data: [] as { role: string; content: string }[] }),
+      fetchReferences(supabase, referenceTags),
     ]);
 
     const profile = (profileRes.data ?? null) as Profile | null;
@@ -298,6 +312,12 @@ serve(async (req: Request) => {
 
     const todayTotals = aggregateToday(foods, todayBR);
     const contextBlock = buildContext(profile, todayTotals, workouts);
+    const referencesBlock = formatReferencesForPrompt(
+      references,
+      isChatMode
+        ? { mode: 'text' }
+        : { mode: 'json_field', jsonField: 'feedback' },
+    );
 
     // No modo chat, prefixamos um snapshot do dia na user msg que vai pro
     // Groq — dá mais peso ao contexto atual e a IA responde de forma situada.
@@ -347,7 +367,10 @@ serve(async (req: Request) => {
     }
 
     const messages: { role: string; content: unknown }[] = [
-      { role: 'system', content: `${PERSONA_PROMPT}\n\n${contextBlock}` },
+      {
+        role: 'system',
+        content: `${PERSONA_PROMPT}\n\n${contextBlock}${referencesBlock}`,
+      },
       ...history.map((h) => ({ role: h.role, content: h.content })),
       { role: 'user', content: userContent },
     ];
