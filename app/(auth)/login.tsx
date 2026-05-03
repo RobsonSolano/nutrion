@@ -3,11 +3,13 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import { useRouter, type Href } from 'expo-router';
 import {
   Mail,
   Lock,
@@ -15,13 +17,16 @@ import {
   Eye,
   EyeOff,
   Sparkles,
+  GraduationCap,
 } from 'lucide-react-native';
 import { useAuth } from '@/hooks/useAuth';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
+import { requestPasswordReset } from '@/services/auth';
 import { colors } from '@/lib/theme';
 import { IS_EXPO_GO } from '@/lib/platform';
 import {
   Button,
+  ConfirmModal,
   Input,
   Logo,
   Screen,
@@ -52,6 +57,7 @@ function GoogleMark() {
 }
 
 export default function LoginScreen() {
+  const router = useRouter();
   const { loginWithGoogle, loginWithEmail, signUp } = useAuth();
   const [mode, setMode] = useState<Mode>('login');
   const [loading, setLoading] = useState(false);
@@ -60,6 +66,35 @@ export default function LoginScreen() {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [forgotLoading, setForgotLoading] = useState(false);
+
+  async function handleForgotPassword() {
+    if (!email.trim()) {
+      Alert.alert(
+        'Informe o email',
+        'Digite seu email no campo acima e tente "Esqueci a senha" de novo.',
+      );
+      return;
+    }
+    setForgotLoading(true);
+    try {
+      await requestPasswordReset(email);
+      setForgotOpen(false);
+      Alert.alert(
+        'Email enviado',
+        'Se o email estiver cadastrado, você vai receber um link pra definir nova senha em alguns minutos.',
+      );
+    } catch (err) {
+      Alert.alert(
+        'Não consegui enviar',
+        err instanceof Error ? err.message : 'Tenta de novo.',
+      );
+    } finally {
+      setForgotLoading(false);
+    }
+  }
 
   const emailRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
@@ -230,6 +265,18 @@ export default function LoginScreen() {
                 disabled={!canSubmit}
               />
             </View>
+
+            {mode === 'login' && (
+              <Pressable
+                onPress={() => setForgotOpen(true)}
+                hitSlop={6}
+                className="self-center mt-1 px-2 py-1 active:opacity-70"
+              >
+                <Text className="text-violet-soft text-[12px] font-semibold">
+                  Esqueci a senha
+                </Text>
+              </Pressable>
+            )}
           </View>
 
           {IS_EXPO_GO && (
@@ -241,6 +288,33 @@ export default function LoginScreen() {
             </View>
           )}
 
+          <View className="flex-row items-center gap-3 mt-7">
+            <View className="flex-1 h-px bg-border" />
+            <Text className="text-text-muted text-[10px] uppercase tracking-widest">
+              Sou professor
+            </Text>
+            <View className="flex-1 h-px bg-border" />
+          </View>
+
+          <Pressable
+            onPress={() => router.push('/(auth)/signup-professor' as Href)}
+            className="mt-3 rounded-2xl border border-violet/40 bg-violet/5 px-4 py-3 active:opacity-70"
+          >
+            <View className="flex-row items-center gap-3">
+              <View className="h-9 w-9 rounded-xl bg-violet/15 border border-violet/40 items-center justify-center">
+                <GraduationCap size={16} color={colors.violetSoft} />
+              </View>
+              <View className="flex-1">
+                <Text className="text-text text-sm font-semibold">
+                  Criar conta de professor
+                </Text>
+                <Text className="text-text-muted text-[11px] mt-0.5">
+                  Cadastre alunos e monte treinos com a IA.
+                </Text>
+              </View>
+            </View>
+          </Pressable>
+
           <Text className="text-text-muted text-[11px] text-center mt-8 leading-relaxed px-2">
             Ao continuar, você concorda em tratar as recomendações como
             informativas. Decisões de saúde devem ser validadas com
@@ -248,6 +322,31 @@ export default function LoginScreen() {
           </Text>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <ConfirmModal
+        visible={forgotOpen}
+        onClose={() => setForgotOpen(false)}
+        title="Esqueci a senha"
+        message={
+          email.trim()
+            ? `Vamos enviar um link pra "${email.trim()}" definir uma nova senha.`
+            : 'Digite seu email no campo de login antes de continuar.'
+        }
+        actions={[
+          {
+            label: 'Enviar link',
+            variant: 'primary',
+            onPress: handleForgotPassword,
+            loading: forgotLoading,
+            disabled: !email.trim(),
+          },
+          {
+            label: 'Cancelar',
+            variant: 'ghost',
+            onPress: () => setForgotOpen(false),
+          },
+        ]}
+      />
     </Screen>
   );
 }

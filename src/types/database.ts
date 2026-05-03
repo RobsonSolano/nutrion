@@ -8,6 +8,8 @@ export type GoalType =
   | 'reduce_body_fat';
 export type WeeklyFrequency = '1-2' | '2-3' | '3-4' | '4-5' | '5-6' | '6-7';
 
+export type ProfileRole = 'comum' | 'aluno' | 'professor';
+
 export type Profile = {
   id: string;
   full_name: string | null;
@@ -32,6 +34,34 @@ export type Profile = {
   onboarding_skipped_at: string | null;
   user_number: number | null;
   is_early_adopter: boolean | null;
+  role: ProfileRole;
+  coach_id: string | null;
+  expo_push_token: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Coach = {
+  id: string;
+  bio: string | null;
+  cref: string | null;
+  max_students: number;
+  created_at: string;
+};
+
+export type StudentRequestStatus =
+  | 'open'
+  | 'in_progress'
+  | 'done'
+  | 'cancelled';
+
+export type StudentRequest = {
+  id: string;
+  student_id: string;
+  coach_id: string;
+  message: string;
+  status: StudentRequestStatus;
+  coach_response: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -109,6 +139,7 @@ export type WorkoutRoutine = {
   modality: Modality;
   description: string | null;
   is_archived: boolean;
+  created_by_coach: string | null;
   created_at: string;
   updated_at: string;
 };

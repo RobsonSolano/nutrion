@@ -7,18 +7,30 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useEffect, useMemo } from 'react';
 import { useAuthBootstrap } from '@/hooks/useAuth';
+import { useNotificationRouter } from '@/hooks/useNotificationRouter';
 import { useSessionStore } from '@/stores/useSessionStore';
 import { initSentry, Sentry, setSentryUser } from '@/lib/sentry';
+import {
+  configurePushHandler,
+  ensureAndroidChannel,
+} from '@/services/pushNotifications';
 
 initSentry();
+configurePushHandler();
 
 function Providers({ children }: { children: React.ReactNode }) {
   useAuthBootstrap();
+  useNotificationRouter();
   const userId = useSessionStore((s) => s.user?.id ?? null);
 
   useEffect(() => {
     setSentryUser(userId);
   }, [userId]);
+
+  // Setup do canal Android — idempotente, roda uma vez no startup.
+  useEffect(() => {
+    void ensureAndroidChannel();
+  }, []);
 
   return <>{children}</>;
 }

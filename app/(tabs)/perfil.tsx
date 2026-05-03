@@ -14,10 +14,16 @@ import {
   Gift,
   RefreshCw,
   AlertTriangle,
+  MessagesSquare,
+  Lock,
+  Download,
+  Bell,
+  BellOff,
 } from 'lucide-react-native';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
 import { useResetOnboarding } from '@/hooks/useOnboarding';
+import { usePushToggle } from '@/hooks/usePushToggle';
 import type { ResetOnboardingMode } from '@/services/onboarding';
 import { useDailyOnboardingUsage } from '@/hooks/useAiUsage';
 import { useOnboardingStore } from '@/stores/useOnboardingStore';
@@ -40,10 +46,13 @@ export default function PerfilScreen() {
   const [redoStep, setRedoStep] = useState<RedoStep>('closed');
   const [logoutOpen, setLogoutOpen] = useState(false);
 
+  const push = usePushToggle();
+
   const hasCompletedOnboarding = !!profile?.onboarding_completed_at;
   const refazerBlocked =
     hasCompletedOnboarding && onboardingUsage.limitReached;
   const isEarlyAdopter = profile?.is_early_adopter === true;
+  const isStudent = profile?.role === 'aluno';
 
   async function executeReset(mode: ResetOnboardingMode) {
     setRedoStep('closed');
@@ -160,6 +169,47 @@ export default function PerfilScreen() {
           icon={<Pencil size={16} color={colors.text} />}
         />
 
+        {isStudent && (
+          <Button
+            label="Minhas solicitações"
+            onPress={() => router.push('/solicitacoes' as Href)}
+            variant="secondary"
+            size="md"
+            icon={<MessagesSquare size={16} color={colors.violetSoft} />}
+          />
+        )}
+
+        <Button
+          label="Trocar senha"
+          onPress={() => router.push('/trocar-senha' as Href)}
+          variant="secondary"
+          size="md"
+          icon={<Lock size={16} color={colors.text} />}
+        />
+
+        <Button
+          label={push.enabled ? 'Desativar notificações' : 'Ativar notificações'}
+          onPress={push.toggle}
+          loading={push.loading}
+          variant="secondary"
+          size="md"
+          icon={
+            push.enabled ? (
+              <BellOff size={16} color={colors.text} />
+            ) : (
+              <Bell size={16} color={colors.text} />
+            )
+          }
+        />
+
+        <Button
+          label="Exportar meus dados"
+          onPress={() => router.push('/exportar-dados' as Href)}
+          variant="ghost"
+          size="md"
+          icon={<Download size={16} color={colors.textDim} />}
+        />
+
         <Card>
           <Text className="text-text-dim text-[11px] uppercase tracking-widest mb-4">
             Medidas
@@ -250,21 +300,23 @@ export default function PerfilScreen() {
           </View>
         </Card>
 
-        <Button
-          label={
-            !profile?.onboarding_completed_at
-              ? 'Completar onboarding com IA'
-              : refazerBlocked
-                ? 'Refazer disponível amanhã'
-                : 'Gerar novo plano com IA'
-          }
-          onPress={handleRedoOnboarding}
-          loading={resetPending}
-          disabled={refazerBlocked}
-          variant="secondary"
-          size="md"
-          icon={<Sparkles size={16} color={colors.accent} />}
-        />
+        {!isStudent && (
+          <Button
+            label={
+              !profile?.onboarding_completed_at
+                ? 'Completar onboarding com IA'
+                : refazerBlocked
+                  ? 'Refazer disponível amanhã'
+                  : 'Gerar novo plano com IA'
+            }
+            onPress={handleRedoOnboarding}
+            loading={resetPending}
+            disabled={refazerBlocked}
+            variant="secondary"
+            size="md"
+            icon={<Sparkles size={16} color={colors.accent} />}
+          />
+        )}
 
         <Button
           label="Sair da conta"
