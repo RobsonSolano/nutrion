@@ -8,6 +8,7 @@
 import { serve } from 'std/http/server.ts';
 import { createClient } from '@supabase/supabase-js';
 import type { PlanOut } from '../_shared/plan-generator.ts';
+import { sendExpoPush } from '../_shared/expoPush.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
@@ -216,6 +217,20 @@ serve(async (req: Request) => {
 
       createdRoutines.push(routine);
     }
+
+    // Push pro aluno avisando que o plano foi atualizado. Erros aqui não
+    // bloqueiam o save — push é best-effort.
+    const { data: coachProfile } = await supabaseService
+      .from('profiles')
+      .select('full_name')
+      .eq('id', caller.id)
+      .single();
+    const coachName = coachProfile?.full_name ?? 'Seu professor';
+    await sendExpoPush(supabaseService, body.student_id, {
+      title: 'Plano atualizado',
+      body: `${coachName} atualizou seus treinos e metas.`,
+      data: { event: 'plan_updated' },
+    });
 
     return json({ profile, routines: createdRoutines });
   } catch (err) {
