@@ -203,7 +203,11 @@ export default function AlunoNovo() {
     try {
       await saveMutation.mutateAsync({ studentId, plan });
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      // Pergunta se quer encaminhar email com credenciais
+      // Volta pra 'preview' antes de abrir o modal: o ConfirmModal só
+      // está renderizado dentro do bloco `phase === 'preview'`, então
+      // sem voltar a tela ficava travada em <SavingScreen /> e o modal
+      // nunca aparecia.
+      setPhase('preview');
       setConfirmEmailOpen(true);
     } catch (err) {
       captureError(err, { feature: 'coach_save_plan' });
