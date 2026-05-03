@@ -9,8 +9,13 @@ import { useEffect, useMemo } from 'react';
 import { useAuthBootstrap } from '@/hooks/useAuth';
 import { useSessionStore } from '@/stores/useSessionStore';
 import { initSentry, Sentry, setSentryUser } from '@/lib/sentry';
+import {
+  configurePushHandler,
+  ensureAndroidChannel,
+} from '@/services/pushNotifications';
 
 initSentry();
+configurePushHandler();
 
 function Providers({ children }: { children: React.ReactNode }) {
   useAuthBootstrap();
@@ -19,6 +24,11 @@ function Providers({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     setSentryUser(userId);
   }, [userId]);
+
+  // Setup do canal Android — idempotente, roda uma vez no startup.
+  useEffect(() => {
+    void ensureAndroidChannel();
+  }, []);
 
   return <>{children}</>;
 }
