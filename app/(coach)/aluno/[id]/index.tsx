@@ -35,9 +35,11 @@ import {
   useGenerateStudentPlan,
   useSaveStudentPlan,
   useStudentDetail,
+  useStudentTracking,
 } from '@/hooks/useStudents';
 import { bmi, bmiCategory } from '@/lib/biometrics';
 import type { OnboardingPlan } from '@/services/onboarding';
+import type { DayActivity, StudentTracking } from '@/services/studentTracking';
 import { captureError } from '@/lib/sentry';
 
 const GOAL_LABEL: Record<string, string> = {
@@ -53,6 +55,7 @@ export default function AlunoDetalheScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const detailQ = useStudentDetail(id ?? null);
+  const trackingQ = useStudentTracking(id ?? null);
   const generateMutation = useGenerateStudentPlan();
   const saveMutation = useSaveStudentPlan();
 
@@ -235,6 +238,14 @@ export default function AlunoDetalheScreen() {
           </Card>
         )}
 
+        {trackingQ.data && (
+          <TodayCard tracking={trackingQ.data} profile={profile} />
+        )}
+
+        {trackingQ.data && (
+          <WeekAdherenceCard tracking={trackingQ.data} />
+        )}
+
         <Card padding="md">
           <Text className="text-text-dim text-[11px] uppercase tracking-widest mb-3">
             Metas atuais
@@ -381,6 +392,184 @@ function MetaRow({
         <Text className="text-text-dim text-sm">{label}</Text>
       </View>
       <Text className="text-text text-sm font-bold">{value}</Text>
+    </View>
+  );
+}
+
+function TodayCard({
+  tracking,
+  profile,
+}: {
+  tracking: StudentTracking;
+  profile: { daily_calorie_goal: number | null; protein_goal_g: number | null; water_goal_ml: number | null };
+}) {
+  const { today } = tracking;
+  const sessionLabel =
+    today.workoutSessions.length > 0
+      ? today.workoutSessions.map((s) => s.routine_name).join(', ')
+      : null;
+
+  return (
+    <Card padding="md">
+      <Text className="text-text-dim text-[11px] uppercase tracking-widest mb-3">
+        Hoje
+      </Text>
+      <View className="gap-3">
+        <ProgressRow
+          icon={<Flame size={14} color={colors.accent} />}
+          label="Calorias"
+          current={today.calories}
+          goal={profile.daily_calorie_goal ?? 0}
+          unit="kcal"
+        />
+        <ProgressRow
+          icon={<Beef size={14} color={colors.violetSoft} />}
+          label="Proteína"
+          current={today.protein}
+          goal={profile.protein_goal_g ?? 0}
+          unit="g"
+        />
+        <ProgressRow
+          icon={<Droplet size={14} color={colors.info} />}
+          label="Água"
+          current={today.waterMl}
+          goal={profile.water_goal_ml ?? 0}
+          unit="ml"
+        />
+        <View className="flex-row items-center justify-between pt-1">
+          <View className="flex-row items-center gap-2">
+            <Dumbbell size={14} color={colors.accent} />
+            <Text className="text-text-dim text-sm">Treino</Text>
+          </View>
+          <Text
+            className="text-sm font-bold flex-1 text-right"
+            numberOfLines={1}
+            style={{
+              color: sessionLabel ? colors.text : colors.textMuted,
+            }}
+          >
+            {sessionLabel ?? 'sem registro'}
+          </Text>
+        </View>
+        <View className="mt-1">
+          <Text className="text-text-muted text-[11px]">
+            {today.foodLogs.length} refeição
+            {today.foodLogs.length === 1 ? '' : 'ões'} registrada
+            {today.foodLogs.length === 1 ? '' : 's'}
+          </Text>
+        </View>
+      </View>
+    </Card>
+  );
+}
+
+function ProgressRow({
+  icon,
+  label,
+  current,
+  goal,
+  unit,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  current: number;
+  goal: number;
+  unit: string;
+}) {
+  const pct = goal > 0 ? Math.min(100, Math.round((current / goal) * 100)) : 0;
+  return (
+    <View className="gap-1.5">
+      <View className="flex-row items-center justify-between">
+        <View className="flex-row items-center gap-2">
+          {icon}
+          <Text className="text-text-dim text-sm">{label}</Text>
+        </View>
+        <Text className="text-text text-xs font-semibold">
+          {current.toLocaleString('pt-BR')} / {goal.toLocaleString('pt-BR')} {unit}
+        </Text>
+      </View>
+      <View className="h-1.5 rounded-full bg-surface-muted overflow-hidden border border-border-subtle">
+        <View
+          className="h-full rounded-full"
+          style={{
+            width: `${pct}%`,
+            backgroundColor:
+              pct >= 100 ? colors.accent : pct >= 50 ? colors.violetSoft : colors.warn,
+          }}
+        />
+      </View>
+    </View>
+  );
+}
+
+function WeekAdherenceCard({ tracking }: { tracking: StudentTracking }) {
+  const tone =
+    tracking.adherenceLast7 >= 70
+      ? colors.accent
+      : tracking.adherenceLast7 >= 40
+        ? colors.warn
+        : colors.danger;
+
+  return (
+    <Card padding="md">
+      <View className="flex-row items-center justify-between mb-3">
+        <Text className="text-text-dim text-[11px] uppercase tracking-widest">
+          Aderência (7d)
+        </Text>
+        <Text className="text-2xl font-bold" style={{ color: tone }}>
+          {tracking.adherenceLast7}%
+        </Text>
+      </View>
+      <View className="flex-row gap-1.5">
+        {tracking.weekActivity.map((d) => (
+          <DayDot key={d.day} day={d} />
+        ))}
+      </View>
+      <View className="flex-row gap-3 mt-3">
+        <Legend color={colors.accent} label="comida" />
+        <Legend color={colors.info} label="água" />
+        <Legend color={colors.violetSoft} label="treino" />
+      </View>
+    </Card>
+  );
+}
+
+function DayDot({ day }: { day: DayActivity }) {
+  const date = new Date(day.day + 'T12:00:00');
+  const label = date.toLocaleDateString('pt-BR', { weekday: 'short' }).slice(0, 3);
+  return (
+    <View className="flex-1 items-center gap-1">
+      <View className="flex-row gap-0.5">
+        <Pip active={day.hasFood} color={colors.accent} />
+        <Pip active={day.hasWater} color={colors.info} />
+        <Pip active={day.hasWorkout} color={colors.violetSoft} />
+      </View>
+      <Text className="text-text-muted text-[10px]">{label}</Text>
+    </View>
+  );
+}
+
+function Pip({ active, color }: { active: boolean; color: string }) {
+  return (
+    <View
+      className="h-2 w-2 rounded-full"
+      style={{
+        backgroundColor: active ? color : 'transparent',
+        borderWidth: 1,
+        borderColor: active ? color : colors.border,
+      }}
+    />
+  );
+}
+
+function Legend({ color, label }: { color: string; label: string }) {
+  return (
+    <View className="flex-row items-center gap-1">
+      <View
+        className="h-2 w-2 rounded-full"
+        style={{ backgroundColor: color }}
+      />
+      <Text className="text-text-muted text-[10px]">{label}</Text>
     </View>
   );
 }
