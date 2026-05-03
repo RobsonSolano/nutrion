@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { triggerPushNotification } from './pushNotifications';
 import type {
   StudentRequest,
   StudentRequestStatus,
@@ -86,6 +87,10 @@ export async function createRequest(message: string): Promise<StudentRequest> {
     .select('*')
     .single();
   if (error) throw error;
+
+  // Push pro professor (fire-and-forget).
+  triggerPushNotification('new_request', data.id);
+
   return data as StudentRequest;
 }
 
@@ -116,5 +121,12 @@ export async function respondToRequest(params: {
     .select('*')
     .single();
   if (error) throw error;
+
+  // Push pro aluno se o coach acrescentou resposta ou mudou status pra
+  // in_progress/done (sinal de que ele agiu na solicitação).
+  if (params.response || params.status !== 'open') {
+    triggerPushNotification('request_response', params.requestId);
+  }
+
   return data as StudentRequest;
 }

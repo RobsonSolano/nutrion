@@ -17,10 +17,13 @@ import {
   MessagesSquare,
   Lock,
   Download,
+  Bell,
+  BellOff,
 } from 'lucide-react-native';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
 import { useResetOnboarding } from '@/hooks/useOnboarding';
+import { usePushToggle } from '@/hooks/usePushToggle';
 import type { ResetOnboardingMode } from '@/services/onboarding';
 import { useDailyOnboardingUsage } from '@/hooks/useAiUsage';
 import { useOnboardingStore } from '@/stores/useOnboardingStore';
@@ -42,6 +45,8 @@ export default function PerfilScreen() {
 
   const [redoStep, setRedoStep] = useState<RedoStep>('closed');
   const [logoutOpen, setLogoutOpen] = useState(false);
+
+  const push = usePushToggle();
 
   const hasCompletedOnboarding = !!profile?.onboarding_completed_at;
   const refazerBlocked =
@@ -180,6 +185,21 @@ export default function PerfilScreen() {
           variant="secondary"
           size="md"
           icon={<Lock size={16} color={colors.text} />}
+        />
+
+        <Button
+          label={push.enabled ? 'Desativar notificações' : 'Ativar notificações'}
+          onPress={push.toggle}
+          loading={push.loading}
+          variant="secondary"
+          size="md"
+          icon={
+            push.enabled ? (
+              <BellOff size={16} color={colors.text} />
+            ) : (
+              <Bell size={16} color={colors.text} />
+            )
+          }
         />
 
         <Button

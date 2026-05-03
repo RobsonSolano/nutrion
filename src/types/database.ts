@@ -36,6 +36,7 @@ export type Profile = {
   is_early_adopter: boolean | null;
   role: ProfileRole;
   coach_id: string | null;
+  expo_push_token: string | null;
   created_at: string;
   updated_at: string;
 };
