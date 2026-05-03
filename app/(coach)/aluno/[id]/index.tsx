@@ -22,6 +22,8 @@ import {
   Ruler,
   Pencil,
   ChevronRight,
+  Trash2,
+  AlertTriangle,
 } from 'lucide-react-native';
 import {
   Button,
@@ -32,6 +34,7 @@ import {
 } from '@/components/ui';
 import { colors } from '@/lib/theme';
 import {
+  useDeleteStudent,
   useGenerateStudentPlan,
   useSaveStudentPlan,
   useStudentDetail,
@@ -49,7 +52,14 @@ const GOAL_LABEL: Record<string, string> = {
   reduce_body_fat: 'Reduzir gordura',
 };
 
-type Phase = 'idle' | 'confirm_regenerate' | 'generating' | 'preview' | 'saving';
+type Phase =
+  | 'idle'
+  | 'confirm_regenerate'
+  | 'generating'
+  | 'preview'
+  | 'saving'
+  | 'confirm_delete'
+  | 'deleting';
 
 export default function AlunoDetalheScreen() {
   const router = useRouter();
@@ -58,6 +68,7 @@ export default function AlunoDetalheScreen() {
   const trackingQ = useStudentTracking(id ?? null);
   const generateMutation = useGenerateStudentPlan();
   const saveMutation = useSaveStudentPlan();
+  const deleteMutation = useDeleteStudent();
 
   const [phase, setPhase] = useState<Phase>('idle');
   const [plan, setPlan] = useState<OnboardingPlan | null>(null);
@@ -99,11 +110,30 @@ export default function AlunoDetalheScreen() {
     }
   }
 
+  async function handleDelete() {
+    if (!id) return;
+    setPhase('deleting');
+    try {
+      await deleteMutation.mutateAsync(id);
+      router.back();
+    } catch (err) {
+      captureError(err, { feature: 'coach_delete_student' });
+      setPhase('idle');
+      Alert.alert(
+        'Não consegui excluir',
+        err instanceof Error ? err.message : 'Tenta de novo.',
+      );
+    }
+  }
+
   if (phase === 'generating') {
     return <FullScreenLoading title="Gerando novo plano com IA" />;
   }
   if (phase === 'saving') {
     return <FullScreenLoading title="Salvando..." />;
+  }
+  if (phase === 'deleting') {
+    return <FullScreenLoading title="Excluindo aluno..." />;
   }
   if (phase === 'preview' && plan) {
     return (
@@ -360,9 +390,15 @@ export default function AlunoDetalheScreen() {
 
         <Text className="text-text-muted text-[11px] text-center px-2 leading-relaxed">
           Gerar novo plano arquiva as rotinas atuais (histórico preservado) e
-          cria as novas baseadas na ficha. Edição individual de exercícios
-          virá em breve.
+          cria as novas baseadas na ficha.
         </Text>
+
+        <Button
+          label="Excluir aluno"
+          onPress={() => setPhase('confirm_delete')}
+          variant="danger"
+          icon={<Trash2 size={16} color={colors.danger} />}
+        />
       </ScrollView>
 
       <ConfirmModal
@@ -383,6 +419,31 @@ export default function AlunoDetalheScreen() {
             label: 'Cancelar',
             variant: 'ghost',
             onPress: () => setPhase('idle'),
+          },
+        ]}
+      />
+
+      <ConfirmModal
+        visible={phase === 'confirm_delete'}
+        onClose={() => setPhase('idle')}
+        title={`Excluir ${profile.full_name ?? 'esse aluno'}?`}
+        message={
+          'Essa ação NÃO pode ser desfeita. A conta do aluno, rotinas, logs (refeições, água, treinos), chat com a IA e solicitações serão removidos definitivamente.'
+        }
+        icon={<AlertTriangle size={26} color={colors.danger} />}
+        dismissable={!deleteMutation.isPending}
+        actions={[
+          {
+            label: 'Excluir definitivamente',
+            variant: 'danger',
+            onPress: handleDelete,
+            loading: deleteMutation.isPending,
+          },
+          {
+            label: 'Cancelar',
+            variant: 'ghost',
+            onPress: () => setPhase('idle'),
+            disabled: deleteMutation.isPending,
           },
         ]}
       />
