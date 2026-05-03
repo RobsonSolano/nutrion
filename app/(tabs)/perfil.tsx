@@ -16,6 +16,7 @@ import {
   AlertTriangle,
   MessagesSquare,
   Lock,
+  Download,
 } from 'lucide-react-native';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
@@ -179,6 +180,14 @@ export default function PerfilScreen() {
           variant="secondary"
           size="md"
           icon={<Lock size={16} color={colors.text} />}
+        />
+
+        <Button
+          label="Exportar meus dados"
+          onPress={() => router.push('/exportar-dados' as Href)}
+          variant="ghost"
+          size="md"
+          icon={<Download size={16} color={colors.textDim} />}
         />
 
         <Card>
