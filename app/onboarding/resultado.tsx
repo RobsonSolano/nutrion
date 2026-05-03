@@ -1,5 +1,6 @@
-import { Alert, ScrollView, Text, View } from 'react-native';
-import { Redirect, useRouter, type Href } from 'expo-router';
+import { useCallback } from 'react';
+import { BackHandler, ScrollView, Text, View } from 'react-native';
+import { Redirect, useFocusEffect, useRouter, type Href } from 'expo-router';
 import {
   Flame,
   Beef,
@@ -13,7 +14,6 @@ import { Button, Card, MarkdownText, Screen } from '@/components/ui';
 import { colors } from '@/lib/theme';
 import { useOnboardingResultStore } from '@/stores/useOnboardingResultStore';
 import { useOnboardingStore } from '@/stores/useOnboardingStore';
-import { useSaveOnboardingResult } from '@/hooks/useOnboarding';
 import type { PlanRoutine } from '@/services/onboarding';
 
 export default function OnboardingResultado() {
@@ -21,27 +21,25 @@ export default function OnboardingResultado() {
   const plan = useOnboardingResultStore((s) => s.plan);
   const input = useOnboardingResultStore((s) => s.input);
   const reset = useOnboardingStore((s) => s.reset);
-  const save = useSaveOnboardingResult();
+
+  // Bloqueia o back hardware: o plano já foi salvo, voltar não faz sentido.
+  useFocusEffect(
+    useCallback(() => {
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => true);
+      return () => sub.remove();
+    }, []),
+  );
 
   // Se o usuário abriu essa tela sem ter gerado um plano, volta pra intro.
   if (!plan || !input) {
     return <Redirect href={'/onboarding' as Href} />;
   }
 
-  async function handleConfirm() {
-    try {
-      if (!plan || !input) return;
-      await save.mutateAsync({ input, plan });
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      useOnboardingResultStore.setState({ plan: null, input: null });
-      reset();
-      router.replace('/(tabs)' as Href);
-    } catch (err) {
-      Alert.alert(
-        'Não consegui salvar',
-        err instanceof Error ? err.message : 'Tenta de novo.',
-      );
-    }
+  function handleContinue() {
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    useOnboardingResultStore.setState({ plan: null, input: null });
+    reset();
+    router.replace('/(tabs)' as Href);
   }
 
   return (
@@ -113,21 +111,16 @@ export default function OnboardingResultado() {
         <Card padding="sm">
           <Text className="text-text-muted text-[11px] leading-relaxed">
             💡 Você pode editar metas e treinos a qualquer momento no perfil.
-            Use isso como ponto de partida — ajuste conforme for evoluindo.
+            Pra refazer o plano com a IA, use o botão "Refazer onboarding" no
+            perfil (1 vez por dia).
           </Text>
         </Card>
 
         <Button
-          label="Começar minha jornada"
-          onPress={handleConfirm}
-          loading={save.isPending}
+          label="Continuar"
+          onPress={handleContinue}
           size="lg"
           icon={<CheckCircle2 size={18} color={colors.textInverse} />}
-        />
-        <Button
-          label="Gerar outro plano"
-          onPress={() => router.replace('/onboarding/loading' as Href)}
-          variant="ghost"
         />
       </ScrollView>
     </Screen>
