@@ -24,6 +24,7 @@ import {
   ChevronRight,
   Trash2,
   AlertTriangle,
+  NotebookPen,
 } from 'lucide-react-native';
 import {
   Button,
@@ -40,6 +41,7 @@ import {
   useStudentDetail,
   useStudentTracking,
 } from '@/hooks/useStudents';
+import { useCoachNotes } from '@/hooks/useCoachNotes';
 import { bmi, bmiCategory } from '@/lib/biometrics';
 import type { OnboardingPlan } from '@/services/onboarding';
 import type { DayActivity, StudentTracking } from '@/services/studentTracking';
@@ -66,6 +68,7 @@ export default function AlunoDetalheScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const detailQ = useStudentDetail(id ?? null);
   const trackingQ = useStudentTracking(id ?? null);
+  const notesQ = useCoachNotes(id ?? null);
   const generateMutation = useGenerateStudentPlan();
   const saveMutation = useSaveStudentPlan();
   const deleteMutation = useDeleteStudent();
@@ -380,6 +383,32 @@ export default function AlunoDetalheScreen() {
             </View>
           )}
         </Card>
+
+        <Pressable
+          onPress={() =>
+            router.push(`/(coach)/aluno/${id}/notas` as Href)
+          }
+          className="active:opacity-80"
+        >
+          <Card padding="md">
+            <View className="flex-row items-center gap-3">
+              <View className="h-11 w-11 rounded-2xl bg-violet/10 border border-violet/30 items-center justify-center">
+                <NotebookPen size={20} color={colors.violetSoft} />
+              </View>
+              <View className="flex-1">
+                <Text className="text-text text-sm font-semibold">
+                  Anotações privadas
+                </Text>
+                <Text className="text-text-muted text-[11px] mt-0.5">
+                  {notesQ.data && notesQ.data.length > 0
+                    ? `${notesQ.data.length} anotação${notesQ.data.length === 1 ? '' : 'ões'} · só você vê`
+                    : 'Nenhuma anotação · só você vê'}
+                </Text>
+              </View>
+              <ChevronRight size={16} color={colors.textDim} />
+            </View>
+          </Card>
+        </Pressable>
 
         <Button
           label="Gerar novo plano com IA"
