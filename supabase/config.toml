@@ -40,6 +40,11 @@ verify_jwt = false
 [functions.onboarding-plan]
 verify_jwt = false
 
+[functions.cron-inactivity-reminders]
+# Cron e' chamado server-to-server sem user logado. Validacao real
+# fica no X-Cron-Secret check da propria function.
+verify_jwt = false
+
 [edge_runtime]
 enabled = true
 policy = "oneshot"

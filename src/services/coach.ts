@@ -1,0 +1,72 @@
+import { supabase } from './supabase';
+import type { Coach } from '@/types/database';
+
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!;
+const ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
+const FN_URL = `${SUPABASE_URL}/functions/v1/signup-professor`;
+
+export type SignupProfessorInput = {
+  bio?: string | null;
+  cref?: string | null;
+};
+
+/**
+ * Promove o user atual a `role='professor'` e cria a row em `coaches`.
+ * Precisa ser chamado depois de `supabase.auth.signUp` ter criado o
+ * auth.users e a sessão estar ativa.
+ */
+export async function promoteToProfessor(
+  input: SignupProfessorInput,
+): Promise<Coach> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  if (!token) {
+    throw new Error('Sessão expirada. Faça login de novo.');
+  }
+
+  const res = await fetch(FN_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      apikey: ANON_KEY,
+    },
+    body: JSON.stringify(input),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    let detail = text;
+    try {
+      const parsed = JSON.parse(text);
+      detail = parsed?.detail ?? parsed?.error ?? text;
+    } catch {
+      // mantém raw
+    }
+    throw new Error(`${res.status} · ${detail}`);
+  }
+
+  const data = (await res.json()) as { coach?: Coach };
+  if (!data?.coach) {
+    throw new Error('Resposta inválida da função signup-professor.');
+  }
+  return data.coach;
+}
+
+/** Busca o registro de coach do user atual (null se não for professor). */
+export async function getMyCoach(): Promise<Coach | null> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data, error } = await supabase
+    .from('coaches')
+    .select('*')
+    .eq('id', user.id)
+    .maybeSingle();
+  if (error) throw error;
+  return (data ?? null) as Coach | null;
+}
