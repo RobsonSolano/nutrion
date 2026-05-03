@@ -68,6 +68,19 @@ serve(async (req: Request) => {
     const bio = body.bio?.trim() || null;
     const cref = body.cref?.trim() || null;
 
+    // CREF/CRN é OBRIGATÓRIO — credencial profissional valida que o user
+    // é mesmo um profissional, e fica visível no painel pra distinguir
+    // de um user que só marcou "sou professor" por engano.
+    if (!cref || cref.length < 4) {
+      return json(
+        {
+          error: 'cref_required',
+          detail: 'Informe seu CREF (Educação Física) ou CRN (Nutrição). Mínimo 4 caracteres.',
+        },
+        400,
+      );
+    }
+
     // Cliente service_role: dribla RLS e a trigger guard_role_changes.
     const supabaseService = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
       auth: { persistSession: false, autoRefreshToken: false },
@@ -95,9 +108,16 @@ serve(async (req: Request) => {
     }
 
     if (existing.role !== 'professor') {
+      // Promove + marca onboarding como completo (professor não passa
+      // pelo fluxo de onboarding do app — esse é só pra usuários que
+      // querem o plano gerado pela IA pra eles mesmos).
       const { error: updateErr } = await supabaseService
         .from('profiles')
-        .update({ role: 'professor' })
+        .update({
+          role: 'professor',
+          onboarding_completed_at: new Date().toISOString(),
+          onboarding_skipped_at: null,
+        })
         .eq('id', user.id);
       if (updateErr) {
         console.error('[signup-professor] role update error:', updateErr);

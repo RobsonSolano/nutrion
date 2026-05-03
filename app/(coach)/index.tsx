@@ -15,11 +15,13 @@ import {
 } from 'lucide-react-native';
 import { Button, Card, Screen } from '@/components/ui';
 import { colors } from '@/lib/theme';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
 import { useStudents, useStudentsTracking } from '@/hooks/useStudents';
 import { useCoachRequests } from '@/hooks/useRequests';
 import { usePushToggle } from '@/hooks/usePushToggle';
+import { getMyCoach } from '@/services/coach';
 import type { StudentLite } from '@/services/students';
 import type { StudentTracking } from '@/services/studentTracking';
 
@@ -32,12 +34,19 @@ const GOAL_LABEL: Record<string, string> = {
 
 export default function CoachHome() {
   const router = useRouter();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const profileQ = useProfile();
   const studentsQ = useStudents();
   const openRequestsQ = useCoachRequests('open');
+  const coachQ = useQuery({
+    queryKey: ['my-coach', user?.id ?? 'anon'],
+    queryFn: getMyCoach,
+    enabled: !!user?.id,
+    staleTime: 60_000,
+  });
   const push = usePushToggle();
   const fullName = profileQ.data?.full_name ?? 'Professor';
+  const cref = coachQ.data?.cref ?? null;
   const openRequestsCount = openRequestsQ.data?.length ?? 0;
 
   const studentIds = (studentsQ.data ?? []).map((s) => s.id);
@@ -66,6 +75,13 @@ export default function CoachHome() {
               Olá, professor
             </Text>
             <Text className="text-text text-xl font-bold">{fullName}</Text>
+            {cref && (
+              <View className="self-start mt-1 rounded-full border border-violet/40 bg-violet/10 px-2.5 py-0.5">
+                <Text className="text-violet-soft text-[11px] font-semibold">
+                  {cref}
+                </Text>
+              </View>
+            )}
           </View>
         </View>
 
