@@ -10,7 +10,7 @@
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
     "db:push": "supabase db push",
-    "fn:deploy": "supabase functions deploy chat-ai && supabase functions deploy onboarding-plan",
+    "fn:deploy": "supabase functions deploy chat-ai && supabase functions deploy onboarding-plan && supabase functions deploy signup-professor && supabase functions deploy coach-create-student && supabase functions deploy coach-generate-plan && supabase functions deploy coach-save-student-plan && supabase functions deploy coach-send-credentials",
     "seed:user": "node --env-file=.env.local scripts/seed-user.mjs"
   },
   "dependencies": {

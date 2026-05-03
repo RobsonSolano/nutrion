@@ -17,6 +17,12 @@ export default function TabsLayout() {
 
   // Gate do onboarding: espera o profile carregar pra evitar flicker das tabs.
   if (profileQ.isLoading) return null;
+
+  // Professor não usa as tabs do app — vai pra área do professor.
+  if (profileQ.data?.role === 'professor') {
+    return <Redirect href={'/(coach)' as Href} />;
+  }
+
   if (
     profileQ.data &&
     !profileQ.data.onboarding_completed_at &&
