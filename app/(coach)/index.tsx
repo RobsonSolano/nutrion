@@ -7,12 +7,14 @@ import {
   LogOut,
   ChevronRight,
   Target,
+  MessagesSquare,
 } from 'lucide-react-native';
 import { Button, Card, Screen } from '@/components/ui';
 import { colors } from '@/lib/theme';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
 import { useStudents } from '@/hooks/useStudents';
+import { useCoachRequests } from '@/hooks/useRequests';
 import type { StudentLite } from '@/services/students';
 
 const GOAL_LABEL: Record<string, string> = {
@@ -27,7 +29,9 @@ export default function CoachHome() {
   const { logout } = useAuth();
   const profileQ = useProfile();
   const studentsQ = useStudents();
+  const openRequestsQ = useCoachRequests('open');
   const fullName = profileQ.data?.full_name ?? 'Professor';
+  const openRequestsCount = openRequestsQ.data?.length ?? 0;
 
   return (
     <Screen variant="hero" edges={['top', 'bottom']}>
@@ -97,6 +101,37 @@ export default function CoachHome() {
             </View>
           )}
         </Card>
+
+        <Pressable
+          onPress={() => router.push('/(coach)/solicitacoes' as Href)}
+          className="active:opacity-80"
+        >
+          <Card padding="md">
+            <View className="flex-row items-center gap-3">
+              <View className="h-11 w-11 rounded-2xl bg-violet/10 border border-violet/30 items-center justify-center">
+                <MessagesSquare size={20} color={colors.violetSoft} />
+              </View>
+              <View className="flex-1">
+                <Text className="text-text text-sm font-semibold">
+                  Solicitações
+                </Text>
+                <Text className="text-text-muted text-[11px] mt-0.5">
+                  {openRequestsCount > 0
+                    ? `${openRequestsCount} aberta${openRequestsCount > 1 ? 's' : ''} aguardando você`
+                    : 'Nenhuma solicitação aberta'}
+                </Text>
+              </View>
+              {openRequestsCount > 0 && (
+                <View className="rounded-full border border-warn/40 bg-warn/10 px-2.5 py-0.5">
+                  <Text className="text-warn text-[11px] font-bold">
+                    {openRequestsCount}
+                  </Text>
+                </View>
+              )}
+              <ChevronRight size={16} color={colors.textDim} />
+            </View>
+          </Card>
+        </Pressable>
 
         <Button
           label="Sair"
