@@ -48,6 +48,23 @@ export type Coach = {
   created_at: string;
 };
 
+export type StudentRequestStatus =
+  | 'open'
+  | 'in_progress'
+  | 'done'
+  | 'cancelled';
+
+export type StudentRequest = {
+  id: string;
+  student_id: string;
+  coach_id: string;
+  message: string;
+  status: StudentRequestStatus;
+  coach_response: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type ProfileUpdate = Partial<
   Omit<Profile, 'id' | 'created_at' | 'updated_at'>
 >;
