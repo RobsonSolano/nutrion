@@ -11,6 +11,7 @@ import {
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Send } from 'lucide-react-native';
 import { Button, Card, Input, Screen } from '@/components/ui';
+import { useAlert } from '@/components/GlobalAlertProvider';
 import { colors } from '@/lib/theme';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { useCreateRequest } from '@/hooks/useRequests';
@@ -22,20 +23,22 @@ export default function NovaSolicitacaoScreen() {
   const kbHeight = useKeyboardHeight();
   const [message, setMessage] = useState('');
   const createMutation = useCreateRequest();
+  const alert = useAlert();
 
   async function handleSubmit() {
     if (message.trim().length === 0) {
-      Alert.alert('Mensagem vazia', 'Escreve sua solicitação antes de enviar.');
+      alert.showAlert({
+        title: 'Mensagem vazia',
+        message: 'Escreve sua solicitação antes de enviar.',
+        type: 'warning',
+      });
       return;
     }
     try {
       await createMutation.mutateAsync(message.trim());
       router.back();
     } catch (err) {
-      Alert.alert(
-        'Não consegui enviar',
-        err instanceof Error ? err.message : 'Tenta de novo.',
-      );
+      alert.showError(err);
     }
   }
 

@@ -17,6 +17,7 @@ import {
 } from 'lucide-react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Button, Card, Screen } from '@/components/ui';
+import { useAlert } from '@/components/GlobalAlertProvider';
 import { colors } from '@/lib/theme';
 import { exportMyData, type DataExport } from '@/services/dataExport';
 import { captureError } from '@/lib/sentry';
@@ -25,6 +26,7 @@ type Phase = 'idle' | 'exporting' | 'ready';
 
 export default function ExportarDadosScreen() {
   const router = useRouter();
+  const alert = useAlert();
   const [phase, setPhase] = useState<Phase>('idle');
   const [data, setData] = useState<DataExport | null>(null);
 
@@ -37,10 +39,7 @@ export default function ExportarDadosScreen() {
     } catch (err) {
       captureError(err, { feature: 'data_export' });
       setPhase('idle');
-      Alert.alert(
-        'Não consegui exportar',
-        err instanceof Error ? err.message : 'Tenta de novo.',
-      );
+      alert.showError(err);
     }
   }
 
@@ -63,10 +62,7 @@ export default function ExportarDadosScreen() {
       );
     } catch (err) {
       captureError(err, { feature: 'data_export_share' });
-      Alert.alert(
-        'Não consegui compartilhar',
-        err instanceof Error ? err.message : 'Tenta de novo.',
-      );
+      alert.showError(err);
     }
   }
 

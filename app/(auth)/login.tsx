@@ -21,6 +21,7 @@ import {
 } from 'lucide-react-native';
 import { useAuth } from '@/hooks/useAuth';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
+import { useAlert } from '@/components/GlobalAlertProvider';
 import { requestPasswordReset } from '@/services/auth';
 import { colors } from '@/lib/theme';
 import { IS_EXPO_GO } from '@/lib/platform';
@@ -59,6 +60,7 @@ function GoogleMark() {
 export default function LoginScreen() {
   const router = useRouter();
   const { loginWithGoogle, loginWithEmail, signUp } = useAuth();
+  const alert = useAlert();
   const [mode, setMode] = useState<Mode>('login');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -72,25 +74,26 @@ export default function LoginScreen() {
 
   async function handleForgotPassword() {
     if (!email.trim()) {
-      Alert.alert(
-        'Informe o email',
-        'Digite seu email no campo acima e tente "Esqueci a senha" de novo.',
-      );
+      alert.showAlert({
+        title: 'Informe o email',
+        message:
+          'Digite seu email no campo acima e tente "Esqueci a senha" de novo.',
+        type: 'warning',
+      });
       return;
     }
     setForgotLoading(true);
     try {
       await requestPasswordReset(email);
       setForgotOpen(false);
-      Alert.alert(
-        'Email enviado',
-        'Se o email estiver cadastrado, você vai receber um link pra definir nova senha em alguns minutos.',
-      );
+      alert.showAlert({
+        title: 'Email enviado',
+        message:
+          'Se o email estiver cadastrado, você vai receber um link pra definir nova senha em alguns minutos.',
+        type: 'success',
+      });
     } catch (err) {
-      Alert.alert(
-        'Não consegui enviar',
-        err instanceof Error ? err.message : 'Tenta de novo.',
-      );
+      alert.showError(err);
     } finally {
       setForgotLoading(false);
     }
@@ -105,10 +108,7 @@ export default function LoginScreen() {
     try {
       await loginWithGoogle();
     } catch (err) {
-      Alert.alert(
-        'Não consegui te logar',
-        err instanceof Error ? err.message : 'Tenta de novo em instantes.',
-      );
+      alert.showError(err);
     } finally {
       setLoading(false);
     }
@@ -123,10 +123,7 @@ export default function LoginScreen() {
         await signUp(fullName, email, password);
       }
     } catch (err) {
-      Alert.alert(
-        mode === 'login' ? 'Não consegui entrar' : 'Não consegui criar a conta',
-        err instanceof Error ? err.message : 'Verifica os dados e tenta de novo.',
-      );
+      alert.showError(err);
     } finally {
       setLoading(false);
     }

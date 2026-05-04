@@ -30,6 +30,7 @@ import { useUiStore } from '@/stores/useUiStore';
 import { queryKeys } from '@/lib/queryKeys';
 import { colors } from '@/lib/theme';
 import { Button, Input, Logo, Screen } from '@/components/ui';
+import { useAlert } from '@/components/GlobalAlertProvider';
 import { captureError } from '@/lib/sentry';
 
 const MAX_BIO = 300;
@@ -39,6 +40,7 @@ export default function SignupProfessorScreen() {
   const router = useRouter();
   const kbHeight = useKeyboardHeight();
   const qc = useQueryClient();
+  const alert = useAlert();
 
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -81,10 +83,7 @@ export default function SignupProfessorScreen() {
       router.replace('/(coach)' as Href);
     } catch (err) {
       captureError(err, { feature: 'signup_professor' });
-      Alert.alert(
-        'Não consegui criar a conta',
-        err instanceof Error ? err.message : 'Verifica os dados e tenta de novo.',
-      );
+      alert.showError(err);
     } finally {
       setLoading(false);
       setPromoting(false);
