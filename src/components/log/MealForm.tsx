@@ -1,7 +1,6 @@
 import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Image,
   Platform,
   Pressable,
@@ -35,6 +34,7 @@ import { runSanityCheck } from '@/services/sanityCheck';
 import { captureError } from '@/lib/sentry';
 import { Button, Card, Input } from '@/components/ui';
 import { CharCounter } from '@/components/onboarding';
+import { useAlert } from '@/components/GlobalAlertProvider';
 import { colors } from '@/lib/theme';
 
 const MEAL_PRESETS = [
@@ -61,6 +61,7 @@ export default function MealForm() {
   const sanityUsage = useDailySanityUsage();
   const qc = useQueryClient();
   const { user } = useAuth();
+  const alert = useAlert();
 
   const photo = useImagePicker({ purpose: 'analisar a refeição' });
 
@@ -92,17 +93,19 @@ export default function MealForm() {
   async function handleAnalyze() {
     if (!canAnalyze) return;
     if (sanityUsage.limitReached) {
-      Alert.alert(
-        'Limite diário',
-        `Você já usou as ${sanityUsage.limit} análises de IA hoje. Volta amanhã!`,
-      );
+      alert.showAlert({
+        type: 'warning',
+        title: 'Limite diário',
+        message: `Você já usou as ${sanityUsage.limit} análises de IA hoje. Volta amanhã!`,
+      });
       return;
     }
     if (!description.trim() && !photo.base64) {
-      Alert.alert(
-        'Descrição ou foto',
-        'Descreve a refeição ou adiciona uma foto pra IA analisar.',
-      );
+      alert.showAlert({
+        type: 'info',
+        title: 'Descrição ou foto',
+        message: 'Descreve a refeição ou adiciona uma foto pra IA analisar.',
+      });
       return;
     }
 
@@ -128,10 +131,12 @@ export default function MealForm() {
         });
       }
       if (!m) {
-        Alert.alert(
-          'Sem estimativa',
-          'A IA respondeu mas não retornou os macros. Preencha manualmente.',
-        );
+        alert.showAlert({
+          type: 'warning',
+          title: 'Sem estimativa',
+          message:
+            'A IA respondeu mas não retornou os macros. Preencha manualmente.',
+        });
       }
     } catch (err) {
       const message =
@@ -142,7 +147,11 @@ export default function MealForm() {
       if (!isQuotaError) {
         captureError(err, { feature: 'meal_analyze' });
       }
-      Alert.alert('Não consegui analisar', message);
+      alert.showAlert({
+        type: 'error',
+        title: 'Não consegui analisar',
+        message,
+      });
     } finally {
       setAnalyzing(false);
     }
@@ -151,7 +160,11 @@ export default function MealForm() {
   async function handleSave() {
     const cal = toInt(calories);
     if (cal == null || cal === 0) {
-      Alert.alert('Informe as calorias', 'Digite um valor em kcal.');
+      alert.showAlert({
+        type: 'warning',
+        title: 'Informe as calorias',
+        message: 'Digite um valor em kcal.',
+      });
       return;
     }
     try {
@@ -168,10 +181,7 @@ export default function MealForm() {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.back();
     } catch (err) {
-      Alert.alert(
-        'Não consegui salvar',
-        err instanceof Error ? err.message : 'Tenta de novo.',
-      );
+      alert.showError(err);
     }
   }
 
