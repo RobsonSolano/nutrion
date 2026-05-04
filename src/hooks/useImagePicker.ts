@@ -34,20 +34,26 @@ export function useImagePicker(options: Options = {}) {
       source === 'camera'
         ? ImagePicker.launchCameraAsync
         : ImagePicker.launchImageLibraryAsync;
-    // quality 0.7 reduz drasticamente o JPEG bruto antes mesmo de chegar na
-    // compressão — em câmeras 100MP+ a diferença é entre ~30MB e ~10MB.
-    // exif=false economiza alguns bytes e evita metadados desnecessários.
-    const picked = await launcher({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.7,
-      exif: false,
-      allowsEditing: false,
-    });
-    if (picked.canceled || !picked.assets?.[0]) return;
-    const asset = picked.assets[0];
-
+    // Ativa preparing ANTES de abrir o launcher: em Androids mais lentos a
+    // promise do picker pode demorar pra resolver depois do user confirmar
+    // (gravação do arquivo, callback nativo). Sem isso, o user volta pro
+    // form e vê tela "vazia" antes do loading aparecer — parece que falhou
+    // e ele clica de novo.
     setPreparing(true);
     try {
+      // quality 0.7 reduz drasticamente o JPEG bruto antes mesmo de chegar
+      // na compressão — em câmeras 100MP+ a diferença é entre ~30MB e ~10MB.
+      // exif=false economiza alguns bytes e evita metadados desnecessários.
+      const picked = await launcher({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.7,
+        exif: false,
+        allowsEditing: false,
+      });
+      if (picked.canceled || !picked.assets?.[0]) {
+        return;
+      }
+      const asset = picked.assets[0];
       const compressed = await compressImageForAI(asset.uri);
       setUri(compressed.uri);
       setBase64(compressed.base64);
