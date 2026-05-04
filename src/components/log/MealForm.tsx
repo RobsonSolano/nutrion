@@ -254,10 +254,10 @@ export default function MealForm() {
             </Pressable>
           </View>
         ) : photo.preparing ? (
-          <View className="rounded-2xl border border-dashed border-violet/40 bg-violet/5 items-center justify-center py-10 mb-3 gap-2">
-            <Sparkles size={20} color={colors.violetSoft} />
-            <Text className="text-violet-soft text-xs font-semibold">
-              Preparando foto...
+          <View className="rounded-2xl border border-violet/50 bg-violet/10 items-center justify-center py-10 mb-3 gap-2">
+            <ActivityIndicator color={colors.violetSoft} />
+            <Text className="text-violet-soft text-xs font-bold">
+              Carregando imagem...
             </Text>
           </View>
         ) : (

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "147862767028",
+    "project_id": "nutrion-d9acc",
+    "storage_bucket": "nutrion-d9acc.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:147862767028:android:3618903594a3d3059a9ee1",
+        "android_client_info": {
+          "package_name": "br.com.nutrion"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBso0kJ5l_WqTQXQv71NBUkd2wn4StdSXQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

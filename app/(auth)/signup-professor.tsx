@@ -21,11 +21,16 @@ import {
   IdCard,
   FileText,
 } from 'lucide-react-native';
+import { useQueryClient } from '@tanstack/react-query';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { signUpWithPassword } from '@/services/auth';
 import { promoteToProfessor } from '@/services/coach';
+import { supabase } from '@/services/supabase';
+import { useUiStore } from '@/stores/useUiStore';
+import { queryKeys } from '@/lib/queryKeys';
 import { colors } from '@/lib/theme';
 import { Button, Input, Logo, Screen } from '@/components/ui';
+import { useAlert } from '@/components/GlobalAlertProvider';
 import { captureError } from '@/lib/sentry';
 
 const MAX_BIO = 300;
@@ -34,6 +39,8 @@ const MAX_CREF = 30;
 export default function SignupProfessorScreen() {
   const router = useRouter();
   const kbHeight = useKeyboardHeight();
+  const qc = useQueryClient();
+  const alert = useAlert();
 
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -47,8 +54,14 @@ export default function SignupProfessorScreen() {
   const emailRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
 
+  const setPromoting = useUiStore((s) => s.setPromotingProfessor);
+
   async function handleSubmit() {
     setLoading(true);
+    // Trava redirects automáticos (gates de auth/tabs/onboarding) enquanto
+    // o signUp + promote estão em curso. Sem isso o user ve a tela de
+    // onboarding piscar enquanto a edge function ainda esta promovendo.
+    setPromoting(true);
     try {
       // 1) Cria o auth.users + profile (via trigger handle_new_user).
       await signUpWithPassword({
@@ -61,16 +74,19 @@ export default function SignupProfessorScreen() {
         bio: bio.trim() || null,
         cref: cref.trim() || null,
       });
-      // 3) Redireciona pra área do professor.
+      // 3) Força refetch do profile ANTES de redirecionar.
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.id) {
+        await qc.refetchQueries({ queryKey: queryKeys.profile(user.id) });
+      }
+      // 4) Redireciona pra área do professor.
       router.replace('/(coach)' as Href);
     } catch (err) {
       captureError(err, { feature: 'signup_professor' });
-      Alert.alert(
-        'Não consegui criar a conta',
-        err instanceof Error ? err.message : 'Verifica os dados e tenta de novo.',
-      );
+      alert.showError(err);
     } finally {
       setLoading(false);
+      setPromoting(false);
     }
   }
 
@@ -78,8 +94,9 @@ export default function SignupProfessorScreen() {
     email.length > 3 &&
     password.length >= 6 &&
     fullName.trim().length >= 2 &&
-    bio.length <= MAX_BIO &&
-    cref.length <= MAX_CREF;
+    cref.trim().length >= 4 &&
+    cref.length <= MAX_CREF &&
+    bio.length <= MAX_BIO;
 
   return (
     <Screen variant="hero" edges={['top', 'bottom']}>
@@ -171,11 +188,15 @@ export default function SignupProfessorScreen() {
             <Input
               value={cref}
               onChangeText={setCref}
-              placeholder="CREF / CRN (opcional)"
+              placeholder="CREF (Ed. Física) ou CRN (Nutrição)"
               autoCapitalize="characters"
               autoCorrect={false}
               leftIcon={<IdCard size={18} color={colors.textMuted} />}
             />
+            <Text className="text-text-muted text-[11px] px-1">
+              Obrigatório — credencial profissional. Aparece no seu perfil
+              pra você e seus alunos identificarem.
+            </Text>
 
             <Input
               value={bio}

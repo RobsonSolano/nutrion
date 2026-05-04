@@ -18,6 +18,7 @@ import {
   X,
 } from 'lucide-react-native';
 import { Button, Card, Input, Screen, SegmentedControl } from '@/components/ui';
+import { useAlert } from '@/components/GlobalAlertProvider';
 import { colors } from '@/lib/theme';
 import {
   useCoachRequests,
@@ -45,6 +46,7 @@ const STATUS_LABEL: Record<StudentRequestStatus, string> = {
 };
 
 export default function CoachSolicitacoesScreen() {
+  const alert = useAlert();
   const router = useRouter();
   const [filter, setFilter] = useState<Filter>('open');
   const requestsQ = useCoachRequests(filter);
@@ -128,10 +130,7 @@ export default function CoachSolicitacoesScreen() {
             });
             setOpenItem(null);
           } catch (err) {
-            Alert.alert(
-              'Não consegui salvar',
-              err instanceof Error ? err.message : 'Tenta de novo.',
-            );
+            alert.showError(err);
           }
         }}
         saving={respondMutation.isPending}

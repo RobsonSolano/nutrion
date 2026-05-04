@@ -34,6 +34,7 @@ import {
   MarkdownText,
   Screen,
 } from '@/components/ui';
+import { useAlert } from '@/components/GlobalAlertProvider';
 import { colors } from '@/lib/theme';
 import {
   useDeleteStudent,
@@ -73,6 +74,7 @@ export default function AlunoDetalheScreen() {
   const generateMutation = useGenerateStudentPlan();
   const saveMutation = useSaveStudentPlan();
   const deleteMutation = useDeleteStudent();
+  const alert = useAlert();
 
   const [phase, setPhase] = useState<Phase>('idle');
   const [plan, setPlan] = useState<OnboardingPlan | null>(null);
@@ -89,10 +91,7 @@ export default function AlunoDetalheScreen() {
     } catch (err) {
       captureError(err, { feature: 'coach_regenerate_existing_student' });
       setPhase('idle');
-      Alert.alert(
-        'Não consegui gerar',
-        err instanceof Error ? err.message : 'Tenta de novo.',
-      );
+      alert.showError(err);
     }
   }
 
@@ -103,14 +102,15 @@ export default function AlunoDetalheScreen() {
       await saveMutation.mutateAsync({ studentId: id, plan });
       setPhase('idle');
       setPlan(null);
-      Alert.alert('Plano atualizado', 'As rotinas anteriores foram arquivadas.');
+      alert.showAlert({
+        title: 'Plano atualizado',
+        message: 'As rotinas anteriores foram arquivadas.',
+        type: 'success',
+      });
     } catch (err) {
       captureError(err, { feature: 'coach_save_existing_student' });
       setPhase('preview');
-      Alert.alert(
-        'Não consegui salvar',
-        err instanceof Error ? err.message : 'Tenta de novo.',
-      );
+      alert.showError(err);
     }
   }
 
@@ -123,10 +123,7 @@ export default function AlunoDetalheScreen() {
     } catch (err) {
       captureError(err, { feature: 'coach_delete_student' });
       setPhase('idle');
-      Alert.alert(
-        'Não consegui excluir',
-        err instanceof Error ? err.message : 'Tenta de novo.',
-      );
+      alert.showError(err);
     }
   }
 

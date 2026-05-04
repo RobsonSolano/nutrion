@@ -14,6 +14,7 @@ import {
   configurePushHandler,
   ensureAndroidChannel,
 } from '@/services/pushNotifications';
+import { GlobalAlertProvider } from '@/components/GlobalAlertProvider';
 
 initSentry();
 configurePushHandler();
@@ -53,15 +54,17 @@ function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <SafeAreaProvider>
         <StatusBar style="light" />
-        <Providers>
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              contentStyle: { backgroundColor: '#000000' },
-              animation: 'fade',
-            }}
-          />
-        </Providers>
+        <GlobalAlertProvider>
+          <Providers>
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                contentStyle: { backgroundColor: '#000000' },
+                animation: 'fade',
+              }}
+            />
+          </Providers>
+        </GlobalAlertProvider>
       </SafeAreaProvider>
     </QueryClientProvider>
   );

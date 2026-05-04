@@ -54,6 +54,7 @@ const config: ExpoConfig = {
   android: {
     package: 'br.com.nutrion',
     versionCode: 1,
+    googleServicesFile: './google-services.json',
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',
       backgroundColor: '#000000',

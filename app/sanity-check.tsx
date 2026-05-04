@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Image,
   KeyboardAvoidingView,
@@ -27,6 +28,7 @@ import { useCreateFoodLog } from '@/hooks/useLogMutations';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { useDailySanityUsage } from '@/hooks/useAiUsage';
 import { useImagePicker } from '@/hooks/useImagePicker';
+import { useAlert } from '@/components/GlobalAlertProvider';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys, todayKey } from '@/lib/queryKeys';
 import { useAuth } from '@/hooks/useAuth';
@@ -43,6 +45,7 @@ export default function SanityCheckScreen() {
   const sanityUsage = useDailySanityUsage();
   const qc = useQueryClient();
   const { user } = useAuth();
+  const alert = useAlert();
 
   const photo = useImagePicker({ purpose: 'analisar o prato' });
   const [description, setDescription] = useState('');
@@ -52,21 +55,27 @@ export default function SanityCheckScreen() {
 
   async function handleAnalyze() {
     if (!photo.base64) {
-      Alert.alert('Foto do prato', 'Tire ou escolha uma foto primeiro.');
+      alert.showAlert({
+        title: 'Foto do prato',
+        message: 'Tire ou escolha uma foto primeiro.',
+        type: 'warning',
+      });
       return;
     }
     if (description.trim().length < 3) {
-      Alert.alert(
-        'Descrição',
-        'Descreve brevemente o prato (ex: 150g arroz, 120g frango).',
-      );
+      alert.showAlert({
+        title: 'Descrição curta',
+        message: 'Descreve brevemente o prato (ex: 150g arroz, 120g frango).',
+        type: 'warning',
+      });
       return;
     }
     if (sanityUsage.limitReached) {
-      Alert.alert(
-        'Limite diário',
-        `Você já analisou ${sanityUsage.limit} pratos hoje. Volta amanhã!`,
-      );
+      alert.showAlert({
+        title: 'Limite diário',
+        message: `Você já analisou ${sanityUsage.limit} pratos hoje. Volta amanhã!`,
+        type: 'info',
+      });
       return;
     }
 
@@ -96,21 +105,7 @@ export default function SanityCheckScreen() {
       if (!isQuotaError) {
         captureError(err, { feature: 'sanity_check' });
       }
-      Alert.alert(
-        'Não consegui analisar',
-        message,
-        isQuotaError
-          ? [{ text: 'OK', style: 'cancel' }]
-          : [
-              { text: 'Cancelar', style: 'cancel' },
-              {
-                text: 'Tentar novamente',
-                onPress: () => {
-                  void handleAnalyze();
-                },
-              },
-            ],
-      );
+      alert.showError(err);
     }
   }
 
@@ -130,10 +125,7 @@ export default function SanityCheckScreen() {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.back();
     } catch (err) {
-      Alert.alert(
-        'Não consegui salvar',
-        err instanceof Error ? err.message : 'Tenta de novo.',
-      );
+      alert.showError(err);
     }
   }
 
@@ -284,13 +276,14 @@ function InputStage(props: {
             />
           </View>
         ) : props.preparing ? (
-          <View className="rounded-2xl border border-dashed border-violet/40 bg-violet/5 items-center justify-center py-12 mb-3 gap-2">
-            <Sparkles size={22} color={colors.violetSoft} />
-            <Text className="text-violet-soft text-xs font-semibold">
-              Preparando foto...
+          <View className="rounded-2xl border border-violet/50 bg-violet/10 items-center justify-center py-12 mb-3 gap-3">
+            <ActivityIndicator size="large" color={colors.violetSoft} />
+            <Text className="text-violet-soft text-sm font-bold">
+              Carregando imagem...
             </Text>
-            <Text className="text-text-muted text-[11px]">
-              Reduzindo tamanho pra enviar pra IA
+            <Text className="text-text-muted text-[11px] text-center px-6 leading-relaxed">
+              Reduzindo tamanho pra enviar pra IA. Pode levar alguns segundos
+              em fotos de alta qualidade.
             </Text>
           </View>
         ) : (
