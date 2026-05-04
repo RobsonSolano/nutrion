@@ -52,10 +52,16 @@ const FREQ_OPTIONS = [
 ] as const;
 
 const SPORTS = [
-  { value: 'musculacao', label: 'Musculação' },
-  { value: 'calistenia', label: 'Calistenia' },
-  { value: 'crossfit', label: 'CrossFit' },
-  { value: 'corrida', label: 'Corrida' },
+  { value: 'musculacao', label: '🏋️ Musculação' },
+  { value: 'calistenia', label: '🤸 Calistenia' },
+  { value: 'crossfit', label: '🔥 CrossFit' },
+  { value: 'powerlifting', label: '💪 Powerlifting' },
+  { value: 'corrida', label: '🏃 Corrida' },
+  { value: 'ciclismo', label: '🚴 Ciclismo' },
+  { value: 'natacao', label: '🏊 Natação' },
+  { value: 'luta', label: '🥊 Luta' },
+  { value: 'danca', label: '💃 Dança' },
+  { value: 'outro', label: '🎯 Outro' },
 ];
 
 export default function EditarAlunoScreen() {
@@ -244,7 +250,7 @@ function EditForm({
                 <Input
                   value={birthYear}
                   onChangeText={setBirthYear}
-                  placeholder="Ano nasc."
+                  placeholder="Ano nasc. (ex: 1990)"
                   keyboardType="number-pad"
                   maxLength={4}
                 />

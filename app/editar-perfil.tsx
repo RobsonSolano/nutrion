@@ -15,6 +15,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useProfile, useUpdateProfile } from '@/hooks/useProfile';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { Button, Card, Input, Screen } from '@/components/ui';
+import { useAlert } from '@/components/GlobalAlertProvider';
 import { colors } from '@/lib/theme';
 import {
   suggestedCalories,
@@ -40,6 +41,7 @@ export default function EditarPerfilScreen() {
   const profileQ = useProfile();
   const updateM = useUpdateProfile();
   const kbHeight = useKeyboardHeight();
+  const alert = useAlert();
 
   const [fullName, setFullName] = useState('');
   const [weight, setWeight] = useState('');
@@ -72,10 +74,12 @@ export default function EditarPerfilScreen() {
     const w = toNum(weight);
     const h = toNum(height);
     if (!w || !h) {
-      Alert.alert(
-        'Informe peso e altura',
-        'Preciso de peso e altura para sugerir metas personalizadas.',
-      );
+      alert.showAlert({
+        title: 'Informe peso e altura',
+        message:
+          'Preciso de peso e altura para sugerir metas personalizadas.',
+        type: 'warning',
+      });
       return;
     }
     const cal = suggestedCalories({ weightKg: w, heightCm: h });
@@ -89,7 +93,11 @@ export default function EditarPerfilScreen() {
   async function handleSave() {
     const name = fullName.trim();
     if (name.length < 2) {
-      Alert.alert('Nome inválido', 'Informe seu nome completo.');
+      alert.showAlert({
+        title: 'Nome inválido',
+        message: 'Informe seu nome completo.',
+        type: 'warning',
+      });
       return;
     }
     try {
@@ -104,10 +112,7 @@ export default function EditarPerfilScreen() {
       });
       router.back();
     } catch (err) {
-      Alert.alert(
-        'Não consegui salvar',
-        err instanceof Error ? err.message : 'Tenta de novo em instantes.',
-      );
+      alert.showError(err);
     }
   }
 

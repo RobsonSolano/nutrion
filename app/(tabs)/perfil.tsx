@@ -24,6 +24,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
 import { useResetOnboarding } from '@/hooks/useOnboarding';
 import { usePushToggle } from '@/hooks/usePushToggle';
+import { useUnreadStudentRequests } from '@/hooks/useRequests';
+import { useAlert } from '@/components/GlobalAlertProvider';
 import type { ResetOnboardingMode } from '@/services/onboarding';
 import { useDailyOnboardingUsage } from '@/hooks/useAiUsage';
 import { useOnboardingStore } from '@/stores/useOnboardingStore';
@@ -47,6 +49,8 @@ export default function PerfilScreen() {
   const [logoutOpen, setLogoutOpen] = useState(false);
 
   const push = usePushToggle();
+  const unreadQ = useUnreadStudentRequests();
+  const alert = useAlert();
 
   const hasCompletedOnboarding = !!profile?.onboarding_completed_at;
   const refazerBlocked =
@@ -61,19 +65,17 @@ export default function PerfilScreen() {
       await resetOnboardingM.mutateAsync(mode);
       router.push('/onboarding' as Href);
     } catch (err) {
-      Alert.alert(
-        'Ops',
-        err instanceof Error ? err.message : 'Tenta de novo.',
-      );
+      alert.showError(err);
     }
   }
 
   function handleRedoOnboarding() {
     if (refazerBlocked) {
-      Alert.alert(
-        'Limite diário',
-        'Você já refez seu plano hoje. Tenta de novo amanhã.',
-      );
+      alert.showAlert({
+        title: 'Limite diário',
+        message: 'Você já refez seu plano hoje. Tenta de novo amanhã.',
+        type: 'info',
+      });
       return;
     }
     if (!hasCompletedOnboarding) {
@@ -161,54 +163,95 @@ export default function PerfilScreen() {
           </View>
         </Card>
 
-        <Button
-          label="Editar perfil"
-          onPress={() => router.push('/editar-perfil' as Href)}
-          variant="secondary"
-          size="md"
-          icon={<Pencil size={16} color={colors.text} />}
-        />
-
-        {isStudent && (
-          <Button
-            label="Minhas solicitações"
-            onPress={() => router.push('/solicitacoes' as Href)}
-            variant="secondary"
-            size="md"
-            icon={<MessagesSquare size={16} color={colors.violetSoft} />}
-          />
-        )}
-
-        <Button
-          label="Trocar senha"
-          onPress={() => router.push('/trocar-senha' as Href)}
-          variant="secondary"
-          size="md"
-          icon={<Lock size={16} color={colors.text} />}
-        />
-
-        <Button
-          label={push.enabled ? 'Desativar notificações' : 'Ativar notificações'}
-          onPress={push.toggle}
-          loading={push.loading}
-          variant="secondary"
-          size="md"
-          icon={
-            push.enabled ? (
-              <BellOff size={16} color={colors.text} />
-            ) : (
-              <Bell size={16} color={colors.text} />
-            )
-          }
-        />
-
-        <Button
-          label="Exportar meus dados"
-          onPress={() => router.push('/exportar-dados' as Href)}
-          variant="ghost"
-          size="md"
-          icon={<Download size={16} color={colors.textDim} />}
-        />
+        <Card padding="md">
+          <Text className="text-text-dim text-[11px] uppercase tracking-widest mb-3">
+            Conta
+          </Text>
+          <View className="flex-row flex-wrap gap-2">
+            <View style={{ width: '48.5%' }}>
+              <Button
+                label="Editar perfil"
+                onPress={() => router.push('/editar-perfil' as Href)}
+                variant="secondary"
+                size="md"
+                icon={<Pencil size={14} color={colors.text} />}
+              />
+            </View>
+            {isStudent && (
+              <View style={{ width: '48.5%', position: 'relative' }}>
+                <Button
+                  label="Solicitações"
+                  onPress={() => router.push('/solicitacoes' as Href)}
+                  variant="secondary"
+                  size="md"
+                  icon={<MessagesSquare size={14} color={colors.violetSoft} />}
+                />
+                {(unreadQ.data ?? 0) > 0 && (
+                  <View
+                    style={{
+                      position: 'absolute',
+                      top: -4,
+                      right: -4,
+                      minWidth: 20,
+                      height: 20,
+                      borderRadius: 10,
+                      backgroundColor: colors.accent,
+                      paddingHorizontal: 4,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderWidth: 2,
+                      borderColor: colors.surface,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: colors.textInverse,
+                        fontSize: 10,
+                        fontWeight: '700',
+                      }}
+                    >
+                      {unreadQ.data}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
+            <View style={{ width: '48.5%' }}>
+              <Button
+                label="Trocar senha"
+                onPress={() => router.push('/trocar-senha' as Href)}
+                variant="secondary"
+                size="md"
+                icon={<Lock size={14} color={colors.text} />}
+              />
+            </View>
+            <View style={{ width: '48.5%' }}>
+              <Button
+                label={push.enabled ? 'Desativar push' : 'Ativar push'}
+                onPress={push.toggle}
+                loading={push.loading}
+                variant="secondary"
+                size="md"
+                icon={
+                  push.enabled ? (
+                    <BellOff size={14} color={colors.text} />
+                  ) : (
+                    <Bell size={14} color={colors.text} />
+                  )
+                }
+              />
+            </View>
+            <View style={{ width: '48.5%' }}>
+              <Button
+                label="Exportar dados"
+                onPress={() => router.push('/exportar-dados' as Href)}
+                variant="ghost"
+                size="md"
+                icon={<Download size={14} color={colors.textDim} />}
+              />
+            </View>
+          </View>
+        </Card>
 
         <Card>
           <Text className="text-text-dim text-[11px] uppercase tracking-widest mb-4">

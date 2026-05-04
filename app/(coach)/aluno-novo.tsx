@@ -29,6 +29,7 @@ import {
   Screen,
   SegmentedControl,
 } from '@/components/ui';
+import { useAlert } from '@/components/GlobalAlertProvider';
 import { colors } from '@/lib/theme';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import {
@@ -66,10 +67,16 @@ const FREQ_OPTIONS = [
 ] as const;
 
 const SPORTS = [
-  { value: 'musculacao', label: 'Musculação' },
-  { value: 'calistenia', label: 'Calistenia' },
-  { value: 'crossfit', label: 'CrossFit' },
-  { value: 'corrida', label: 'Corrida' },
+  { value: 'musculacao', label: '🏋️ Musculação' },
+  { value: 'calistenia', label: '🤸 Calistenia' },
+  { value: 'crossfit', label: '🔥 CrossFit' },
+  { value: 'powerlifting', label: '💪 Powerlifting' },
+  { value: 'corrida', label: '🏃 Corrida' },
+  { value: 'ciclismo', label: '🚴 Ciclismo' },
+  { value: 'natacao', label: '🏊 Natação' },
+  { value: 'luta', label: '🥊 Luta' },
+  { value: 'danca', label: '💃 Dança' },
+  { value: 'outro', label: '🎯 Outro' },
 ];
 
 function generatePassword(): string {
@@ -86,6 +93,7 @@ function generatePassword(): string {
 export default function AlunoNovo() {
   const router = useRouter();
   const kbHeight = useKeyboardHeight();
+  const alert = useAlert();
 
   const createMutation = useCreateStudent();
   const generateMutation = useGenerateStudentPlan();
@@ -171,10 +179,7 @@ export default function AlunoNovo() {
     } catch (err) {
       captureError(err, { feature: 'coach_create_student' });
       setPhase('form');
-      Alert.alert(
-        'Não consegui cadastrar',
-        err instanceof Error ? err.message : 'Verifica os dados e tenta de novo.',
-      );
+      alert.showError(err);
     }
   }
 
@@ -190,10 +195,7 @@ export default function AlunoNovo() {
     } catch (err) {
       captureError(err, { feature: 'coach_regenerate_plan' });
       setPhase('preview');
-      Alert.alert(
-        'Não consegui gerar de novo',
-        err instanceof Error ? err.message : 'Tenta de novo em instantes.',
-      );
+      alert.showError(err);
     }
   }
 
@@ -203,15 +205,16 @@ export default function AlunoNovo() {
     try {
       await saveMutation.mutateAsync({ studentId, plan });
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      // Pergunta se quer encaminhar email com credenciais
+      // Volta pra 'preview' antes de abrir o modal: o ConfirmModal só
+      // está renderizado dentro do bloco `phase === 'preview'`, então
+      // sem voltar a tela ficava travada em <SavingScreen /> e o modal
+      // nunca aparecia.
+      setPhase('preview');
       setConfirmEmailOpen(true);
     } catch (err) {
       captureError(err, { feature: 'coach_save_plan' });
       setPhase('preview');
-      Alert.alert(
-        'Não consegui salvar',
-        err instanceof Error ? err.message : 'Tenta de novo.',
-      );
+      alert.showError(err);
     }
   }
 
@@ -223,18 +226,14 @@ export default function AlunoNovo() {
         studentId,
         password: studentPassword,
       });
-      Alert.alert('Email enviado', 'O aluno recebeu os dados de acesso.', [
-        { text: 'OK', onPress: () => router.back() },
-      ]);
+      alert.showAlert({
+        title: 'Email enviado',
+        message: 'O aluno recebeu os dados de acesso.',
+        type: 'success',
+        onConfirm: () => router.back(),
+      });
     } catch (err) {
-      Alert.alert(
-        'Não consegui enviar o email',
-        err instanceof Error ? err.message : 'Tenta de novo.',
-        [
-          { text: 'Voltar pra lista', onPress: () => router.back() },
-          { text: 'OK' },
-        ],
-      );
+      alert.showError(err);
     }
   }
 
@@ -364,7 +363,7 @@ export default function AlunoNovo() {
                 <Input
                   value={birthYear}
                   onChangeText={setBirthYear}
-                  placeholder="Ano nasc."
+                  placeholder="Ano nasc. (ex: 1990)"
                   keyboardType="number-pad"
                   maxLength={4}
                 />
