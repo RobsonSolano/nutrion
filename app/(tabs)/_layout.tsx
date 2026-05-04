@@ -5,14 +5,19 @@ import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
+import { useUiStore } from '@/stores/useUiStore';
 import { colors } from '@/lib/theme';
 
 export default function TabsLayout() {
   const { isAuthenticated, isBootstrapping } = useAuth();
   const profileQ = useProfile();
+  const isPromotingProfessor = useUiStore((s) => s.isPromotingProfessor);
   const insets = useSafeAreaInsets();
 
   if (isBootstrapping) return null;
+  // Trava redirects enquanto signup-professor está em curso (evita
+  // ver onboarding piscar antes da promoção a role=professor).
+  if (isPromotingProfessor) return null;
   if (!isAuthenticated) return <Redirect href="/(auth)/login" />;
 
   // Gate do onboarding: espera o profile carregar pra evitar flicker das tabs.
