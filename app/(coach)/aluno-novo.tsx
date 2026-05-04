@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
+  AlertTriangle,
   ArrowLeft,
   CheckCircle2,
   Mail,
@@ -123,6 +124,32 @@ export default function AlunoNovo() {
   const [studentPassword, setStudentPassword] = useState<string | null>(null);
   const [plan, setPlan] = useState<OnboardingPlan | null>(null);
   const [confirmEmailOpen, setConfirmEmailOpen] = useState(false);
+  const [errorOpen, setErrorOpen] = useState<{ title: string; message: string } | null>(null);
+
+  /**
+   * Traduz mensagens cruas do servidor pra algo amigável. Erros mais
+   * comuns no cadastro: email duplicado, senha fraca, limite de alunos
+   * atingido, generic_500.
+   */
+  function friendlyError(raw: string): string {
+    const lower = raw.toLowerCase();
+    if (lower.includes('email_already_registered') || lower.includes('already registered') || lower.includes('user already')) {
+      return 'Esse email já está cadastrado. Use outro email pro aluno ou peça pra ele logar com a conta existente.';
+    }
+    if (lower.includes('weak_password')) {
+      return 'A senha precisa ter pelo menos 6 caracteres.';
+    }
+    if (lower.includes('student_limit_reached')) {
+      return 'Você atingiu o limite de alunos cadastrados. Entre em contato pra aumentar o limite.';
+    }
+    if (lower.includes('rate_limit')) {
+      return 'Muitas tentativas. Aguarde 1 minuto e tente de novo.';
+    }
+    if (lower.includes('groq_api_error') || lower.includes('parse_failed')) {
+      return 'A IA não conseguiu gerar o plano agora. Tenta de novo em alguns segundos.';
+    }
+    return raw;
+  }
 
   function toggleSport(s: string) {
     setSports((prev) =>
@@ -177,10 +204,11 @@ export default function AlunoNovo() {
     } catch (err) {
       captureError(err, { feature: 'coach_create_student' });
       setPhase('form');
-      Alert.alert(
-        'Não consegui cadastrar',
-        err instanceof Error ? err.message : 'Verifica os dados e tenta de novo.',
-      );
+      const raw = err instanceof Error ? err.message : 'Tenta de novo.';
+      setErrorOpen({
+        title: 'Não consegui cadastrar',
+        message: friendlyError(raw),
+      });
     }
   }
 
@@ -196,10 +224,11 @@ export default function AlunoNovo() {
     } catch (err) {
       captureError(err, { feature: 'coach_regenerate_plan' });
       setPhase('preview');
-      Alert.alert(
-        'Não consegui gerar de novo',
-        err instanceof Error ? err.message : 'Tenta de novo em instantes.',
-      );
+      const raw = err instanceof Error ? err.message : 'Tenta de novo em instantes.';
+      setErrorOpen({
+        title: 'Não consegui gerar de novo',
+        message: friendlyError(raw),
+      });
     }
   }
 
@@ -253,11 +282,31 @@ export default function AlunoNovo() {
     router.back();
   }
 
+  // Modal de erro estilizado — substitui Alert.alert nativo. Renderizado
+  // como overlay em todas as fases pra que erros lançados em qualquer
+  // step apareçam corretamente.
+  const errorModal = (
+    <ConfirmModal
+      visible={!!errorOpen}
+      onClose={() => setErrorOpen(null)}
+      title={errorOpen?.title ?? ''}
+      message={errorOpen?.message}
+      icon={<AlertTriangle size={26} color={colors.danger} />}
+      actions={[
+        {
+          label: 'OK',
+          variant: 'primary',
+          onPress: () => setErrorOpen(null),
+        },
+      ]}
+    />
+  );
+
   if (phase === 'generating') {
-    return <GeneratingScreen />;
+    return <>{errorModal}<GeneratingScreen /></>;
   }
   if (phase === 'saving') {
-    return <SavingScreen />;
+    return <>{errorModal}<SavingScreen /></>;
   }
   if (phase === 'preview' && plan) {
     return (
@@ -289,11 +338,13 @@ export default function AlunoNovo() {
             },
           ]}
         />
+        {errorModal}
       </>
     );
   }
 
   return (
+    <>
     <Screen variant="hero" edges={['top', 'bottom']}>
       <KeyboardAvoidingView
         behavior="padding"
@@ -489,6 +540,8 @@ export default function AlunoNovo() {
         </ScrollView>
       </KeyboardAvoidingView>
     </Screen>
+    {errorModal}
+    </>
   );
 }
 
