@@ -29,6 +29,7 @@ import {
   Screen,
   SegmentedControl,
 } from '@/components/ui';
+import { useAlert } from '@/components/GlobalAlertProvider';
 import { colors } from '@/lib/theme';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import {
@@ -92,6 +93,7 @@ function generatePassword(): string {
 export default function AlunoNovo() {
   const router = useRouter();
   const kbHeight = useKeyboardHeight();
+  const alert = useAlert();
 
   const createMutation = useCreateStudent();
   const generateMutation = useGenerateStudentPlan();
@@ -177,10 +179,7 @@ export default function AlunoNovo() {
     } catch (err) {
       captureError(err, { feature: 'coach_create_student' });
       setPhase('form');
-      Alert.alert(
-        'Não consegui cadastrar',
-        err instanceof Error ? err.message : 'Verifica os dados e tenta de novo.',
-      );
+      alert.showError(err);
     }
   }
 
@@ -196,10 +195,7 @@ export default function AlunoNovo() {
     } catch (err) {
       captureError(err, { feature: 'coach_regenerate_plan' });
       setPhase('preview');
-      Alert.alert(
-        'Não consegui gerar de novo',
-        err instanceof Error ? err.message : 'Tenta de novo em instantes.',
-      );
+      alert.showError(err);
     }
   }
 
@@ -218,10 +214,7 @@ export default function AlunoNovo() {
     } catch (err) {
       captureError(err, { feature: 'coach_save_plan' });
       setPhase('preview');
-      Alert.alert(
-        'Não consegui salvar',
-        err instanceof Error ? err.message : 'Tenta de novo.',
-      );
+      alert.showError(err);
     }
   }
 
@@ -233,18 +226,14 @@ export default function AlunoNovo() {
         studentId,
         password: studentPassword,
       });
-      Alert.alert('Email enviado', 'O aluno recebeu os dados de acesso.', [
-        { text: 'OK', onPress: () => router.back() },
-      ]);
+      alert.showAlert({
+        title: 'Email enviado',
+        message: 'O aluno recebeu os dados de acesso.',
+        type: 'success',
+        onConfirm: () => router.back(),
+      });
     } catch (err) {
-      Alert.alert(
-        'Não consegui enviar o email',
-        err instanceof Error ? err.message : 'Tenta de novo.',
-        [
-          { text: 'Voltar pra lista', onPress: () => router.back() },
-          { text: 'OK' },
-        ],
-      );
+      alert.showError(err);
     }
   }
 
