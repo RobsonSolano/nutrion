@@ -26,9 +26,11 @@ import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { signUpWithPassword } from '@/services/auth';
 import { promoteToProfessor } from '@/services/coach';
 import { supabase } from '@/services/supabase';
+import { useUiStore } from '@/stores/useUiStore';
 import { queryKeys } from '@/lib/queryKeys';
 import { colors } from '@/lib/theme';
 import { Button, Input, Logo, Screen } from '@/components/ui';
+import { useAlert } from '@/components/GlobalAlertProvider';
 import { captureError } from '@/lib/sentry';
 
 const MAX_BIO = 300;
@@ -38,6 +40,7 @@ export default function SignupProfessorScreen() {
   const router = useRouter();
   const kbHeight = useKeyboardHeight();
   const qc = useQueryClient();
+  const alert = useAlert();
 
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -51,8 +54,14 @@ export default function SignupProfessorScreen() {
   const emailRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
 
+  const setPromoting = useUiStore((s) => s.setPromotingProfessor);
+
   async function handleSubmit() {
     setLoading(true);
+    // Trava redirects automáticos (gates de auth/tabs/onboarding) enquanto
+    // o signUp + promote estão em curso. Sem isso o user ve a tela de
+    // onboarding piscar enquanto a edge function ainda esta promovendo.
+    setPromoting(true);
     try {
       // 1) Cria o auth.users + profile (via trigger handle_new_user).
       await signUpWithPassword({
@@ -65,12 +74,7 @@ export default function SignupProfessorScreen() {
         bio: bio.trim() || null,
         cref: cref.trim() || null,
       });
-      // 3) Força refetch do profile ANTES de redirecionar — sem isso
-      //    o cache pode estar com role='comum' (estado pre-promoção)
-      //    e o gate de (coach)/_layout joga o user pra (tabs)/_layout
-      //    que por sua vez detecta onboarding incompleto e manda pra
-      //    /onboarding. Sintoma: professor recém-cadastrado caindo
-      //    no fluxo de IA do app.
+      // 3) Força refetch do profile ANTES de redirecionar.
       const { data: { user } } = await supabase.auth.getUser();
       if (user?.id) {
         await qc.refetchQueries({ queryKey: queryKeys.profile(user.id) });
@@ -79,12 +83,10 @@ export default function SignupProfessorScreen() {
       router.replace('/(coach)' as Href);
     } catch (err) {
       captureError(err, { feature: 'signup_professor' });
-      Alert.alert(
-        'Não consegui criar a conta',
-        err instanceof Error ? err.message : 'Verifica os dados e tenta de novo.',
-      );
+      alert.showError(err);
     } finally {
       setLoading(false);
+      setPromoting(false);
     }
   }
 

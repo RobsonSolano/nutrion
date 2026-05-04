@@ -27,6 +27,7 @@ import {
   Input,
   Screen,
 } from '@/components/ui';
+import { useAlert } from '@/components/GlobalAlertProvider';
 import { colors } from '@/lib/theme';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import {
@@ -47,6 +48,7 @@ export default function NotasScreen() {
   const createMutation = useCreateNote();
   const updateMutation = useUpdateNote();
   const deleteMutation = useDeleteNote();
+  const alert = useAlert();
 
   const [draft, setDraft] = useState('');
   const [editing, setEditing] = useState<CoachNote | null>(null);
@@ -60,10 +62,7 @@ export default function NotasScreen() {
       await createMutation.mutateAsync({ studentId: id, body: draft });
       setDraft('');
     } catch (err) {
-      Alert.alert(
-        'Não consegui salvar',
-        err instanceof Error ? err.message : 'Tenta de novo.',
-      );
+      alert.showError(err);
     }
   }
 
@@ -76,10 +75,7 @@ export default function NotasScreen() {
       });
       setConfirmDelete(null);
     } catch (err) {
-      Alert.alert(
-        'Não consegui excluir',
-        err instanceof Error ? err.message : 'Tenta de novo.',
-      );
+      alert.showError(err);
     }
   }
 
@@ -192,10 +188,7 @@ export default function NotasScreen() {
             });
             setEditing(null);
           } catch (err) {
-            Alert.alert(
-              'Não consegui salvar',
-              err instanceof Error ? err.message : 'Tenta de novo.',
-            );
+            alert.showError(err);
           }
         }}
         saving={updateMutation.isPending}

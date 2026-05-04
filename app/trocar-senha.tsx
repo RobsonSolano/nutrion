@@ -11,6 +11,7 @@ import {
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Eye, EyeOff, Lock, ShieldCheck } from 'lucide-react-native';
 import { Button, Card, Input, Screen } from '@/components/ui';
+import { useAlert } from '@/components/GlobalAlertProvider';
 import { colors } from '@/lib/theme';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { changePassword } from '@/services/auth';
@@ -19,6 +20,7 @@ import { captureError } from '@/lib/sentry';
 export default function TrocarSenhaScreen() {
   const router = useRouter();
   const kbHeight = useKeyboardHeight();
+  const alert = useAlert();
 
   const [newPassword, setNewPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -36,15 +38,15 @@ export default function TrocarSenhaScreen() {
     setLoading(true);
     try {
       await changePassword(newPassword);
-      Alert.alert('Senha trocada', 'Use a nova senha no próximo login.', [
-        { text: 'OK', onPress: () => router.back() },
-      ]);
+      alert.showAlert({
+        title: 'Senha trocada',
+        message: 'Use a nova senha no próximo login.',
+        type: 'success',
+        onConfirm: () => router.back(),
+      });
     } catch (err) {
       captureError(err, { feature: 'change_password' });
-      Alert.alert(
-        'Não consegui trocar',
-        err instanceof Error ? err.message : 'Tenta de novo.',
-      );
+      alert.showError(err);
     } finally {
       setLoading(false);
     }
