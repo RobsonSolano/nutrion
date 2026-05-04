@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Image,
   KeyboardAvoidingView,
@@ -284,13 +285,14 @@ function InputStage(props: {
             />
           </View>
         ) : props.preparing ? (
-          <View className="rounded-2xl border border-dashed border-violet/40 bg-violet/5 items-center justify-center py-12 mb-3 gap-2">
-            <Sparkles size={22} color={colors.violetSoft} />
-            <Text className="text-violet-soft text-xs font-semibold">
-              Preparando foto...
+          <View className="rounded-2xl border border-violet/50 bg-violet/10 items-center justify-center py-12 mb-3 gap-3">
+            <ActivityIndicator size="large" color={colors.violetSoft} />
+            <Text className="text-violet-soft text-sm font-bold">
+              Carregando imagem...
             </Text>
-            <Text className="text-text-muted text-[11px]">
-              Reduzindo tamanho pra enviar pra IA
+            <Text className="text-text-muted text-[11px] text-center px-6 leading-relaxed">
+              Reduzindo tamanho pra enviar pra IA. Pode levar alguns segundos
+              em fotos de alta qualidade.
             </Text>
           </View>
         ) : (
