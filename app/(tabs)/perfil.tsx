@@ -25,6 +25,7 @@ import { useProfile } from '@/hooks/useProfile';
 import { useResetOnboarding } from '@/hooks/useOnboarding';
 import { usePushToggle } from '@/hooks/usePushToggle';
 import { useUnreadStudentRequests } from '@/hooks/useRequests';
+import { useAlert } from '@/components/GlobalAlertProvider';
 import type { ResetOnboardingMode } from '@/services/onboarding';
 import { useDailyOnboardingUsage } from '@/hooks/useAiUsage';
 import { useOnboardingStore } from '@/stores/useOnboardingStore';
@@ -49,6 +50,7 @@ export default function PerfilScreen() {
 
   const push = usePushToggle();
   const unreadQ = useUnreadStudentRequests();
+  const alert = useAlert();
 
   const hasCompletedOnboarding = !!profile?.onboarding_completed_at;
   const refazerBlocked =
@@ -63,19 +65,17 @@ export default function PerfilScreen() {
       await resetOnboardingM.mutateAsync(mode);
       router.push('/onboarding' as Href);
     } catch (err) {
-      Alert.alert(
-        'Ops',
-        err instanceof Error ? err.message : 'Tenta de novo.',
-      );
+      alert.showError(err);
     }
   }
 
   function handleRedoOnboarding() {
     if (refazerBlocked) {
-      Alert.alert(
-        'Limite diário',
-        'Você já refez seu plano hoje. Tenta de novo amanhã.',
-      );
+      alert.showAlert({
+        title: 'Limite diário',
+        message: 'Você já refez seu plano hoje. Tenta de novo amanhã.',
+        type: 'info',
+      });
       return;
     }
     if (!hasCompletedOnboarding) {

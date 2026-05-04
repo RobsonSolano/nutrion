@@ -1,15 +1,20 @@
 import { useEffect, useState, useMemo } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   Text,
   View,
 } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
-import { ArrowLeft, MessageSquarePlus, MessagesSquare } from 'lucide-react-native';
-import { Button, Card, Screen, SegmentedControl } from '@/components/ui';
+import {
+  ArrowLeft,
+  AlertTriangle,
+  MessageSquarePlus,
+  MessagesSquare,
+} from 'lucide-react-native';
+import { Button, Card, ConfirmModal, Screen, SegmentedControl } from '@/components/ui';
+import { useAlert } from '@/components/GlobalAlertProvider';
 import { colors } from '@/lib/theme';
 import {
   useMyRequests,
@@ -43,7 +48,11 @@ export default function MinhasSolicitacoesScreen() {
   const requestsQ = useMyRequests();
   const cancelMutation = useCancelRequest();
   const markSeen = useMarkRequestsSeen();
+  const alert = useAlert();
   const [filter, setFilter] = useState<Filter>('all');
+  const [confirmCancel, setConfirmCancel] = useState<StudentRequest | null>(
+    null,
+  );
 
   // Marca como visto ao abrir a tela — zera o badge de não-lidas.
   useEffect(() => {
@@ -58,27 +67,18 @@ export default function MinhasSolicitacoesScreen() {
   }, [requestsQ.data, filter]);
 
   function handleCancel(req: StudentRequest) {
-    Alert.alert(
-      'Cancelar solicitação?',
-      'Não pode ser desfeita. O professor vê como cancelada.',
-      [
-        { text: 'Voltar', style: 'cancel' },
-        {
-          text: 'Cancelar',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await cancelMutation.mutateAsync(req.id);
-            } catch (err) {
-              Alert.alert(
-                'Não consegui cancelar',
-                err instanceof Error ? err.message : 'Tenta de novo.',
-              );
-            }
-          },
-        },
-      ],
-    );
+    setConfirmCancel(req);
+  }
+
+  async function confirmCancelNow() {
+    if (!confirmCancel) return;
+    try {
+      await cancelMutation.mutateAsync(confirmCancel.id);
+      setConfirmCancel(null);
+    } catch (err) {
+      setConfirmCancel(null);
+      alert.showError(err);
+    }
   }
 
   return (
@@ -143,6 +143,27 @@ export default function MinhasSolicitacoesScreen() {
           icon={<MessageSquarePlus size={18} color={colors.textInverse} />}
         />
       </ScrollView>
+
+      <ConfirmModal
+        visible={!!confirmCancel}
+        onClose={() => setConfirmCancel(null)}
+        title="Cancelar solicitação?"
+        message="Essa ação não pode ser desfeita. O professor vê como cancelada."
+        icon={<AlertTriangle size={26} color={colors.danger} />}
+        actions={[
+          {
+            label: 'Sim, cancelar',
+            variant: 'danger',
+            onPress: confirmCancelNow,
+            loading: cancelMutation.isPending,
+          },
+          {
+            label: 'Voltar',
+            variant: 'ghost',
+            onPress: () => setConfirmCancel(null),
+          },
+        ]}
+      />
     </Screen>
   );
 }
