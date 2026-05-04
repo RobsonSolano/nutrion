@@ -653,19 +653,39 @@ function buildEnrichedUserMessage(
 }
 
 function buildSanityPrompt(body: ChatRequest) {
+  const hasPhoto = !!body.imageBase64;
+  const weightLine = body.scaleWeightG
+    ? `Peso na balança: ${body.scaleWeightG}g.`
+    : 'Peso na balança: não informado.';
+
+  if (hasPhoto) {
+    return [
+      'MODO SANITY CHECK DE REFEIÇÃO (com foto).',
+      `Descrição informada: "${body.message}"`,
+      weightLine,
+      'Tarefas:',
+      '1. Identifique os itens visíveis na foto.',
+      '2. Verifique consistência entre descrição, peso e volume visual.',
+      '3. Estime calorias e macros (kcal, proteína g, carbo g, gordura g) usando bom senso e tabelas nutricionais brasileiras (TACO/USDA).',
+      '4. Dê feedback empático (acerto vs. oportunidade de ajuste).',
+      'IMPORTANTE: SEMPRE retorne o objeto "macros" com TODOS os 4 campos numéricos preenchidos — nunca null, nunca string, nunca vazio. Se não tiver certeza absoluta, faça a melhor estimativa razoável.',
+      'Responda APENAS em JSON puro, sem markdown, sem ```:',
+      '{ "items":["..."], "consistency":"ok|diverge", "macros":{"kcal":N,"protein_g":N,"carbs_g":N,"fats_g":N}, "feedback":"texto curto" }',
+    ].join('\n');
+  }
+
   return [
-    'MODO SANITY CHECK DE REFEIÇÃO.',
-    `Descrição informada: "${body.message}"`,
-    body.scaleWeightG
-      ? `Peso na balança: ${body.scaleWeightG}g.`
-      : 'Peso na balança: não informado.',
+    'MODO SANITY CHECK DE REFEIÇÃO (apenas descrição textual — sem foto).',
+    `Descrição da refeição: "${body.message}"`,
+    weightLine,
     'Tarefas:',
-    '1. Identifique os itens visíveis na foto.',
-    '2. Verifique consistência entre descrição, peso e volume visual.',
-    '3. Estime calorias e macros (kcal, proteína g, carbo g, gordura g).',
-    '4. Dê feedback empático (acerto vs. oportunidade de ajuste).',
-    'Responda em JSON:',
-    '{ "items":["..."], "consistency":"ok|diverge", "macros":{"kcal":N,"protein_g":N,"carbs_g":N,"fats_g":N}, "feedback":"texto curto" }',
+    '1. Liste os itens da refeição a partir da descrição (em "items").',
+    '2. Estime calorias e macros (kcal, proteína g, carbo g, gordura g) usando tabelas nutricionais brasileiras (TACO/USDA) e bom senso. Se faltar quantidade explícita, assuma porções típicas brasileiras.',
+    '3. Dê feedback empático curto (1-2 frases) sobre a refeição.',
+    'IMPORTANTE: NUNCA recuse a estimativa. SEMPRE retorne o objeto "macros" com TODOS os 4 campos numéricos preenchidos — nunca null, nunca string, nunca vazio. Faça sempre uma estimativa razoável mesmo com pouca informação.',
+    'Use "consistency":"ok" (não há foto pra divergir).',
+    'Responda APENAS em JSON puro, sem markdown, sem ```:',
+    '{ "items":["..."], "consistency":"ok", "macros":{"kcal":N,"protein_g":N,"carbs_g":N,"fats_g":N}, "feedback":"texto curto" }',
   ].join('\n');
 }
 
