@@ -161,54 +161,67 @@ export default function PerfilScreen() {
           </View>
         </Card>
 
-        <Button
-          label="Editar perfil"
-          onPress={() => router.push('/editar-perfil' as Href)}
-          variant="secondary"
-          size="md"
-          icon={<Pencil size={16} color={colors.text} />}
-        />
-
-        {isStudent && (
-          <Button
-            label="Minhas solicitações"
-            onPress={() => router.push('/solicitacoes' as Href)}
-            variant="secondary"
-            size="md"
-            icon={<MessagesSquare size={16} color={colors.violetSoft} />}
-          />
-        )}
-
-        <Button
-          label="Trocar senha"
-          onPress={() => router.push('/trocar-senha' as Href)}
-          variant="secondary"
-          size="md"
-          icon={<Lock size={16} color={colors.text} />}
-        />
-
-        <Button
-          label={push.enabled ? 'Desativar notificações' : 'Ativar notificações'}
-          onPress={push.toggle}
-          loading={push.loading}
-          variant="secondary"
-          size="md"
-          icon={
-            push.enabled ? (
-              <BellOff size={16} color={colors.text} />
-            ) : (
-              <Bell size={16} color={colors.text} />
-            )
-          }
-        />
-
-        <Button
-          label="Exportar meus dados"
-          onPress={() => router.push('/exportar-dados' as Href)}
-          variant="ghost"
-          size="md"
-          icon={<Download size={16} color={colors.textDim} />}
-        />
+        <Card padding="md">
+          <Text className="text-text-dim text-[11px] uppercase tracking-widest mb-3">
+            Conta
+          </Text>
+          <View className="flex-row flex-wrap gap-2">
+            <View style={{ width: '48.5%' }}>
+              <Button
+                label="Editar perfil"
+                onPress={() => router.push('/editar-perfil' as Href)}
+                variant="secondary"
+                size="md"
+                icon={<Pencil size={14} color={colors.text} />}
+              />
+            </View>
+            {isStudent && (
+              <View style={{ width: '48.5%' }}>
+                <Button
+                  label="Solicitações"
+                  onPress={() => router.push('/solicitacoes' as Href)}
+                  variant="secondary"
+                  size="md"
+                  icon={<MessagesSquare size={14} color={colors.violetSoft} />}
+                />
+              </View>
+            )}
+            <View style={{ width: '48.5%' }}>
+              <Button
+                label="Trocar senha"
+                onPress={() => router.push('/trocar-senha' as Href)}
+                variant="secondary"
+                size="md"
+                icon={<Lock size={14} color={colors.text} />}
+              />
+            </View>
+            <View style={{ width: '48.5%' }}>
+              <Button
+                label={push.enabled ? 'Desativar push' : 'Ativar push'}
+                onPress={push.toggle}
+                loading={push.loading}
+                variant="secondary"
+                size="md"
+                icon={
+                  push.enabled ? (
+                    <BellOff size={14} color={colors.text} />
+                  ) : (
+                    <Bell size={14} color={colors.text} />
+                  )
+                }
+              />
+            </View>
+            <View style={{ width: '48.5%' }}>
+              <Button
+                label="Exportar dados"
+                onPress={() => router.push('/exportar-dados' as Href)}
+                variant="ghost"
+                size="md"
+                icon={<Download size={14} color={colors.textDim} />}
+              />
+            </View>
+          </View>
+        </Card>
 
         <Card>
           <Text className="text-text-dim text-[11px] uppercase tracking-widest mb-4">
