@@ -5,6 +5,7 @@ import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
+import { useUnreadStudentRequests } from '@/hooks/useRequests';
 import { useUiStore } from '@/stores/useUiStore';
 import { colors } from '@/lib/theme';
 
@@ -12,7 +13,10 @@ export default function TabsLayout() {
   const { isAuthenticated, isBootstrapping } = useAuth();
   const profileQ = useProfile();
   const isPromotingProfessor = useUiStore((s) => s.isPromotingProfessor);
+  const unreadQ = useUnreadStudentRequests();
   const insets = useSafeAreaInsets();
+  const isStudent = profileQ.data?.role === 'aluno';
+  const unreadCount = isStudent ? unreadQ.data ?? 0 : 0;
 
   if (isBootstrapping) return null;
   // Trava redirects enquanto signup-professor está em curso (evita
@@ -122,6 +126,16 @@ export default function TabsLayout() {
         name="perfil"
         options={{
           title: 'Perfil',
+          tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
+          tabBarBadgeStyle: {
+            backgroundColor: colors.accent,
+            color: colors.textInverse,
+            fontSize: 10,
+            fontWeight: '700',
+            minWidth: 18,
+            height: 18,
+            lineHeight: 16,
+          },
           tabBarIcon: ({ color, focused }) => (
             <TabIcon focused={focused}>
               <User color={color} size={22} strokeWidth={focused ? 2.5 : 2} />
