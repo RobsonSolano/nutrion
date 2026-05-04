@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useRouter, type Href } from 'expo-router';
 import * as Notifications from 'expo-notifications';
+import { IS_EXPO_GO } from '@/lib/platform';
 import { useSessionStore } from '@/stores/useSessionStore';
 
 type PushPayload = {
@@ -28,6 +29,10 @@ export function useNotificationRouter() {
   const consumedColdStart = useRef(false);
 
   useEffect(() => {
+    // Expo Go (SDK 53+) não suporta push remoto. Pular pra evitar
+    // warning "Android Push notifications functionality... was
+    // removed from Expo Go".
+    if (IS_EXPO_GO) return;
     if (!isAuthenticated) return;
 
     function navigate(payload: PushPayload | null | undefined) {

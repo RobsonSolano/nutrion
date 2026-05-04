@@ -148,7 +148,20 @@ serve(async (req: Request) => {
         html,
       });
     } finally {
-      await client.close().catch(() => {});
+      // denomailer.close() pode retornar void OU Promise dependendo da
+      // versao. Encapsulamos em try/catch defensivo pra evitar
+      // "Cannot read properties of undefined (reading 'catch')".
+      try {
+        const maybePromise = client.close();
+        if (
+          maybePromise &&
+          typeof (maybePromise as Promise<unknown>).then === 'function'
+        ) {
+          await maybePromise;
+        }
+      } catch (_) {
+        // ignora — close best-effort.
+      }
     }
 
     return json({ ok: true, sent_to: studentEmail });
