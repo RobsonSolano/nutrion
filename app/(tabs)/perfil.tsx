@@ -24,6 +24,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
 import { useResetOnboarding } from '@/hooks/useOnboarding';
 import { usePushToggle } from '@/hooks/usePushToggle';
+import { useUnreadStudentRequests } from '@/hooks/useRequests';
 import type { ResetOnboardingMode } from '@/services/onboarding';
 import { useDailyOnboardingUsage } from '@/hooks/useAiUsage';
 import { useOnboardingStore } from '@/stores/useOnboardingStore';
@@ -47,6 +48,7 @@ export default function PerfilScreen() {
   const [logoutOpen, setLogoutOpen] = useState(false);
 
   const push = usePushToggle();
+  const unreadQ = useUnreadStudentRequests();
 
   const hasCompletedOnboarding = !!profile?.onboarding_completed_at;
   const refazerBlocked =
@@ -176,7 +178,7 @@ export default function PerfilScreen() {
               />
             </View>
             {isStudent && (
-              <View style={{ width: '48.5%' }}>
+              <View style={{ width: '48.5%', position: 'relative' }}>
                 <Button
                   label="Solicitações"
                   onPress={() => router.push('/solicitacoes' as Href)}
@@ -184,6 +186,34 @@ export default function PerfilScreen() {
                   size="md"
                   icon={<MessagesSquare size={14} color={colors.violetSoft} />}
                 />
+                {(unreadQ.data ?? 0) > 0 && (
+                  <View
+                    style={{
+                      position: 'absolute',
+                      top: -4,
+                      right: -4,
+                      minWidth: 20,
+                      height: 20,
+                      borderRadius: 10,
+                      backgroundColor: colors.accent,
+                      paddingHorizontal: 4,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderWidth: 2,
+                      borderColor: colors.surface,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: colors.textInverse,
+                        fontSize: 10,
+                        fontWeight: '700',
+                      }}
+                    >
+                      {unreadQ.data}
+                    </Text>
+                  </View>
+                )}
               </View>
             )}
             <View style={{ width: '48.5%' }}>

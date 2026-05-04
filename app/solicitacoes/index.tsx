@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -11,7 +11,11 @@ import { useRouter, type Href } from 'expo-router';
 import { ArrowLeft, MessageSquarePlus, MessagesSquare } from 'lucide-react-native';
 import { Button, Card, Screen, SegmentedControl } from '@/components/ui';
 import { colors } from '@/lib/theme';
-import { useMyRequests, useCancelRequest } from '@/hooks/useRequests';
+import {
+  useMyRequests,
+  useCancelRequest,
+  useMarkRequestsSeen,
+} from '@/hooks/useRequests';
 import type {
   StudentRequest,
   StudentRequestStatus,
@@ -38,7 +42,14 @@ export default function MinhasSolicitacoesScreen() {
   const router = useRouter();
   const requestsQ = useMyRequests();
   const cancelMutation = useCancelRequest();
+  const markSeen = useMarkRequestsSeen();
   const [filter, setFilter] = useState<Filter>('all');
+
+  // Marca como visto ao abrir a tela — zera o badge de não-lidas.
+  useEffect(() => {
+    void markSeen();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const filtered = useMemo(() => {
     const all = requestsQ.data ?? [];
