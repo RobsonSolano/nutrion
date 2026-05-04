@@ -21,9 +21,12 @@ import {
   IdCard,
   FileText,
 } from 'lucide-react-native';
+import { useQueryClient } from '@tanstack/react-query';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { signUpWithPassword } from '@/services/auth';
 import { promoteToProfessor } from '@/services/coach';
+import { supabase } from '@/services/supabase';
+import { queryKeys } from '@/lib/queryKeys';
 import { colors } from '@/lib/theme';
 import { Button, Input, Logo, Screen } from '@/components/ui';
 import { captureError } from '@/lib/sentry';
@@ -34,6 +37,7 @@ const MAX_CREF = 30;
 export default function SignupProfessorScreen() {
   const router = useRouter();
   const kbHeight = useKeyboardHeight();
+  const qc = useQueryClient();
 
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -61,7 +65,17 @@ export default function SignupProfessorScreen() {
         bio: bio.trim() || null,
         cref: cref.trim() || null,
       });
-      // 3) Redireciona pra área do professor.
+      // 3) Força refetch do profile ANTES de redirecionar — sem isso
+      //    o cache pode estar com role='comum' (estado pre-promoção)
+      //    e o gate de (coach)/_layout joga o user pra (tabs)/_layout
+      //    que por sua vez detecta onboarding incompleto e manda pra
+      //    /onboarding. Sintoma: professor recém-cadastrado caindo
+      //    no fluxo de IA do app.
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.id) {
+        await qc.refetchQueries({ queryKey: queryKeys.profile(user.id) });
+      }
+      // 4) Redireciona pra área do professor.
       router.replace('/(coach)' as Href);
     } catch (err) {
       captureError(err, { feature: 'signup_professor' });

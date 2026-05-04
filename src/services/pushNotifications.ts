@@ -2,14 +2,21 @@ import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
+import { IS_EXPO_GO } from '@/lib/platform';
 import { supabase } from './supabase';
 
 /**
  * Comportamento do listener de foreground: mostra a notificação
  * mesmo com o app aberto. Sem isso, em foreground o user não vê
  * nada (silencioso).
+ *
+ * No Expo Go (SDK 53+), push remoto foi removido — pular a config
+ * pra evitar warning "Android Push notifications functionality...
+ * was removed from Expo Go". Em dev/preview/production builds,
+ * roda normal.
  */
 export function configurePushHandler() {
+  if (IS_EXPO_GO) return;
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
       shouldShowBanner: true,
@@ -23,8 +30,11 @@ export function configurePushHandler() {
 /**
  * Cria o canal padrão do Android. Sem canal, a notificação cai num
  * "default" sem som/vibração. Roda no startup, idempotente.
+ *
+ * Pulado em Expo Go (mesmo motivo do configurePushHandler).
  */
 export async function ensureAndroidChannel() {
+  if (IS_EXPO_GO) return;
   if (Platform.OS !== 'android') return;
   await Notifications.setNotificationChannelAsync('default', {
     name: 'NutriOn',
@@ -46,6 +56,14 @@ export type RegisterResult =
  * Android emulator com Google Play Services funciona normal.
  */
 export async function registerForPushNotifications(): Promise<RegisterResult> {
+  if (IS_EXPO_GO) {
+    return {
+      ok: false,
+      reason: 'not_device',
+      detail:
+        'Push remoto não funciona no Expo Go (SDK 53+). Use development build ou APK.',
+    };
+  }
   if (!Device.isDevice) {
     return { ok: false, reason: 'not_device' };
   }
