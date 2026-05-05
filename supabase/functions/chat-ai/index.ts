@@ -101,6 +101,21 @@ Escopo (regra rígida — NÃO negocie):
 Formatação:
 - Use markdown leve. **Negrito** em números/métricas chave (ex: "**1850 kcal**"); listas com "- " quando enumerar pontos ou itens; parágrafos curtos separados por linha em branco. Nunca use tabelas. Não abuse — texto fluido continua sendo o padrão.`;
 
+// System prompt enxuto pro modo sanity_check. NÃO reusa PERSONA_PROMPT
+// porque aquele instrui markdown/texto fluido — conflita diretamente com
+// o pedido de JSON estrito do user message e faz o modelo responder em
+// texto livre (parser falha → "Sem estimativa" no app).
+const SANITY_PERSONA_PROMPT = `Você é o NutriOn IA atuando em MODO ANALISADOR DE REFEIÇÃO.
+
+Sua única tarefa é estimar macros de uma refeição e devolver um objeto JSON estrito no formato pedido pelo usuário. NUNCA use markdown, NUNCA escreva parágrafos, NUNCA prefacie a resposta. A primeira coisa da resposta deve ser \`{\` e a última deve ser \`}\`.
+
+Diretrizes:
+- Sempre responda em português brasileiro DENTRO do campo "feedback" do JSON.
+- Use bom senso e tabelas nutricionais brasileiras (TACO/USDA) pra estimar.
+- SEMPRE preencha "macros" com os 4 campos numéricos (kcal, protein_g, carbs_g, fats_g). NUNCA null, NUNCA string, NUNCA omita. Se a info for limitada, faça a melhor estimativa razoável.
+- "feedback" deve ser empático e curto (1-2 frases) — celebre acertos, sugira ajustes sem culpar.
+- Se o input claramente não for comida, ainda assim retorne o JSON, com macros zerados e "feedback" explicando educadamente.`;
+
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: CORS });
@@ -242,13 +257,13 @@ serve(async (req: Request) => {
       }
     }
 
-    // Tags de referências bibliográficas relevantes pro modo. Chat livre
-    // pega tudo (nutrição + treino + geral); sanity_check de prato foca
-    // em nutrição. As referências entram no system prompt e a IA é
-    // instruída a citar no final da resposta.
-    const referenceTags = isChatMode
-      ? ['nutricao', 'treino', 'geral']
-      : ['nutricao', 'geral'];
+    // Tags de referências bibliográficas relevantes pro modo. No
+    // sanity_check NÃO usamos referências — testes mostraram que o Llama
+    // colocava a citação como chave malformada no top-level do JSON
+    // ("Referência utilizada: TACO" sem valor), quebrando o JSON.parse e
+    // resultando em "Sem estimativa" no app. Pro fluxo de macros de
+    // refeição, citação científica não agrega — texto livre do chat sim.
+    const referenceTags = isChatMode ? ['nutricao', 'treino', 'geral'] : [];
 
     // Contexto rico (perfil + logs) — usado em ambos os modos.
     const [
@@ -311,7 +326,12 @@ serve(async (req: Request) => {
       .reverse(); // banco vem desc; modelo precisa cronológico asc
 
     const todayTotals = aggregateToday(foods, todayBR);
-    const contextBlock = buildContext(profile, todayTotals, workouts);
+    // No sanity_check, contextBlock (perfil + peso + treino) só polui o
+    // prompt — a IA só precisa estimar macros do que foi descrito. Mantemos
+    // só pro chat, onde o contexto importa pra resposta personalizada.
+    const contextBlock = isChatMode
+      ? buildContext(profile, todayTotals, workouts)
+      : '';
     const referencesBlock = formatReferencesForPrompt(
       references,
       isChatMode
@@ -366,10 +386,15 @@ serve(async (req: Request) => {
       }
     }
 
+    // Persona difere por modo: PERSONA_PROMPT (texto fluido + markdown) só
+    // serve pro chat. No sanity_check usamos um persona enxuto que NÃO
+    // instrui markdown — caso contrário o modelo prioriza o "texto fluido"
+    // do system e ignora o pedido de JSON estrito do user message.
+    const personaPrompt = isChatMode ? PERSONA_PROMPT : SANITY_PERSONA_PROMPT;
     const messages: { role: string; content: unknown }[] = [
       {
         role: 'system',
-        content: `${PERSONA_PROMPT}\n\n${contextBlock}${referencesBlock}`,
+        content: `${personaPrompt}\n\n${contextBlock}${referencesBlock}`,
       },
       ...history.map((h) => ({ role: h.role, content: h.content })),
       { role: 'user', content: userContent },
@@ -392,6 +417,10 @@ serve(async (req: Request) => {
         max_tokens: 700,
         top_p: 0.9,
         stream: useStream,
+        // JSON mode no sanity_check: força a API a retornar JSON valido.
+        // Resolve definitivamente o problema do modelo retornar texto livre
+        // que o parser nao consegue extrair.
+        ...(isChatMode ? {} : { response_format: { type: 'json_object' } }),
       }),
     });
 
@@ -462,6 +491,17 @@ serve(async (req: Request) => {
           detail: 'Modelo não retornou texto. Tenta reformular a pergunta.',
         },
         502,
+      );
+    }
+
+    // Log do output do sanity_check pra investigar quando o parser do
+    // cliente reclama de "Sem estimativa". Cortado em 800 chars pra não
+    // poluir os logs em casos normais.
+    if (!isChatMode) {
+      const preview = aiText.length > 800 ? aiText.slice(0, 800) + '…' : aiText;
+      console.log(
+        `[chat-ai] sanity_check output (model=${modelToUse}, hasPhoto=${isMultimodal}):`,
+        preview,
       );
     }
 
@@ -653,19 +693,39 @@ function buildEnrichedUserMessage(
 }
 
 function buildSanityPrompt(body: ChatRequest) {
+  const hasPhoto = !!body.imageBase64;
+  const weightLine = body.scaleWeightG
+    ? `Peso na balança: ${body.scaleWeightG}g.`
+    : 'Peso na balança: não informado.';
+
+  if (hasPhoto) {
+    return [
+      'MODO SANITY CHECK DE REFEIÇÃO (com foto).',
+      `Descrição informada: "${body.message}"`,
+      weightLine,
+      'Tarefas:',
+      '1. Identifique os itens visíveis na foto.',
+      '2. Verifique consistência entre descrição, peso e volume visual.',
+      '3. Estime calorias e macros (kcal, proteína g, carbo g, gordura g) usando bom senso e tabelas nutricionais brasileiras (TACO/USDA).',
+      '4. Dê feedback empático (acerto vs. oportunidade de ajuste).',
+      'IMPORTANTE: SEMPRE retorne o objeto "macros" com TODOS os 4 campos numéricos preenchidos — nunca null, nunca string, nunca vazio. Se não tiver certeza absoluta, faça a melhor estimativa razoável.',
+      'Responda APENAS em JSON puro, sem markdown, sem ```:',
+      '{ "items":["..."], "consistency":"ok|diverge", "macros":{"kcal":N,"protein_g":N,"carbs_g":N,"fats_g":N}, "feedback":"texto curto" }',
+    ].join('\n');
+  }
+
   return [
-    'MODO SANITY CHECK DE REFEIÇÃO.',
-    `Descrição informada: "${body.message}"`,
-    body.scaleWeightG
-      ? `Peso na balança: ${body.scaleWeightG}g.`
-      : 'Peso na balança: não informado.',
+    'MODO SANITY CHECK DE REFEIÇÃO (apenas descrição textual — sem foto).',
+    `Descrição da refeição: "${body.message}"`,
+    weightLine,
     'Tarefas:',
-    '1. Identifique os itens visíveis na foto.',
-    '2. Verifique consistência entre descrição, peso e volume visual.',
-    '3. Estime calorias e macros (kcal, proteína g, carbo g, gordura g).',
-    '4. Dê feedback empático (acerto vs. oportunidade de ajuste).',
-    'Responda em JSON:',
-    '{ "items":["..."], "consistency":"ok|diverge", "macros":{"kcal":N,"protein_g":N,"carbs_g":N,"fats_g":N}, "feedback":"texto curto" }',
+    '1. Liste os itens da refeição a partir da descrição (em "items").',
+    '2. Estime calorias e macros (kcal, proteína g, carbo g, gordura g) usando tabelas nutricionais brasileiras (TACO/USDA) e bom senso. Se faltar quantidade explícita, assuma porções típicas brasileiras.',
+    '3. Dê feedback empático curto (1-2 frases) sobre a refeição.',
+    'IMPORTANTE: NUNCA recuse a estimativa. SEMPRE retorne o objeto "macros" com TODOS os 4 campos numéricos preenchidos — nunca null, nunca string, nunca vazio. Faça sempre uma estimativa razoável mesmo com pouca informação.',
+    'Use "consistency":"ok" (não há foto pra divergir).',
+    'Responda APENAS em JSON puro, sem markdown, sem ```:',
+    '{ "items":["..."], "consistency":"ok", "macros":{"kcal":N,"protein_g":N,"carbs_g":N,"fats_g":N}, "feedback":"texto curto" }',
   ].join('\n');
 }
 

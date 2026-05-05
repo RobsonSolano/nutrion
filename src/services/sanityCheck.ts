@@ -44,6 +44,63 @@ function parseJsonFromText(text: string): Partial<SanityCheckResult> | null {
   }
 }
 
+/**
+ * Ultimo recurso quando JSON.parse falha completo — extrai numeros direto
+ * do texto bruto procurando padroes "kcal": N. Acontece quando o Llama
+ * inclui linha solta no top-level (ex: '"Referencia utilizada: TACO"' sem
+ * valor) que invalida o JSON inteiro.
+ */
+function extractMacrosFromRaw(raw: string): SanityCheckResult['macros'] | undefined {
+  const grab = (key: string): number | undefined => {
+    // procura "key": N ou "key":N (com aspas opcionais e numero possivelmente em string)
+    const re = new RegExp(`"${key}"\\s*:\\s*"?\\s*(-?\\d+(?:[.,]\\d+)?)`, 'i');
+    const m = raw.match(re);
+    if (!m) return undefined;
+    const n = Number(m[1].replace(',', '.'));
+    return Number.isFinite(n) ? n : undefined;
+  };
+  const kcal = grab('kcal') ?? grab('calories') ?? grab('calorias');
+  const protein_g = grab('protein_g') ?? grab('protein') ?? grab('proteina_g') ?? grab('proteina');
+  const carbs_g = grab('carbs_g') ?? grab('carbs') ?? grab('carbo_g') ?? grab('carboidratos');
+  const fats_g = grab('fats_g') ?? grab('fats') ?? grab('gordura_g') ?? grab('gorduras');
+  if (kcal == null && protein_g == null && carbs_g == null && fats_g == null) {
+    return undefined;
+  }
+  return { kcal, protein_g, carbs_g, fats_g };
+}
+
+/**
+ * Extrai um numero de um valor que a IA pode ter mandado como number, string
+ * ("450" ou "450 kcal"), ou null. Retorna undefined se nao conseguir.
+ */
+function coerceNumber(v: unknown): number | undefined {
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  if (typeof v === 'string') {
+    const m = v.match(/-?\d+(?:[.,]\d+)?/);
+    if (!m) return undefined;
+    const n = Number(m[0].replace(',', '.'));
+    return Number.isFinite(n) ? n : undefined;
+  }
+  return undefined;
+}
+
+/**
+ * Tenta achar macros mesmo que o modelo tenha posto fora do objeto "macros"
+ * — em padroes tipo {"kcal":N, "protein_g":N, ...} no top-level, ou strings.
+ * Garante que ao menos kcal exista — sem kcal nao adianta retornar.
+ */
+function extractMacros(parsed: Record<string, unknown>): SanityCheckResult['macros'] | undefined {
+  const inner = (parsed.macros ?? parsed) as Record<string, unknown>;
+  const kcal = coerceNumber(inner.kcal ?? inner.calories ?? inner.calorias);
+  const protein_g = coerceNumber(inner.protein_g ?? inner.protein ?? inner.proteina_g ?? inner.proteina);
+  const carbs_g = coerceNumber(inner.carbs_g ?? inner.carbs ?? inner.carbo_g ?? inner.carboidrato_g ?? inner.carboidratos);
+  const fats_g = coerceNumber(inner.fats_g ?? inner.fats ?? inner.gordura_g ?? inner.gorduras);
+  if (kcal == null && protein_g == null && carbs_g == null && fats_g == null) {
+    return undefined;
+  }
+  return { kcal, protein_g, carbs_g, fats_g };
+}
+
 export async function runSanityCheck(
   params: SanityCheckRequest,
 ): Promise<SanityCheckResult> {
@@ -98,8 +155,23 @@ export async function runSanityCheck(
   const rawText: string = data?.text ?? '';
   const parsed = parseJsonFromText(rawText);
 
+  // Defensive: se o JSON.parse falhou (modelo retornou JSON invalido,
+  // ex: chave malformada por instrucoes conflitantes), ainda assim
+  // extraimos macros direto do texto bruto via regex como ultimo recurso.
   if (!parsed) {
-    return { feedback: rawText, raw: rawText };
+    const fallbackMacros = extractMacrosFromRaw(rawText);
+    return {
+      feedback: rawText,
+      macros: fallbackMacros,
+      raw: rawText,
+    };
   }
-  return { ...parsed, raw: rawText } as SanityCheckResult;
+  // Mesmo com JSON parseado, o modelo pode ter colocado macros como string
+  // ou fora do objeto "macros". coerceNumber + extractMacros normalizam.
+  const macros = extractMacros(parsed as Record<string, unknown>);
+  return {
+    ...(parsed as Partial<SanityCheckResult>),
+    macros,
+    raw: rawText,
+  } as SanityCheckResult;
 }
