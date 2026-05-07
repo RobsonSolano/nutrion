@@ -28,6 +28,10 @@ export const queryKeys = {
   aiUsage: (userId: string, feature: string, day: string) =>
     ['ai-usage', userId, feature, day] as const,
   coachContact: (coachId: string) => ['coach-contact', coachId] as const,
+  studentContracts: (studentId: string) =>
+    ['student-contracts', studentId] as const,
+  activeContract: (studentId: string) =>
+    ['active-contract', studentId] as const,
 };
 
 export function todayKey() {
