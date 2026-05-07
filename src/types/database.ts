@@ -217,3 +217,35 @@ export type ChatAiResponse = {
     totalTokenCount?: number;
   } | null;
 };
+
+export type ContractType = 'mensal' | 'treino' | 'semanal' | 'parceria';
+export type ContractStatus = 'active' | 'ended' | 'cancelled';
+
+export type StudentContract = {
+  id: string;
+  student_id: string;
+  coach_id: string;
+  type: ContractType;
+  start_date: string;
+  end_date: string | null;
+  value_cents: number | null;
+  payment_day: number | null;
+  status: ContractStatus;
+  effective_status: ContractStatus;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ContractInput = Omit<
+  StudentContract,
+  'id' | 'coach_id' | 'effective_status' | 'created_at' | 'updated_at' | 'status'
+>;
+
+export type ContractPatch = Partial<
+  Pick<
+    StudentContract,
+    'type' | 'start_date' | 'end_date' | 'value_cents' | 'payment_day' | 'notes'
+  >
+>;
+
