@@ -32,6 +32,8 @@ export const queryKeys = {
     ['student-contracts', studentId] as const,
   activeContract: (studentId: string) =>
     ['active-contract', studentId] as const,
+  progressEntries: (userId: string) =>
+    ['progress-entries', userId] as const,
 };
 
 export function todayKey() {
