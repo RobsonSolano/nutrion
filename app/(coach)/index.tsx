@@ -13,6 +13,7 @@ import {
   Bell,
   BellOff,
   BookOpen,
+  UserCog,
 } from 'lucide-react-native';
 import { Button, Card, Screen } from '@/components/ui';
 import { colors } from '@/lib/theme';
@@ -205,6 +206,14 @@ export default function CoachHome() {
               <Bell size={16} color={colors.textDim} />
             )
           }
+        />
+
+        <Button
+          label="Meu perfil"
+          onPress={() => router.push('/(coach)/perfil' as Href)}
+          variant="secondary"
+          size="md"
+          icon={<UserCog size={16} color={colors.text} />}
         />
 
         <View className="flex-row gap-2">
