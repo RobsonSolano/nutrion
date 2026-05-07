@@ -16,6 +16,10 @@ export const queryKeys = {
     ['weekly-activity', userId, anchor] as const,
   routines: (userId: string) => ['routines', userId] as const,
   routineDetail: (routineId: string) => ['routine-detail', routineId] as const,
+  templates: (coachId: string, archived: boolean) =>
+    ['templates', coachId, archived ? 'archived' : 'active'] as const,
+  templateDetail: (templateId: string) =>
+    ['template-detail', templateId] as const,
   todaySessions: (userId: string, day: string) =>
     ['today-sessions', userId, day] as const,
   chatMessages: (userId: string) => ['chat-messages', userId] as const,
