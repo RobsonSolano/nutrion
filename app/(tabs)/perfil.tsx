@@ -19,6 +19,7 @@ import {
   Download,
   Bell,
   BellOff,
+  TrendingUp,
 } from 'lucide-react-native';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
@@ -240,6 +241,15 @@ export default function PerfilScreen() {
                     <Bell size={14} color={colors.text} />
                   )
                 }
+              />
+            </View>
+            <View style={{ width: '48.5%' }}>
+              <Button
+                label="Minha evolução"
+                onPress={() => router.push('/evolucao' as Href)}
+                variant="secondary"
+                size="md"
+                icon={<TrendingUp size={14} color={colors.accent} />}
               />
             </View>
             <View style={{ width: '48.5%' }}>
