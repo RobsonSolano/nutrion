@@ -14,6 +14,7 @@ import {
   BellOff,
   BookOpen,
   UserCog,
+  TrendingUp,
 } from 'lucide-react-native';
 import { Button, Card, Screen } from '@/components/ui';
 import { colors } from '@/lib/theme';
@@ -208,13 +209,26 @@ export default function CoachHome() {
           }
         />
 
-        <Button
-          label="Meu perfil"
-          onPress={() => router.push('/(coach)/perfil' as Href)}
-          variant="secondary"
-          size="md"
-          icon={<UserCog size={16} color={colors.text} />}
-        />
+        <View className="flex-row gap-2">
+          <View className="flex-1">
+            <Button
+              label="Meu perfil"
+              onPress={() => router.push('/(coach)/perfil' as Href)}
+              variant="secondary"
+              size="md"
+              icon={<UserCog size={16} color={colors.text} />}
+            />
+          </View>
+          <View className="flex-1">
+            <Button
+              label="Minha evolução"
+              onPress={() => router.push('/evolucao' as Href)}
+              variant="secondary"
+              size="md"
+              icon={<TrendingUp size={16} color={colors.accent} />}
+            />
+          </View>
+        </View>
 
         <View className="flex-row gap-2">
           <View className="flex-1">
