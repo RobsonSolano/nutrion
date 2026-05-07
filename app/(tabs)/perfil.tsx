@@ -30,6 +30,7 @@ import type { ResetOnboardingMode } from '@/services/onboarding';
 import { useDailyOnboardingUsage } from '@/hooks/useAiUsage';
 import { useOnboardingStore } from '@/stores/useOnboardingStore';
 import { Button, Card, ConfirmModal, Screen } from '@/components/ui';
+import CoachCard from '@/components/CoachCard';
 import Disclaimer from '@/components/Disclaimer';
 import { colors } from '@/lib/theme';
 import { bmi, bmiCategory } from '@/lib/biometrics';
@@ -368,6 +369,10 @@ export default function PerfilScreen() {
           size="md"
           icon={<LogOut size={16} color={colors.danger} />}
         />
+
+        {isStudent && profile?.coach_id && (
+          <CoachCard coachId={profile.coach_id} />
+        )}
 
         <Disclaimer />
       </ScrollView>
