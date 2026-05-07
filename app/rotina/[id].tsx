@@ -14,18 +14,22 @@ import {
   Pencil,
   Trash2,
   GraduationCap,
+  BookmarkPlus,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import RoutineEditor from '@/components/routine/RoutineEditor';
 import ExerciseImagesModal from '@/components/routine/ExerciseImagesModal';
 import ExerciseReadRow from '@/components/routine/ExerciseReadRow';
+import SaveAsTemplateModal from '@/components/coach/SaveAsTemplateModal';
 import {
   useDeleteRoutine,
   useRoutineDetail,
   useUpdateRoutine,
 } from '@/hooks/useRoutines';
+import { useCreateTemplate } from '@/hooks/useTemplates';
 import { useExerciseImagesMap } from '@/hooks/useExercises';
 import { useProfile } from '@/hooks/useProfile';
+import { useAlert } from '@/components/GlobalAlertProvider';
 import { Button, Card, Screen } from '@/components/ui';
 import Disclaimer from '@/components/Disclaimer';
 import { colors } from '@/lib/theme';
@@ -41,10 +45,14 @@ export default function RotinaDetalheScreen() {
   const imagesMap = useExerciseImagesMap();
 
   const isStudent = profileQ.data?.role === 'aluno';
+  const isCoach = profileQ.data?.role === 'professor';
   const fromCoach = !!detailQ.data?.created_by_coach;
   const readOnly = isStudent && fromCoach;
+  const createTemplate = useCreateTemplate();
+  const alert = useAlert();
 
   const [editing, setEditing] = useState(false);
+  const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
   const [preview, setPreview] = useState<{
     name: string;
     equipment: string | null;
@@ -52,6 +60,42 @@ export default function RotinaDetalheScreen() {
   } | null>(null);
 
   if (!id) return null;
+
+  async function handleSaveAsTemplate(name: string) {
+    if (!detailQ.data) return;
+    try {
+      await createTemplate.mutateAsync({
+        name,
+        modality: detailQ.data.modality,
+        groupId: detailQ.data.group_id,
+        description: detailQ.data.description,
+        exercises: detailQ.data.exercises.map((e) => ({
+          exercise_id: e.exercise_id,
+          exercise_name: e.exercise_name,
+          equipment: e.equipment,
+          sort_order: e.sort_order,
+          sets: e.sets,
+          reps_min: e.reps_min,
+          reps_max: e.reps_max,
+          weight_min_kg: e.weight_min_kg,
+          weight_max_kg: e.weight_max_kg,
+          duration_min: e.duration_min,
+          notes: e.notes,
+        })),
+      });
+      void Haptics.notificationAsync(
+        Haptics.NotificationFeedbackType.Success,
+      );
+      setSaveTemplateOpen(false);
+      alert.showAlert({
+        title: 'Salvo na biblioteca',
+        message: `Template "${name}" criado.`,
+        type: 'success',
+      });
+    } catch (err) {
+      alert.showError(err);
+    }
+  }
 
   function handleDelete() {
     Alert.alert(
@@ -246,6 +290,16 @@ export default function RotinaDetalheScreen() {
                     variant="secondary"
                     icon={<Pencil size={16} color={colors.text} />}
                   />
+                  {isCoach && (
+                    <Button
+                      label="Salvar como template"
+                      onPress={() => setSaveTemplateOpen(true)}
+                      variant="ghost"
+                      icon={
+                        <BookmarkPlus size={16} color={colors.violetSoft} />
+                      }
+                    />
+                  )}
                   <Button
                     label="Excluir treino"
                     onPress={handleDelete}
@@ -259,6 +313,14 @@ export default function RotinaDetalheScreen() {
           )}
         </KeyboardAvoidingView>
       </Screen>
+
+      <SaveAsTemplateModal
+        visible={saveTemplateOpen}
+        onClose={() => setSaveTemplateOpen(false)}
+        defaultName={detailQ.data?.name ?? ''}
+        loading={createTemplate.isPending}
+        onConfirm={handleSaveAsTemplate}
+      />
 
       <ExerciseImagesModal
         visible={!!preview}
