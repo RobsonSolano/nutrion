@@ -19,6 +19,7 @@ import {
   Download,
   Bell,
   BellOff,
+  TrendingUp,
 } from 'lucide-react-native';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
@@ -30,6 +31,7 @@ import type { ResetOnboardingMode } from '@/services/onboarding';
 import { useDailyOnboardingUsage } from '@/hooks/useAiUsage';
 import { useOnboardingStore } from '@/stores/useOnboardingStore';
 import { Button, Card, ConfirmModal, Screen } from '@/components/ui';
+import CoachCard from '@/components/CoachCard';
 import Disclaimer from '@/components/Disclaimer';
 import { colors } from '@/lib/theme';
 import { bmi, bmiCategory } from '@/lib/biometrics';
@@ -243,6 +245,15 @@ export default function PerfilScreen() {
             </View>
             <View style={{ width: '48.5%' }}>
               <Button
+                label="Minha evolução"
+                onPress={() => router.push('/evolucao' as Href)}
+                variant="secondary"
+                size="md"
+                icon={<TrendingUp size={14} color={colors.accent} />}
+              />
+            </View>
+            <View style={{ width: '48.5%' }}>
+              <Button
                 label="Exportar dados"
                 onPress={() => router.push('/exportar-dados' as Href)}
                 variant="ghost"
@@ -368,6 +379,10 @@ export default function PerfilScreen() {
           size="md"
           icon={<LogOut size={16} color={colors.danger} />}
         />
+
+        {isStudent && profile?.coach_id && (
+          <CoachCard coachId={profile.coach_id} />
+        )}
 
         <Disclaimer />
       </ScrollView>

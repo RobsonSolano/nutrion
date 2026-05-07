@@ -12,6 +12,9 @@ import {
   Download,
   Bell,
   BellOff,
+  BookOpen,
+  UserCog,
+  TrendingUp,
 } from 'lucide-react-native';
 import { Button, Card, Screen } from '@/components/ui';
 import { colors } from '@/lib/theme';
@@ -169,6 +172,28 @@ export default function CoachHome() {
           </Card>
         </Pressable>
 
+        <Pressable
+          onPress={() => router.push('/(coach)/templates' as Href)}
+          className="active:opacity-80"
+        >
+          <Card padding="md">
+            <View className="flex-row items-center gap-3">
+              <View className="h-11 w-11 rounded-2xl bg-violet/10 border border-violet/30 items-center justify-center">
+                <BookOpen size={20} color={colors.violetSoft} />
+              </View>
+              <View className="flex-1">
+                <Text className="text-text text-sm font-semibold">
+                  Biblioteca de treinos
+                </Text>
+                <Text className="text-text-muted text-[11px] mt-0.5">
+                  Templates pra reaplicar em vários alunos
+                </Text>
+              </View>
+              <ChevronRight size={16} color={colors.textDim} />
+            </View>
+          </Card>
+        </Pressable>
+
         <Button
           label={push.enabled ? 'Desativar notificações' : 'Ativar notificações'}
           onPress={push.toggle}
@@ -183,6 +208,27 @@ export default function CoachHome() {
             )
           }
         />
+
+        <View className="flex-row gap-2">
+          <View className="flex-1">
+            <Button
+              label="Meu perfil"
+              onPress={() => router.push('/(coach)/perfil' as Href)}
+              variant="secondary"
+              size="md"
+              icon={<UserCog size={16} color={colors.text} />}
+            />
+          </View>
+          <View className="flex-1">
+            <Button
+              label="Minha evolução"
+              onPress={() => router.push('/evolucao' as Href)}
+              variant="secondary"
+              size="md"
+              icon={<TrendingUp size={16} color={colors.accent} />}
+            />
+          </View>
+        </View>
 
         <View className="flex-row gap-2">
           <View className="flex-1">

@@ -26,6 +26,12 @@ const CORS = {
 
 type Body = {
   student_id: string;
+  /**
+   * Quando `true`, a resposta retorna `routines: []` mesmo que a IA tenha
+   * gerado treinos. Usado quando o coach vai aplicar templates da biblioteca
+   * em vez de aceitar as rotinas geradas pela IA.
+   */
+  skip_routines?: boolean;
 };
 
 serve(async (req: Request) => {
@@ -170,7 +176,13 @@ serve(async (req: Request) => {
 
     await logEvent({ status: 'success', tokens: result.totalTokens });
 
-    return json({ plan: result.plan, model: MODEL });
+    // skip_routines hoje só descarta as routines da resposta — a IA ainda as
+    // gera. Otimização futura: prompt slim pra economizar tokens.
+    const finalPlan = body.skip_routines
+      ? { ...result.plan, routines: [] }
+      : result.plan;
+
+    return json({ plan: finalPlan, model: MODEL });
   } catch (err) {
     console.error('[coach-generate-plan] unexpected error:', err);
     return json(
