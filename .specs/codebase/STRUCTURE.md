@@ -16,6 +16,11 @@ app/                          # Rotas Expo Router (file-based)
     habitos.tsx, bio.tsx, loading.tsx, resultado.tsx
   rotina/                     # CRUD de rotinas de treino
     nova.tsx, [id].tsx
+  (coach)/                    # Área do professor (role=professor)
+    index.tsx, _layout.tsx, aluno-novo.tsx, solicitacoes.tsx
+    aluno/[id]/               # Detalhe do aluno (rotinas, notas, histórico)
+    templates/                # Biblioteca de treinos do coach
+      index.tsx, novo.tsx, [id].tsx
   log.tsx                     # Log rápido (refeição/água/treino)
   sanity-check.tsx            # Validação de prato via foto
   editar-perfil.tsx
@@ -26,14 +31,18 @@ src/
   components/                 # Componentes reutilizáveis
     ui/                       # Primitivos (Button, Input, SegmentedControl, ConfirmModal, ...)
     onboarding/               # Steps de onboarding
-    routine/                  # Editor de treino, ExercisePicker, etc.
+    routine/                  # Editor + ExerciseReadRow (compartilhado entre rotinas e templates)
+    coach/                    # TemplatePicker (modal multi-select de templates)
     log/                      # Tabs de log rápido
     ChatBubble.tsx, TypingIndicator.tsx, WeekStreak.tsx, Disclaimer.tsx
   services/                   # Camada de acesso ao Supabase (uma por entidade)
     supabase.ts               # Cliente Supabase
     auth.ts, profile.ts, onboarding.ts
     foodLogs.ts, waterLogs.ts, workoutLogs.ts, routines.ts, exercises.ts
+    templates.ts              # CRUD da biblioteca de treinos do coach + applyTemplates
     chat.ts, chatMessages.ts, sanityCheck.ts, aiUsage.ts
+    coach.ts, coachNotes.ts, students.ts, studentTracking.ts, requests.ts
+    planHistory.ts, dataExport.ts, pushNotifications.ts
   stores/                     # Zustand stores
     useSessionStore.ts        # Sessão Supabase
     useOnboardingStore.ts     # Estado do form de onboarding
@@ -47,6 +56,14 @@ supabase/
   functions/
     chat-ai/                  # Edge function do chat
     onboarding-plan/          # Edge function que gera plano de onboarding
+    signup-professor/         # Cria conta de professor (define role + coaches row)
+    coach-create-student/     # Cria conta + ficha do aluno (service_role)
+    coach-generate-plan/      # IA gera plano para aluno (suporta skip_routines)
+    coach-save-student-plan/  # Persiste metas + rotinas geradas
+    coach-update-student/, coach-delete-student/, coach-send-credentials/
+    coach-apply-template/     # Copia 1+ templates do coach pro aluno (atomic)
+    admin-list-users/, send-push-notification/, cron-inactivity-reminders/
+    _shared/                  # Helpers compartilhados (plan-generator, expoPush, ...)
   config.toml
 
 scripts/
@@ -60,12 +77,18 @@ assets/                       # Imagens, ícones, splash
 **Auth:** `auth.users` (gerenciado pelo Supabase).
 
 **Por usuário (RLS = auth.uid() = user_id):**
-- `profiles` — id = auth.users.id; biometria, metas, campos de onboarding, `user_number`, `is_early_adopter`.
+- `profiles` — id = auth.users.id; biometria, metas, campos de onboarding, `user_number`, `is_early_adopter`, `role` (`'comum'|'aluno'|'professor'`), `coach_id`.
 - `workout_logs`, `food_logs`, `water_logs` — logs diários.
-- `workout_routines` → `workout_routine_exercises` (cascade) — rotinas e prescrição.
+- `workout_routines` → `workout_routine_exercises` (cascade) — rotinas e prescrição. Tem `created_by_coach` (lock pra aluno) e `source_template_id` (auditoria de cópia de template).
 - `workout_sessions` — execuções diárias de rotinas.
 - `chat_messages` — histórico do chat com IA (cota diária via `day` column).
-- `ai_usage_log` — log analítico de chamadas IA (chat, sanity_check, onboarding_plan).
+- `ai_usage_log` — log analítico de chamadas IA (chat, sanity_check, onboarding_plan, coach_plan).
+
+**Área do professor:**
+- `coaches` — 1:1 com profiles quando role=professor. bio, cref, max_students.
+- `workout_templates` → `workout_template_exercises` (cascade) — biblioteca privada de treinos do coach (RLS: só o coach dono).
+- `student_requests` — fila de solicitações aluno → professor.
+- `coach_notes`, `student_plan_revisions` — anotações privadas e histórico de planos.
 
 **Catálogo global (RLS = leitura pra todos autenticados):**
 - `exercise_groups` (9 grupos) → `exercises` (~90 com modalidade).

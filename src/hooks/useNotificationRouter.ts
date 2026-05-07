@@ -1,13 +1,21 @@
 import { useEffect, useRef } from 'react';
 import { useRouter, type Href } from 'expo-router';
-import * as Notifications from 'expo-notifications';
 import { IS_EXPO_GO } from '@/lib/platform';
 import { useSessionStore } from '@/stores/useSessionStore';
+import type * as NotificationsType from 'expo-notifications';
 
 type PushPayload = {
   event?: string;
   request_id?: string;
 };
+
+// Lazy require: em Expo Go o módulo warna no import top-level.
+// Carregamos só fora do Expo Go.
+function loadNotifications(): typeof NotificationsType | null {
+  if (IS_EXPO_GO) return null;
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  return require('expo-notifications');
+}
 
 /**
  * Faz o roteamento quando o user toca numa push notification:
@@ -29,10 +37,8 @@ export function useNotificationRouter() {
   const consumedColdStart = useRef(false);
 
   useEffect(() => {
-    // Expo Go (SDK 53+) não suporta push remoto. Pular pra evitar
-    // warning "Android Push notifications functionality... was
-    // removed from Expo Go".
-    if (IS_EXPO_GO) return;
+    const Notifications = loadNotifications();
+    if (!Notifications) return;
     if (!isAuthenticated) return;
 
     function navigate(payload: PushPayload | null | undefined) {

@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import type { Coach } from '@/types/database';
+import type { Coach, CoachContact } from '@/types/database';
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!;
 const ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
@@ -69,4 +69,51 @@ export async function getMyCoach(): Promise<Coach | null> {
     .maybeSingle();
   if (error) throw error;
   return (data ?? null) as Coach | null;
+}
+
+/**
+ * Busca dados de contato/identidade do coach (junta coaches + profile).
+ * Aluno vinculado pode chamar via RLS estendida em coaches_select.
+ */
+export async function getCoachContact(
+  coachId: string,
+): Promise<CoachContact | null> {
+  const { data, error } = await supabase
+    .from('coaches')
+    .select(
+      'id, bio, cref, show_contact_to_students, contact_phone, profile:profiles!inner(full_name, avatar_url)',
+    )
+    .eq('id', coachId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  const profile = (data as unknown as { profile: { full_name: string | null; avatar_url: string | null } }).profile;
+  return {
+    id: data.id,
+    full_name: profile.full_name,
+    avatar_url: profile.avatar_url,
+    bio: data.bio,
+    cref: data.cref,
+    show_contact_to_students: data.show_contact_to_students,
+    contact_phone: data.contact_phone,
+  };
+}
+
+export type CoachSettingsPatch = {
+  show_contact_to_students?: boolean;
+  contact_phone?: string | null;
+  bio?: string | null;
+  cref?: string | null;
+};
+
+export async function updateCoachSettings(patch: CoachSettingsPatch): Promise<void> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error('Sessão expirada.');
+  const { error } = await supabase
+    .from('coaches')
+    .update(patch)
+    .eq('id', user.id);
+  if (error) throw error;
 }

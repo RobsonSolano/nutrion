@@ -100,7 +100,10 @@ export function useCreateStudent() {
 
 export function useGenerateStudentPlan() {
   return useMutation({
-    mutationFn: (studentId: string) => generatePlanForStudent(studentId),
+    mutationFn: (input: { studentId: string; skipRoutines?: boolean }) =>
+      generatePlanForStudent(input.studentId, {
+        skipRoutines: input.skipRoutines,
+      }),
   });
 }
 

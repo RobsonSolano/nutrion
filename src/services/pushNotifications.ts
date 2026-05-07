@@ -1,9 +1,24 @@
 import { Platform } from 'react-native';
-import * as Notifications from 'expo-notifications';
-import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { IS_EXPO_GO } from '@/lib/platform';
 import { supabase } from './supabase';
+import type * as NotificationsType from 'expo-notifications';
+import type * as DeviceType from 'expo-device';
+
+// Em Expo Go (SDK 53+) o `expo-notifications` warna no momento do import
+// ("Android Push notifications functionality... was removed from Expo Go"),
+// mesmo sem ser usado. Carregamos os módulos lazy só fora do Expo Go.
+function loadNotifications(): typeof NotificationsType | null {
+  if (IS_EXPO_GO) return null;
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  return require('expo-notifications');
+}
+
+function loadDevice(): typeof DeviceType | null {
+  if (IS_EXPO_GO) return null;
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  return require('expo-device');
+}
 
 /**
  * Comportamento do listener de foreground: mostra a notificação
@@ -16,7 +31,8 @@ import { supabase } from './supabase';
  * roda normal.
  */
 export function configurePushHandler() {
-  if (IS_EXPO_GO) return;
+  const Notifications = loadNotifications();
+  if (!Notifications) return;
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
       shouldShowBanner: true,
@@ -34,7 +50,8 @@ export function configurePushHandler() {
  * Pulado em Expo Go (mesmo motivo do configurePushHandler).
  */
 export async function ensureAndroidChannel() {
-  if (IS_EXPO_GO) return;
+  const Notifications = loadNotifications();
+  if (!Notifications) return;
   if (Platform.OS !== 'android') return;
   await Notifications.setNotificationChannelAsync('default', {
     name: 'NutriOn',
@@ -56,7 +73,9 @@ export type RegisterResult =
  * Android emulator com Google Play Services funciona normal.
  */
 export async function registerForPushNotifications(): Promise<RegisterResult> {
-  if (IS_EXPO_GO) {
+  const Notifications = loadNotifications();
+  const Device = loadDevice();
+  if (!Notifications || !Device) {
     return {
       ok: false,
       reason: 'not_device',
@@ -93,7 +112,7 @@ export async function registerForPushNotifications(): Promise<RegisterResult> {
     };
   }
 
-  let tokenResp: Notifications.ExpoPushToken;
+  let tokenResp: NotificationsType.ExpoPushToken;
   try {
     tokenResp = await Notifications.getExpoPushTokenAsync({ projectId });
   } catch (err) {

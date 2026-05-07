@@ -46,7 +46,19 @@ export type Coach = {
   bio: string | null;
   cref: string | null;
   max_students: number;
+  show_contact_to_students: boolean;
+  contact_phone: string | null;
   created_at: string;
+};
+
+export type CoachContact = {
+  id: string;
+  full_name: string | null;
+  avatar_url: string | null;
+  bio: string | null;
+  cref: string | null;
+  show_contact_to_students: boolean;
+  contact_phone: string | null;
 };
 
 export type StudentRequestStatus =
@@ -140,8 +152,48 @@ export type WorkoutRoutine = {
   description: string | null;
   is_archived: boolean;
   created_by_coach: string | null;
+  source_template_id: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type WorkoutTemplate = {
+  id: string;
+  coach_id: string;
+  name: string;
+  description: string | null;
+  group_id: string | null;
+  modality: Modality;
+  is_archived: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TemplateExercise = {
+  id: string;
+  template_id: string;
+  exercise_id: string | null;
+  exercise_name: string;
+  equipment: string | null;
+  sort_order: number;
+  sets: number | null;
+  reps_min: number | null;
+  reps_max: number | null;
+  weight_min_kg: number | null;
+  weight_max_kg: number | null;
+  duration_min: number | null;
+  notes: string | null;
+};
+
+export type TemplateExerciseInsert = Omit<TemplateExercise, 'id' | 'template_id'>;
+
+export type TemplateWithExercises = WorkoutTemplate & {
+  exercises: TemplateExercise[];
+  group: ExerciseGroup | null;
+};
+
+export type TemplateListItem = WorkoutTemplate & {
+  exercises_count: number;
 };
 
 /** Versão do listItem com contagem de exercícios (via PostgREST aggregate). */
@@ -217,3 +269,43 @@ export type ChatAiResponse = {
     totalTokenCount?: number;
   } | null;
 };
+
+export type ContractType = 'mensal' | 'treino' | 'semanal' | 'parceria';
+export type ContractStatus = 'active' | 'ended' | 'cancelled';
+
+export type StudentContract = {
+  id: string;
+  student_id: string;
+  coach_id: string;
+  type: ContractType;
+  start_date: string;
+  end_date: string | null;
+  value_cents: number | null;
+  payment_day: number | null;
+  status: ContractStatus;
+  effective_status: ContractStatus;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ContractInput = Omit<
+  StudentContract,
+  'id' | 'coach_id' | 'effective_status' | 'created_at' | 'updated_at' | 'status'
+>;
+
+export type ContractPatch = Partial<
+  Pick<
+    StudentContract,
+    'type' | 'start_date' | 'end_date' | 'value_cents' | 'payment_day' | 'notes'
+  >
+>;
+
+export type ProgressEntry = {
+  id: string;
+  user_id: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+};
+

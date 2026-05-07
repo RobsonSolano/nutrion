@@ -12,6 +12,7 @@ import {
 import { useRouter } from 'expo-router';
 import {
   ArrowLeft,
+  BookOpen,
   CheckCircle2,
   Mail,
   RefreshCcw,
@@ -38,11 +39,14 @@ import {
   useSaveStudentPlan,
   useSendStudentCredentials,
 } from '@/hooks/useStudents';
+import { useApplyTemplates, useTemplates } from '@/hooks/useTemplates';
+import TemplatePicker from '@/components/coach/TemplatePicker';
 import type { OnboardingPlan } from '@/services/onboarding';
 import type { Profile, Sex, GoalType, WeeklyFrequency } from '@/types/database';
 import { captureError } from '@/lib/sentry';
 
 type Phase = 'form' | 'generating' | 'preview' | 'saving';
+type CreationMode = 'ai' | 'templates';
 
 const SEX_OPTIONS = [
   { value: 'm', label: 'Masc' },
@@ -99,8 +103,13 @@ export default function AlunoNovo() {
   const generateMutation = useGenerateStudentPlan();
   const saveMutation = useSaveStudentPlan();
   const sendCredsMutation = useSendStudentCredentials();
+  const applyTemplatesMutation = useApplyTemplates();
+  const templatesQ = useTemplates({ archived: false });
 
   const [phase, setPhase] = useState<Phase>('form');
+  const [creationMode, setCreationMode] = useState<CreationMode>('ai');
+  const [selectedTemplateIds, setSelectedTemplateIds] = useState<string[]>([]);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   // Identidade
   const [email, setEmail] = useState('');
@@ -132,6 +141,8 @@ export default function AlunoNovo() {
     );
   }
 
+  const isTemplatesMode = creationMode === 'templates';
+
   const canSubmitForm =
     email.length > 3 &&
     password.length >= 6 &&
@@ -141,7 +152,8 @@ export default function AlunoNovo() {
     height.length > 0 &&
     goalType !== null &&
     sports.length > 0 &&
-    frequency !== null;
+    frequency !== null &&
+    (!isTemplatesMode || selectedTemplateIds.length > 0);
 
   async function handleCreateAndGenerate() {
     if (!canSubmitForm) return;
@@ -169,10 +181,33 @@ export default function AlunoNovo() {
       setStudentId(student.id);
       setStudentPassword(password);
 
-      // 2. Gera o plano via IA
-      const { plan: generated } = await generateMutation.mutateAsync(
-        student.id,
-      );
+      const { plan: generated } = await generateMutation.mutateAsync({
+        studentId: student.id,
+        skipRoutines: creationMode === 'templates',
+      });
+
+      if (creationMode === 'templates') {
+        // Ordem importa: coach-save-student-plan ARQUIVA todas as
+        // rotinas do coach pra esse aluno antes de criar as do plan.
+        // Se rodasse em paralelo com applyTemplates, as rotinas
+        // recém-criadas pelo template seriam arquivadas junto.
+        await saveMutation.mutateAsync({
+          studentId: student.id,
+          plan: generated,
+        });
+        await applyTemplatesMutation.mutateAsync({
+          studentId: student.id,
+          templateIds: selectedTemplateIds,
+        });
+        void Haptics.notificationAsync(
+          Haptics.NotificationFeedbackType.Success,
+        );
+        setPlan(generated);
+        setPhase('preview');
+        setConfirmEmailOpen(true);
+        return;
+      }
+
       setPlan(generated);
       setPhase('preview');
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -187,9 +222,9 @@ export default function AlunoNovo() {
     if (!studentId) return;
     setPhase('generating');
     try {
-      const { plan: regenerated } = await generateMutation.mutateAsync(
+      const { plan: regenerated } = await generateMutation.mutateAsync({
         studentId,
-      );
+      });
       setPlan(regenerated);
       setPhase('preview');
     } catch (err) {
@@ -463,20 +498,80 @@ export default function AlunoNovo() {
             />
           </Section>
 
+          <Section title="Como gerar os treinos">
+            <SegmentedControl
+              options={[
+                { value: 'ai', label: 'IA gera tudo' },
+                { value: 'templates', label: 'Usar templates' },
+              ]}
+              value={creationMode}
+              onChange={setCreationMode}
+            />
+
+            {isTemplatesMode && (
+              <View className="gap-2 mt-2">
+                <Pressable
+                  onPress={() => setPickerOpen(true)}
+                  className="rounded-2xl border border-violet/40 bg-violet/10 px-3 py-2.5 active:opacity-70"
+                >
+                  <Text className="text-violet-soft text-xs font-semibold text-center">
+                    {selectedTemplateIds.length === 0
+                      ? 'Selecionar templates da biblioteca'
+                      : `${selectedTemplateIds.length} template${
+                          selectedTemplateIds.length === 1 ? '' : 's'
+                        } selecionado${
+                          selectedTemplateIds.length === 1 ? '' : 's'
+                        } · trocar`}
+                  </Text>
+                </Pressable>
+                {selectedTemplateIds.length === 0 &&
+                  templatesQ.data &&
+                  templatesQ.data.length === 0 && (
+                    <Text className="text-text-muted text-[11px] text-center px-2 leading-relaxed">
+                      Você ainda não tem templates. Crie pela &quot;Biblioteca
+                      de treinos&quot; no menu inicial do professor.
+                    </Text>
+                  )}
+              </View>
+            )}
+          </Section>
+
           <Button
-            label="Cadastrar e gerar plano com IA"
+            label={
+              isTemplatesMode
+                ? 'Cadastrar e aplicar templates'
+                : 'Cadastrar e gerar plano com IA'
+            }
             onPress={handleCreateAndGenerate}
             disabled={!canSubmitForm}
             size="lg"
-            icon={<Sparkles size={18} color={colors.textInverse} />}
+            icon={
+              isTemplatesMode ? (
+                <BookOpen size={18} color={colors.textInverse} />
+              ) : (
+                <Sparkles size={18} color={colors.textInverse} />
+              )
+            }
           />
 
           <Text className="text-text-muted text-[11px] text-center leading-relaxed px-2">
-            A IA vai gerar metas (kcal, proteína, água) e ~3-5 treinos
-            baseados na ficha. Você poderá revisar antes de salvar.
+            {isTemplatesMode
+              ? 'A IA gera só as metas (kcal, proteína, água). Os treinos vão ser copiados dos templates selecionados.'
+              : 'A IA vai gerar metas (kcal, proteína, água) e ~3-5 treinos baseados na ficha. Você poderá revisar antes de salvar.'}
           </Text>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <TemplatePicker
+        visible={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        title="Escolher templates"
+        confirmLabel="Confirmar"
+        onConfirm={(ids) => {
+          setSelectedTemplateIds(ids);
+          setPickerOpen(false);
+        }}
+      />
     </Screen>
   );
 }
