@@ -46,7 +46,19 @@ export type Coach = {
   bio: string | null;
   cref: string | null;
   max_students: number;
+  show_contact_to_students: boolean;
+  contact_phone: string | null;
   created_at: string;
+};
+
+export type CoachContact = {
+  id: string;
+  full_name: string | null;
+  avatar_url: string | null;
+  bio: string | null;
+  cref: string | null;
+  show_contact_to_students: boolean;
+  contact_phone: string | null;
 };
 
 export type StudentRequestStatus =

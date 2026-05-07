@@ -23,6 +23,7 @@ export const queryKeys = {
     ['chat-daily-count', userId, day] as const,
   aiUsage: (userId: string, feature: string, day: string) =>
     ['ai-usage', userId, feature, day] as const,
+  coachContact: (coachId: string) => ['coach-contact', coachId] as const,
 };
 
 export function todayKey() {
