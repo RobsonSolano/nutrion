@@ -26,6 +26,7 @@ import {
   AlertTriangle,
   NotebookPen,
   History,
+  BookOpen,
 } from 'lucide-react-native';
 import {
   Button,
@@ -44,6 +45,8 @@ import {
   useStudentTracking,
 } from '@/hooks/useStudents';
 import { useCoachNotes } from '@/hooks/useCoachNotes';
+import { useApplyTemplates } from '@/hooks/useTemplates';
+import TemplatePicker from '@/components/coach/TemplatePicker';
 import { bmi, bmiCategory } from '@/lib/biometrics';
 import type { OnboardingPlan } from '@/services/onboarding';
 import type { DayActivity, StudentTracking } from '@/services/studentTracking';
@@ -74,10 +77,12 @@ export default function AlunoDetalheScreen() {
   const generateMutation = useGenerateStudentPlan();
   const saveMutation = useSaveStudentPlan();
   const deleteMutation = useDeleteStudent();
+  const applyTemplates = useApplyTemplates();
   const alert = useAlert();
 
   const [phase, setPhase] = useState<Phase>('idle');
   const [plan, setPlan] = useState<OnboardingPlan | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   if (!id) return null;
 
@@ -85,7 +90,9 @@ export default function AlunoDetalheScreen() {
     if (!id) return;
     setPhase('generating');
     try {
-      const { plan: generated } = await generateMutation.mutateAsync(id);
+      const { plan: generated } = await generateMutation.mutateAsync({
+        studentId: id,
+      });
       setPlan(generated);
       setPhase('preview');
     } catch (err) {
@@ -445,12 +452,54 @@ export default function AlunoDetalheScreen() {
         </Text>
 
         <Button
+          label="Aplicar template da biblioteca"
+          onPress={() => setPickerOpen(true)}
+          variant="secondary"
+          icon={<BookOpen size={16} color={colors.text} />}
+        />
+
+        <Text className="text-text-muted text-[11px] text-center px-2 leading-relaxed">
+          Os treinos do template são copiados pro aluno como rotinas novas (não
+          arquiva as atuais — soma).
+        </Text>
+
+        <Button
           label="Excluir aluno"
           onPress={() => setPhase('confirm_delete')}
           variant="danger"
           icon={<Trash2 size={16} color={colors.danger} />}
         />
       </ScrollView>
+
+      <TemplatePicker
+        visible={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        title="Aplicar templates"
+        confirmLabel="Aplicar"
+        loading={applyTemplates.isPending}
+        onConfirm={async (templateIds) => {
+          if (!id || templateIds.length === 0) return;
+          try {
+            const result = await applyTemplates.mutateAsync({
+              studentId: id,
+              templateIds,
+            });
+            setPickerOpen(false);
+            alert.showAlert({
+              title: 'Templates aplicados',
+              message: `${result.created_routine_ids.length} treino${
+                result.created_routine_ids.length === 1 ? '' : 's'
+              } adicionado${
+                result.created_routine_ids.length === 1 ? '' : 's'
+              } ao aluno.`,
+              type: 'success',
+            });
+          } catch (err) {
+            captureError(err, { feature: 'coach_apply_templates' });
+            alert.showError(err);
+          }
+        }}
+      />
 
       <ConfirmModal
         visible={phase === 'confirm_regenerate'}
