@@ -157,9 +157,11 @@ export async function createStudent(
 
 export async function generatePlanForStudent(
   studentId: string,
+  options: { skipRoutines?: boolean } = {},
 ): Promise<{ plan: OnboardingPlan }> {
   return callFn<{ plan: OnboardingPlan }>('coach-generate-plan', {
     student_id: studentId,
+    skip_routines: options.skipRoutines ?? false,
   });
 }
 

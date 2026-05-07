@@ -12,37 +12,38 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import {
   X,
   Pencil,
+  Archive,
+  ArchiveRestore,
   Trash2,
-  GraduationCap,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import RoutineEditor from '@/components/routine/RoutineEditor';
 import ExerciseImagesModal from '@/components/routine/ExerciseImagesModal';
 import ExerciseReadRow from '@/components/routine/ExerciseReadRow';
 import {
-  useDeleteRoutine,
-  useRoutineDetail,
-  useUpdateRoutine,
-} from '@/hooks/useRoutines';
+  useArchiveTemplate,
+  useDeleteTemplate,
+  useTemplateDetail,
+  useUnarchiveTemplate,
+  useUpdateTemplate,
+} from '@/hooks/useTemplates';
 import { useExerciseImagesMap } from '@/hooks/useExercises';
-import { useProfile } from '@/hooks/useProfile';
 import { Button, Card, Screen } from '@/components/ui';
-import Disclaimer from '@/components/Disclaimer';
 import { colors } from '@/lib/theme';
-import { MODALITY_LABELS } from '@/types/database';
+import {
+  MODALITY_LABELS,
+  type TemplateExerciseInsert,
+} from '@/types/database';
 
-export default function RotinaDetalheScreen() {
+export default function TemplateDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const detailQ = useRoutineDetail(id ?? null);
-  const profileQ = useProfile();
-  const update = useUpdateRoutine();
-  const remove = useDeleteRoutine();
+  const detailQ = useTemplateDetail(id ?? null);
+  const update = useUpdateTemplate();
+  const archive = useArchiveTemplate();
+  const unarchive = useUnarchiveTemplate();
+  const remove = useDeleteTemplate();
   const imagesMap = useExerciseImagesMap();
-
-  const isStudent = profileQ.data?.role === 'aluno';
-  const fromCoach = !!detailQ.data?.created_by_coach;
-  const readOnly = isStudent && fromCoach;
 
   const [editing, setEditing] = useState(false);
   const [preview, setPreview] = useState<{
@@ -53,10 +54,31 @@ export default function RotinaDetalheScreen() {
 
   if (!id) return null;
 
+  const isArchived = detailQ.data?.is_archived ?? false;
+
+  function handleArchiveToggle() {
+    if (!detailQ.data) return;
+    const action = isArchived ? unarchive : archive;
+    action.mutate(detailQ.data.id, {
+      onSuccess: () => {
+        void Haptics.notificationAsync(
+          Haptics.NotificationFeedbackType.Success,
+        );
+        router.back();
+      },
+      onError: (err) => {
+        Alert.alert(
+          'Não consegui salvar',
+          err instanceof Error ? err.message : 'Tenta de novo.',
+        );
+      },
+    });
+  }
+
   function handleDelete() {
     Alert.alert(
-      'Excluir treino?',
-      'Essa ação não pode ser desfeita. As sessões antigas mantêm o nome salvo.',
+      'Excluir template?',
+      'As rotinas já aplicadas em alunos não serão afetadas (cópias independentes). Mas o template some da biblioteca pra sempre.',
       [
         { text: 'Cancelar', style: 'cancel' },
         {
@@ -100,7 +122,7 @@ export default function RotinaDetalheScreen() {
               <X size={18} color={colors.textDim} />
             </Pressable>
             <Text className="text-text font-semibold" numberOfLines={1}>
-              {editing ? 'Editar treino' : detailQ.data?.name ?? 'Treino'}
+              {editing ? 'Editar template' : detailQ.data?.name ?? 'Template'}
             </Text>
             <View style={{ width: 40 }} />
           </View>
@@ -111,7 +133,7 @@ export default function RotinaDetalheScreen() {
             </View>
           ) : !detailQ.data ? (
             <View className="flex-1 items-center justify-center p-8">
-              <Text className="text-text-dim">Treino não encontrado.</Text>
+              <Text className="text-text-dim">Template não encontrado.</Text>
             </View>
           ) : editing ? (
             <RoutineEditor
@@ -143,7 +165,7 @@ export default function RotinaDetalheScreen() {
                     group_id: payload.groupId,
                     description: payload.description,
                   },
-                  exercises: payload.exercises,
+                  exercises: payload.exercises as TemplateExerciseInsert[],
                 });
                 void Haptics.notificationAsync(
                   Haptics.NotificationFeedbackType.Success,
@@ -156,15 +178,18 @@ export default function RotinaDetalheScreen() {
               contentContainerStyle={{ padding: 20, gap: 16, paddingBottom: 40 }}
               showsVerticalScrollIndicator={false}
             >
-              <Card glow accent={fromCoach ? 'violet' : 'green'}>
+              <Card glow accent="violet">
                 <View className="flex-row items-center gap-3">
-                  <View className="h-12 w-12 rounded-2xl bg-accent/10 border border-accent/30 items-center justify-center">
+                  <View className="h-12 w-12 rounded-2xl bg-violet/10 border border-violet/30 items-center justify-center">
                     <Text className="text-xl">
-                      {detailQ.data.group?.icon ?? '💪'}
+                      {detailQ.data.group?.icon ?? '📚'}
                     </Text>
                   </View>
                   <View className="flex-1">
-                    <Text className="text-text text-xl font-bold" numberOfLines={2}>
+                    <Text
+                      className="text-text text-xl font-bold"
+                      numberOfLines={2}
+                    >
                       {detailQ.data.name}
                     </Text>
                     <Text className="text-text-dim text-xs mt-0.5">
@@ -174,17 +199,12 @@ export default function RotinaDetalheScreen() {
                     </Text>
                   </View>
                 </View>
-                {fromCoach && (
-                  <View className="flex-row items-center gap-2 mt-3 rounded-2xl border border-violet/40 bg-violet/10 px-3 py-2">
-                    <GraduationCap size={14} color={colors.violetSoft} />
-                    <Text className="text-violet-soft text-[11px] font-semibold flex-1">
-                      Criado pelo seu professor
+                {isArchived && (
+                  <View className="flex-row items-center gap-2 mt-3 rounded-2xl border border-border bg-surface-muted px-3 py-2">
+                    <Archive size={14} color={colors.textMuted} />
+                    <Text className="text-text-muted text-[11px] font-semibold flex-1">
+                      Arquivado — não aparece no picker
                     </Text>
-                    {readOnly && (
-                      <Text className="text-text-muted text-[10px]">
-                        Somente leitura
-                      </Text>
-                    )}
                   </View>
                 )}
                 {detailQ.data.description && (
@@ -200,7 +220,7 @@ export default function RotinaDetalheScreen() {
                 </Text>
                 {detailQ.data.exercises.length === 0 ? (
                   <Text className="text-text-muted text-sm text-center py-4">
-                    Este treino ainda não tem exercícios.
+                    Nenhum exercício no template.
                   </Text>
                 ) : (
                   <View className="gap-3">
@@ -231,30 +251,31 @@ export default function RotinaDetalheScreen() {
                 )}
               </Card>
 
-              {readOnly ? (
-                <Card padding="sm">
-                  <Text className="text-text-muted text-[11px] leading-relaxed">
-                    💡 Pra ajustar esse treino, abra uma solicitação no seu
-                    perfil. Seu professor recebe e responde.
-                  </Text>
-                </Card>
-              ) : (
-                <>
-                  <Button
-                    label="Editar treino"
-                    onPress={() => setEditing(true)}
-                    variant="secondary"
-                    icon={<Pencil size={16} color={colors.text} />}
-                  />
-                  <Button
-                    label="Excluir treino"
-                    onPress={handleDelete}
-                    variant="danger"
-                    icon={<Trash2 size={16} color={colors.danger} />}
-                  />
-                </>
-              )}
-              <Disclaimer />
+              <Button
+                label="Editar template"
+                onPress={() => setEditing(true)}
+                variant="secondary"
+                icon={<Pencil size={16} color={colors.text} />}
+              />
+              <Button
+                label={isArchived ? 'Desarquivar' : 'Arquivar'}
+                onPress={handleArchiveToggle}
+                loading={archive.isPending || unarchive.isPending}
+                variant="ghost"
+                icon={
+                  isArchived ? (
+                    <ArchiveRestore size={16} color={colors.textDim} />
+                  ) : (
+                    <Archive size={16} color={colors.textDim} />
+                  )
+                }
+              />
+              <Button
+                label="Excluir template"
+                onPress={handleDelete}
+                variant="danger"
+                icon={<Trash2 size={16} color={colors.danger} />}
+              />
             </ScrollView>
           )}
         </KeyboardAvoidingView>
