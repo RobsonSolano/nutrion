@@ -187,15 +187,18 @@ export default function AlunoNovo() {
       });
 
       if (creationMode === 'templates') {
-        // saveMutation grava metas; applyTemplates cria rotinas. São
-        // independentes — paraleliza pra cortar uma roundtrip.
-        await Promise.all([
-          saveMutation.mutateAsync({ studentId: student.id, plan: generated }),
-          applyTemplatesMutation.mutateAsync({
-            studentId: student.id,
-            templateIds: selectedTemplateIds,
-          }),
-        ]);
+        // Ordem importa: coach-save-student-plan ARQUIVA todas as
+        // rotinas do coach pra esse aluno antes de criar as do plan.
+        // Se rodasse em paralelo com applyTemplates, as rotinas
+        // recém-criadas pelo template seriam arquivadas junto.
+        await saveMutation.mutateAsync({
+          studentId: student.id,
+          plan: generated,
+        });
+        await applyTemplatesMutation.mutateAsync({
+          studentId: student.id,
+          templateIds: selectedTemplateIds,
+        });
         void Haptics.notificationAsync(
           Haptics.NotificationFeedbackType.Success,
         );
