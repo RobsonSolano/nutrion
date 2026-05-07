@@ -27,6 +27,8 @@ import {
   NotebookPen,
   History,
   BookOpen,
+  FileText,
+  TrendingUp,
 } from 'lucide-react-native';
 import {
   Button,
@@ -432,6 +434,54 @@ export default function AlunoDetalheScreen() {
                 </Text>
                 <Text className="text-text-muted text-[11px] mt-0.5">
                   Cada plano gerado fica registrado pra consulta
+                </Text>
+              </View>
+              <ChevronRight size={16} color={colors.textDim} />
+            </View>
+          </Card>
+        </Pressable>
+
+        <Pressable
+          onPress={() =>
+            router.push(`/(coach)/aluno/${id}/contrato` as Href)
+          }
+          className="active:opacity-80"
+        >
+          <Card padding="md">
+            <View className="flex-row items-center gap-3">
+              <View className="h-11 w-11 rounded-2xl bg-violet/10 border border-violet/30 items-center justify-center">
+                <FileText size={20} color={colors.violetSoft} />
+              </View>
+              <View className="flex-1">
+                <Text className="text-text text-sm font-semibold">
+                  Contrato
+                </Text>
+                <Text className="text-text-muted text-[11px] mt-0.5">
+                  Tipo de contratação, valor e pagamento
+                </Text>
+              </View>
+              <ChevronRight size={16} color={colors.textDim} />
+            </View>
+          </Card>
+        </Pressable>
+
+        <Pressable
+          onPress={() =>
+            router.push(`/(coach)/aluno/${id}/evolucao` as Href)
+          }
+          className="active:opacity-80"
+        >
+          <Card padding="md">
+            <View className="flex-row items-center gap-3">
+              <View className="h-11 w-11 rounded-2xl bg-accent/10 border border-accent/30 items-center justify-center">
+                <TrendingUp size={20} color={colors.accent} />
+              </View>
+              <View className="flex-1">
+                <Text className="text-text text-sm font-semibold">
+                  Evolução
+                </Text>
+                <Text className="text-text-muted text-[11px] mt-0.5">
+                  Linha do tempo de conquistas e marcos do aluno
                 </Text>
               </View>
               <ChevronRight size={16} color={colors.textDim} />
