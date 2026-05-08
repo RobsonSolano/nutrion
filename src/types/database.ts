@@ -132,6 +132,7 @@ export type Exercise = {
   equipment: string | null;
   is_compound: boolean | null;
   image_urls: string[] | null;
+  video_url: string | null;
   modality: Modality;
 };
 
