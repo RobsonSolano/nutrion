@@ -34,6 +34,12 @@ export const queryKeys = {
     ['active-contract', studentId] as const,
   progressEntries: (userId: string) =>
     ['progress-entries', userId] as const,
+  physicalAssessments: (studentId: string) =>
+    ['physical-assessments', studentId] as const,
+  physicalAssessmentDetail: (assessmentId: string) =>
+    ['physical-assessment-detail', assessmentId] as const,
+  latestPhysicalAssessment: (studentId: string) =>
+    ['latest-physical-assessment', studentId] as const,
 };
 
 export function todayKey() {
