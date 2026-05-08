@@ -310,3 +310,70 @@ export type ProgressEntry = {
   updated_at: string;
 };
 
+export type AssessmentProtocol = 'pollock_3' | 'pollock_7' | 'none';
+
+export type PhysicalAssessment = {
+  id: string;
+  student_id: string;
+  coach_id: string;
+  assessed_at: string; // YYYY-MM-DD
+
+  protocol: AssessmentProtocol;
+
+  weight_kg: number | null;
+  height_cm: number | null;
+
+  perim_arm_r_cm: number | null;
+  perim_arm_l_cm: number | null;
+  perim_forearm_r_cm: number | null;
+  perim_forearm_l_cm: number | null;
+  perim_chest_cm: number | null;
+  perim_waist_cm: number | null;
+  perim_hip_cm: number | null;
+  perim_thigh_r_cm: number | null;
+  perim_thigh_l_cm: number | null;
+  perim_calf_r_cm: number | null;
+  perim_calf_l_cm: number | null;
+
+  skin_chest_mm: number | null;
+  skin_midaxillary_mm: number | null;
+  skin_triceps_mm: number | null;
+  skin_subscapular_mm: number | null;
+  skin_abdominal_mm: number | null;
+  skin_suprailiac_mm: number | null;
+  skin_thigh_mm: number | null;
+
+  body_density: number | null;
+  body_fat_pct: number | null;
+  fat_mass_kg: number | null;
+  lean_mass_kg: number | null;
+  bmi: number | null;
+
+  posture_notes: string | null;
+  posture_photos: string[];
+  notes: string | null;
+
+  created_at: string;
+  updated_at: string;
+};
+
+export type PhysicalAssessmentInput = Omit<
+  PhysicalAssessment,
+  | 'id'
+  | 'coach_id'
+  | 'body_density'
+  | 'body_fat_pct'
+  | 'fat_mass_kg'
+  | 'lean_mass_kg'
+  | 'bmi'
+  | 'created_at'
+  | 'updated_at'
+>;
+
+export type PhysicalAssessmentPatch = Partial<
+  Omit<
+    PhysicalAssessmentInput,
+    'student_id'
+  >
+>;
+
