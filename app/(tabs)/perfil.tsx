@@ -20,6 +20,7 @@ import {
   Bell,
   BellOff,
   TrendingUp,
+  HeartPulse,
 } from 'lucide-react-native';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
@@ -269,6 +270,15 @@ export default function PerfilScreen() {
                 variant="ghost"
                 size="md"
                 icon={<Bell size={14} color={colors.textDim} />}
+              />
+            </View>
+            <View style={{ width: '48.5%' }}>
+              <Button
+                label="Anamnese clínica"
+                onPress={() => router.push('/anamnese' as Href)}
+                variant="ghost"
+                size="md"
+                icon={<HeartPulse size={14} color={colors.violetSoft} />}
               />
             </View>
           </View>
