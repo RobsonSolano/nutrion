@@ -420,3 +420,61 @@ export type PushHistoryEntry = {
   sent_at: string;
 };
 
+export type InjuryTag =
+  | 'ombro_d' | 'ombro_e'
+  | 'cotovelo_d' | 'cotovelo_e'
+  | 'punho_d' | 'punho_e'
+  | 'lombar' | 'cervical'
+  | 'quadril_d' | 'quadril_e'
+  | 'joelho_d' | 'joelho_e'
+  | 'tornozelo_d' | 'tornozelo_e'
+  | 'outros';
+
+export type ChronicConditionTag =
+  | 'hipertensao' | 'diabetes_t1' | 'diabetes_t2'
+  | 'hipotireoidismo' | 'hipertireoidismo'
+  | 'asma' | 'cardiopatia' | 'dislipidemia'
+  | 'artrose' | 'artrite' | 'fibromialgia' | 'epilepsia'
+  | 'depressao' | 'ansiedade'
+  | 'outros';
+
+export type DietaryRestrictionTag =
+  | 'vegetariano' | 'vegano' | 'ovolactovegetariano' | 'pescetariano'
+  | 'sem_gluten' | 'sem_lactose' | 'low_carb'
+  | 'kosher' | 'halal' | 'jejum_intermitente'
+  | 'outros';
+
+export type Surgery = {
+  date: string; // 'YYYY' ou 'YYYY-MM'
+  type: string;
+  notes?: string;
+};
+
+export type StudentAnamnese = {
+  user_id: string;
+  injuries: InjuryTag[];
+  injuries_notes: string | null;
+  surgeries: Surgery[];
+  chronic_conditions: ChronicConditionTag[];
+  chronic_conditions_notes: string | null;
+  medications: string | null;
+  allergy_food: string | null;
+  allergy_medication: string | null;
+  allergy_environmental: string | null;
+  dietary_restrictions: DietaryRestrictionTag[];
+  dietary_notes: string | null;
+  emergency_contact_name: string | null;
+  emergency_contact_phone: string | null;
+  emergency_contact_relation: string | null;
+  sport_history: string | null;
+  goal_notes: string | null;
+  has_medical_clearance: boolean | null;
+  medical_clearance_notes: string | null;
+  filled_at: string | null;
+  updated_at: string;
+};
+
+export type StudentAnamnesePatch = Partial<
+  Omit<StudentAnamnese, 'user_id' | 'updated_at'>
+>;
+

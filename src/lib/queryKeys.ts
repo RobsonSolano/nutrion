@@ -42,6 +42,7 @@ export const queryKeys = {
     ['latest-physical-assessment', studentId] as const,
   pushPreferences: (userId: string) =>
     ['push-preferences', userId] as const,
+  anamnese: (userId: string) => ['anamnese', userId] as const,
 };
 
 export function todayKey() {
