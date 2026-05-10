@@ -377,3 +377,46 @@ export type PhysicalAssessmentPatch = Partial<
   >
 >;
 
+export type PushType =
+  | 'inactivity_reminder'
+  | 'streak_celebration'
+  | 'daily_workout_reminder'
+  | 'water_reminder'
+  | 'weekly_summary'
+  | 'coach_adherence_alert'
+  | 'coach_plan_update'
+  | 'goal_achieved';
+
+export type PushPreference = {
+  user_id: string;
+  type: PushType;
+  enabled: boolean;
+  preferred_time: string | null;
+  updated_at: string;
+};
+
+export type PushHistoryStatus = 'sent' | 'failed' | 'skipped';
+export type PushHistorySkipReason =
+  | 'no_token'
+  | 'opted_out'
+  | 'cooldown'
+  | 'rate_limit'
+  | 'quiet_hours'
+  | 'ai_failed'
+  | 'expo_failed';
+
+export type PushHistoryEntry = {
+  id: string;
+  user_id: string;
+  type: PushType;
+  title: string;
+  body: string;
+  data: Record<string, unknown> | null;
+  ai_generated: boolean;
+  ai_tokens: number | null;
+  expo_response: Record<string, unknown> | null;
+  status: PushHistoryStatus;
+  skip_reason: PushHistorySkipReason | null;
+  sent_at: string;
+};
+
