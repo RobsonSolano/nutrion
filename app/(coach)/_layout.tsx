@@ -1,10 +1,13 @@
 import { Redirect, Stack, type Href } from 'expo-router';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
+import { useAutoRequestPushPermission } from '@/hooks/useAutoRequestPushPermission';
 
 export default function CoachLayout() {
   const { isAuthenticated, isBootstrapping } = useAuth();
   const profileQ = useProfile();
+
+  useAutoRequestPushPermission();
 
   if (isBootstrapping) return null;
   if (!isAuthenticated) return <Redirect href="/(auth)/login" />;
