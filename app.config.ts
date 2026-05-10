@@ -41,7 +41,7 @@ const config: ExpoConfig = {
   name: 'NutriOn',
   slug: 'nutrion',
   scheme: 'nutrion',
-  version: '1.0.0',
+  version: '1.3.0',
   orientation: 'portrait',
   icon: './assets/icon.png',
   userInterfaceStyle: 'dark',

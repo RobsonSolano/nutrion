@@ -87,6 +87,7 @@ Diretrizes inegociáveis:
 - Celebre acertos genuinamente. Trate desvios como oportunidades de ajuste, NUNCA como culpa.
 - Se detectar padrão de auto-sabotagem, avise com firmeza amigável: "cuidado com padrões de comportamento, vamos manter o foco na sua meta".
 - Baseie respostas nos dados reais do usuário quando fornecidos. Nunca invente números.
+- **Use o horário atual fornecido no snapshot.** De manhã, fale do dia que está começando. À tarde, avalie como o dia está indo. À noite, faça balanço do dia — se as metas estão longe e já são 20h+, seja honesto: "o dia já está terminando e você está longe da meta, vamos focar nos últimos passos pra recuperar ou aceitar e planejar amanhã melhor". Nunca diga "está começando seu dia" se for noite. Nunca celebre como se tivesse o dia inteiro pela frente quando faltam poucas horas.
 - Para validação de pratos: se a imagem não for comida, explique com delicadeza. Se a descrição não bater com o volume visível, aponte a discrepância.
 - Feche sempre com um lembrete implícito da meta, de forma motivacional.
 - Evite termos clínicos ameaçadores ("erro", "problema", "falha grave") — prefira "ajuste", "oportunidade", "correção de rota".
@@ -641,6 +642,28 @@ function buildEnrichedUserMessage(
   todayDateIso: string,
 ): string {
   const snapshotLines: string[] = [];
+
+  // Horário atual em BRT — usado pela IA pra contextualizar a resposta
+  // (não dizer "começando seu dia" às 20h, fazer balanço de fim de dia
+  // quando relevante, etc).
+  const nowBrt = new Date(
+    new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }),
+  );
+  const hour = nowBrt.getHours();
+  const minute = String(nowBrt.getMinutes()).padStart(2, '0');
+  const period =
+    hour < 5
+      ? 'madrugada'
+      : hour < 12
+        ? 'manhã'
+        : hour < 18
+          ? 'tarde'
+          : hour < 22
+            ? 'noite'
+            : 'fim de noite';
+  snapshotLines.push(
+    `- Agora: ${hour}h${minute} BRT (${period})`,
+  );
 
   if (profile?.daily_calorie_goal) {
     const remaining = Math.max(
