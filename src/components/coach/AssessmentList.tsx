@@ -3,6 +3,7 @@ import { Alert, Pressable, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ArrowRight, Check, Plus, Ruler, Trash2 } from 'lucide-react-native';
 import { Button, Card, ConfirmModal } from '@/components/ui';
+import EvolutionChart from '@/components/coach/EvolutionChart';
 import {
   useDeletePhysicalAssessment,
   usePhysicalAssessments,
@@ -133,16 +134,19 @@ export default function AssessmentList({ studentId }: Props) {
       {items.length === 0 ? (
         <EmptyState />
       ) : (
-        items.map((a) => (
-          <AssessmentCard
-            key={a.id}
-            assessment={a}
-            selected={selected.has(a.id)}
-            onToggle={() => toggle(a.id)}
-            onView={() => handleVer(a.id)}
-            onDelete={() => setPendingDelete(a)}
-          />
-        ))
+        <>
+          {items.map((a) => (
+            <AssessmentCard
+              key={a.id}
+              assessment={a}
+              selected={selected.has(a.id)}
+              onToggle={() => toggle(a.id)}
+              onView={() => handleVer(a.id)}
+              onDelete={() => setPendingDelete(a)}
+            />
+          ))}
+          {items.length >= 2 && <EvolutionChart assessments={items} />}
+        </>
       )}
 
       <ConfirmModal
