@@ -66,6 +66,17 @@ const config: ExpoConfig = {
   experiments: {
     typedRoutes: true,
   },
+  // OTA updates via EAS Update.
+  // runtimeVersion=appVersion: updates só atingem builds da mesma version.
+  // Quando subir version (ex: 1.0.0 -> 1.1.0) é porque mudou algo nativo,
+  // o APK velho fica preso no último JS compatível dele.
+  runtimeVersion: {
+    policy: 'appVersion',
+  },
+  updates: {
+    url: 'https://u.expo.dev/6aed6bd3-078e-4424-b7e1-5d4afbd9d624',
+    fallbackToCacheTimeout: 0,
+  },
   extra: {
     eas: {
       projectId: '6aed6bd3-078e-4424-b7e1-5d4afbd9d624',
