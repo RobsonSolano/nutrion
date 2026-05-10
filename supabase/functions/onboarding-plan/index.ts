@@ -9,6 +9,7 @@
 import { serve } from 'std/http/server.ts';
 import { createClient } from '@supabase/supabase-js';
 import { generatePlan, type PlanInput } from '../_shared/plan-generator.ts';
+import { formatAnamneseForPrompt } from '../_shared/anamneseFormatter.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
@@ -122,7 +123,25 @@ serve(async (req: Request) => {
       }
     }
 
-    const result = await generatePlan(supabase, GROQ_API_KEY, MODEL, body);
+    // Carrega anamnese (não-bloqueante) e injeta no body
+    const { data: anamnese } = await supabase
+      .from('student_anamneses')
+      .select(
+        'injuries, injuries_notes, surgeries, chronic_conditions, chronic_conditions_notes, allergy_food, dietary_restrictions, dietary_notes, sport_history, goal_notes, has_medical_clearance, medical_clearance_notes',
+      )
+      .eq('user_id', user.id)
+      .maybeSingle();
+    const inputWithAnamnese: PlanInput = {
+      ...body,
+      anamnese_summary: formatAnamneseForPrompt(anamnese),
+    };
+
+    const result = await generatePlan(
+      supabase,
+      GROQ_API_KEY,
+      MODEL,
+      inputWithAnamnese,
+    );
 
     if (result.error) {
       const e = result.error;

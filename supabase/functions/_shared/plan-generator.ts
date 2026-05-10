@@ -51,6 +51,8 @@ export type PlanInput = {
   allergies?: string | null;
   physical_limitations?: string | null;
   bio?: string | null;
+  /** Bloco formatado pela anamnese clínica (formatAnamneseForPrompt). */
+  anamnese_summary?: string | null;
 };
 
 export type CatalogExercise = {
@@ -186,6 +188,14 @@ function modalityGuidelines(m: Modality): string {
   }
 }
 
+const ANAMNESE_SAFETY_RULES = `
+
+Regras de segurança a partir da anamnese clínica (quando presente no perfil do usuário):
+- Lesão em região X: evitar exercícios que sobrecarreguem X (ex: lesão joelho -> evitar agachamento profundo, leg press unilateral pesado, salto plyo). Sugerir variações seguras (ex: leg curl, extensão isolada, bike).
+- Doença cardiovascular sem liberação médica: intensidade moderada (RPE máx 7), priorizar aeróbio leve, evitar valsalva pesado.
+- Restrição alimentar (vegano, sem lactose, etc): refletir nas metas e sugestões (ex: sem lactose -> não sugerir whey de leite; vegano -> proteínas vegetais).
+- Cirurgia recente (< 12 meses) na região X: tratar como lesão ativa da região.`;
+
 export function buildSystemPrompt(
   modalities: Modality[],
   onlyFood: boolean,
@@ -196,7 +206,7 @@ export function buildSystemPrompt(
 MODO ESPECIAL — usuário escolheu NÃO TREINAR:
 - Retorne "routines": [] (array vazio).
 - Foque o "rationale" 100% em alimentação, hidratação e hábitos.
-- NÃO invente rotinas mesmo se houver exercícios no catálogo.`;
+- NÃO invente rotinas mesmo se houver exercícios no catálogo.${ANAMNESE_SAFETY_RULES}`;
   }
 
   const labels = modalities.map((m) => MODALITY_LABEL[m]).join(', ');
@@ -213,7 +223,7 @@ ${guidelines}
 Quantidade de rotinas:
 - Entre 3 e 5 rotinas semanais no total, distribuídas entre as modalidades selecionadas
   proporcionalmente. Ex: se ele pratica musculação + corrida com freq 4x, gera ~3 musc + 1 corrida.
-- Compatíveis com a frequência semanal informada.`;
+- Compatíveis com a frequência semanal informada.${ANAMNESE_SAFETY_RULES}`;
 }
 
 function mapSportsToModalities(sports: string[]): Modality[] {
@@ -331,6 +341,10 @@ export function buildUserBlock(
     `- Limitações físicas: ${input.physical_limitations ?? 'nenhuma relatada'}`,
     `- Bio: ${input.bio ?? 'não informado'}`,
   ];
+
+  if (input.anamnese_summary) {
+    lines.push('', 'Anamnese clínica:', input.anamnese_summary);
+  }
 
   if (!onlyFood) {
     lines.push(
