@@ -10,6 +10,7 @@
 import { serve } from 'std/http/server.ts';
 import { createClient } from '@supabase/supabase-js';
 import { generatePlan, type PlanInput } from '../_shared/plan-generator.ts';
+import { formatAnamneseForPrompt } from '../_shared/anamneseFormatter.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
@@ -101,6 +102,16 @@ serve(async (req: Request) => {
       );
     }
 
+    // Carrega anamnese (não-bloqueante: se falhar, segue sem ela)
+    const { data: anamnese } = await supabaseService
+      .from('student_anamneses')
+      .select(
+        'injuries, injuries_notes, surgeries, chronic_conditions, chronic_conditions_notes, allergy_food, dietary_restrictions, dietary_notes, sport_history, goal_notes, has_medical_clearance, medical_clearance_notes',
+      )
+      .eq('user_id', body.student_id)
+      .maybeSingle();
+    const anamneseSummary = formatAnamneseForPrompt(anamnese);
+
     const logEvent = async (params: {
       status: 'success' | 'error';
       tokens?: number | null;
@@ -134,6 +145,7 @@ serve(async (req: Request) => {
       allergies: student.allergies,
       physical_limitations: student.physical_limitations,
       bio: student.bio,
+      anamnese_summary: anamneseSummary,
     };
 
     const result = await generatePlan(
