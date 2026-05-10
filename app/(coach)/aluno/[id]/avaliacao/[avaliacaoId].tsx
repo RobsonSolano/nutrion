@@ -12,6 +12,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, Pencil, Trash2 } from 'lucide-react-native';
 import { Button, Card, ConfirmModal, Screen } from '@/components/ui';
 import AssessmentForm from '@/components/coach/AssessmentForm';
+import PosturePhotoSection from '@/components/coach/PosturePhotoSection';
 import {
   useDeletePhysicalAssessment,
   usePhysicalAssessment,
@@ -137,6 +138,15 @@ export default function DetalheAvaliacaoScreen() {
                 onSubmit={handleSubmit}
                 onCancel={() => setEditing(false)}
               />
+
+              <Card padding="md">
+                <PosturePhotoSection
+                  assessmentId={a.id}
+                  studentId={id}
+                  photos={a.posture_photos}
+                  editable
+                />
+              </Card>
             </ScrollView>
           </KeyboardAvoidingView>
         ) : (
@@ -149,6 +159,16 @@ export default function DetalheAvaliacaoScreen() {
             showsVerticalScrollIndicator={false}
           >
             <ViewMode assessment={a} />
+            {a.posture_photos.length > 0 && (
+              <Card padding="md">
+                <PosturePhotoSection
+                  assessmentId={a.id}
+                  studentId={id}
+                  photos={a.posture_photos}
+                  editable={false}
+                />
+              </Card>
+            )}
             <View className="gap-2 mt-2">
               <Button
                 label="Editar"
