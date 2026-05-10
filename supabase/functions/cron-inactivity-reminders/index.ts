@@ -2,6 +2,10 @@
 // Roda agendada (diária) e envia push pra alunos que estão sem
 // registrar nada (food, water, workout_session) há 2+ dias.
 //
+// V2 (push-ai): conteúdo gerado por IA (Groq Llama 3.3 70B) via
+// helper sendPushAi, que cuida de opt-out, cooldown, quiet hours
+// e log em push_history.
+//
 // Autenticação via X-Cron-Secret header (env var CRON_SECRET) pra
 // evitar que qualquer um trigger isso. Não usa JWT — é chamada
 // server-to-server pelo agendador.
@@ -15,7 +19,7 @@
 
 import { serve } from 'std/http/server.ts';
 import { createClient } from '@supabase/supabase-js';
-import { sendExpoPush } from '../_shared/expoPush.ts';
+import { sendPushAi } from '../_shared/pushAi.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -29,6 +33,7 @@ const CORS = {
 };
 
 const INACTIVITY_DAYS = 2;
+const THROTTLE_MS = 100; // espaça chamadas Groq no batch
 
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -59,17 +64,16 @@ serve(async (req: Request) => {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
-    // Limites usados no NOT EXISTS (timestamp pra logs com created_at,
-    // date pra colunas day).
+    const now = Date.now();
     const cutoffIso = new Date(
-      Date.now() - INACTIVITY_DAYS * 24 * 60 * 60 * 1000,
+      now - INACTIVITY_DAYS * 24 * 60 * 60 * 1000,
     ).toISOString();
     const cutoffDate = cutoffIso.slice(0, 10);
+    const weekAgoIso = new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-    // Lista alunos com push habilitado.
     const { data: students, error: stErr } = await supabase
       .from('profiles')
-      .select('id, full_name')
+      .select('id, full_name, goal_type')
       .eq('role', 'aluno')
       .not('expo_push_token', 'is', null);
     if (stErr) {
@@ -80,32 +84,48 @@ serve(async (req: Request) => {
     }
 
     let processed = 0;
-    let notified = 0;
-    let skippedNoToken = 0;
-    let skippedActive = 0;
+    let sent = 0;
+    let skipped = 0;
+    const skipReasons: Record<string, number> = {};
 
     for (const s of students ?? []) {
       processed++;
       const studentId = s.id as string;
 
-      // Tem food_log nos últimos 2 dias?
-      const [foodCount, sessionCount, waterCount] = await Promise.all([
-        supabase
-          .from('food_logs')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', studentId)
-          .gte('created_at', cutoffIso),
-        supabase
-          .from('workout_sessions')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', studentId)
-          .gte('day', cutoffDate),
-        supabase
-          .from('water_logs')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', studentId)
-          .gte('day', cutoffDate),
-      ]);
+      const [foodCount, sessionCount, waterCount, lastActivity, weekRemindersCount] =
+        await Promise.all([
+          supabase
+            .from('food_logs')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', studentId)
+            .gte('created_at', cutoffIso),
+          supabase
+            .from('workout_sessions')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', studentId)
+            .gte('day', cutoffDate),
+          supabase
+            .from('water_logs')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', studentId)
+            .gte('day', cutoffDate),
+          // Última atividade qualquer pra resumo do contexto
+          supabase
+            .from('food_logs')
+            .select('created_at')
+            .eq('user_id', studentId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+          // Quantos lembretes de inatividade já enviei nos últimos 7 dias
+          supabase
+            .from('push_history')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', studentId)
+            .eq('type', 'inactivity_reminder')
+            .eq('status', 'sent')
+            .gte('sent_at', weekAgoIso),
+        ]);
 
       const totalActivity =
         (foodCount.count ?? 0) +
@@ -113,29 +133,58 @@ serve(async (req: Request) => {
         (waterCount.count ?? 0);
 
       if (totalActivity > 0) {
-        skippedActive++;
+        skipped++;
+        skipReasons.active = (skipReasons.active ?? 0) + 1;
         continue;
       }
 
-      const result = await sendExpoPush(supabase, studentId, {
-        title: 'Sentimos sua falta!',
-        body: 'Como foi seu dia? Registre uma refeição, água ou treino pra manter a constância.',
-        data: { event: 'inactivity_reminder' },
-      });
+      const lastActivityIso = lastActivity.data?.created_at as string | null;
+      const daysInactive = lastActivityIso
+        ? Math.floor(
+            (now - new Date(lastActivityIso).getTime()) /
+              (24 * 60 * 60 * 1000),
+          )
+        : INACTIVITY_DAYS;
+      const lastActivitySummary = lastActivityIso
+        ? `há ${daysInactive} dias`
+        : 'sem registro recente';
 
-      if (result.ok && result.skipped === 'no_token') {
-        skippedNoToken++;
-      } else if (result.ok) {
-        notified++;
+      const result = await sendPushAi(
+        supabase,
+        studentId,
+        'inactivity_reminder',
+        {
+          full_name: s.full_name,
+          goal_type: s.goal_type,
+          days_inactive: daysInactive,
+          last_activity_summary: lastActivitySummary,
+          nth_inactivity_reminder_in_week: (weekRemindersCount.count ?? 0) + 1,
+        },
+      );
+
+      if (result.ok && result.status === 'sent') {
+        sent++;
+      } else {
+        skipped++;
+        const reason =
+          'reason' in result
+            ? result.reason
+            : 'error' in result
+              ? 'error'
+              : 'unknown';
+        skipReasons[reason] = (skipReasons[reason] ?? 0) + 1;
       }
+
+      // Throttle pra não saturar Groq rate limit
+      await new Promise((r) => setTimeout(r, THROTTLE_MS));
     }
 
     return json({
       ok: true,
       processed,
-      notified,
-      skippedActive,
-      skippedNoToken,
+      sent,
+      skipped,
+      skipReasons,
       cutoffIso,
     });
   } catch (err) {
