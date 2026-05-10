@@ -1,7 +1,8 @@
-import { Text, View } from 'react-native';
-import { Check, Clock, Dumbbell } from 'lucide-react-native';
+import { Pressable, Text, View } from 'react-native';
+import { Check, Clock, CirclePlay } from 'lucide-react-native';
 import PreviewEyeButton from './PreviewEyeButton';
 import { colors } from '@/lib/theme';
+import { openYouTubeSearchForExercise } from '@/lib/youtube';
 
 export type ReadableExercise = {
   exercise_id: string | null;
@@ -50,11 +51,16 @@ export default function ExerciseReadRow({
             </Text>
           )}
         </View>
-        {hasImages && onPreview ? (
-          <PreviewEyeButton onPress={onPreview} />
-        ) : (
-          <Dumbbell size={14} color={colors.textMuted} />
-        )}
+        <View className="flex-row items-center gap-2">
+          {hasImages && onPreview && <PreviewEyeButton onPress={onPreview} />}
+          <Pressable
+            onPress={() => openYouTubeSearchForExercise(exercise.exercise_name)}
+            hitSlop={8}
+            className="h-8 w-8 rounded-lg bg-surface border border-border items-center justify-center active:opacity-70"
+          >
+            <CirclePlay size={14} color={colors.danger} />
+          </Pressable>
+        </View>
       </View>
       <View className="flex-row flex-wrap gap-2 mt-2">
         {exercise.sets != null && (
