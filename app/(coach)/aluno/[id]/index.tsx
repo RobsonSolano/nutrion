@@ -48,6 +48,7 @@ import {
 } from '@/hooks/useStudents';
 import { useCoachNotes } from '@/hooks/useCoachNotes';
 import { useApplyTemplates } from '@/hooks/useTemplates';
+import StudentAnamneseCard from '@/components/coach/StudentAnamneseCard';
 import TemplatePicker from '@/components/coach/TemplatePicker';
 import { bmi, bmiCategory } from '@/lib/biometrics';
 import type { OnboardingPlan } from '@/services/onboarding';
@@ -416,6 +417,8 @@ export default function AlunoDetalheScreen() {
             </View>
           </Card>
         </Pressable>
+
+        {id && <StudentAnamneseCard studentId={id} />}
 
         <Pressable
           onPress={() =>
