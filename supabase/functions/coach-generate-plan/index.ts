@@ -11,6 +11,7 @@ import { serve } from 'std/http/server.ts';
 import { createClient } from '@supabase/supabase-js';
 import { generatePlan, type PlanInput } from '../_shared/plan-generator.ts';
 import { formatAnamneseForPrompt } from '../_shared/anamneseFormatter.ts';
+import { getAiCircuitState } from '../_shared/aiCircuit.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
@@ -148,6 +149,32 @@ serve(async (req: Request) => {
       anamnese_summary: anamneseSummary,
     };
 
+    // Circuit breaker: coach NÃO recebe fallback (coach quer plano por IA);
+    // devolvemos 429 com mensagem amigável e ele tenta de novo em 1min.
+    const circuit = await getAiCircuitState(supabaseService);
+    if (circuit.open) {
+      console.warn(
+        `[coach-generate-plan] circuit open (${circuit.recentFailures} rate_limits/1min), refusing call`,
+      );
+      await logEvent({ status: 'error', errorCode: 'circuit_open' });
+      return new Response(
+        JSON.stringify({
+          error: 'rate_limit',
+          detail:
+            'IA temporariamente instável. Aguarda ~1 minuto e tenta de novo.',
+          retry_after_seconds: 60,
+        }),
+        {
+          status: 429,
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Content-Type': 'application/json',
+            'Retry-After': '60',
+          },
+        },
+      );
+    }
+
     const result = await generatePlan(
       supabaseService,
       GROQ_API_KEY,
@@ -163,12 +190,21 @@ serve(async (req: Request) => {
       }
       if (e.kind === 'rate_limit') {
         await logEvent({ status: 'error', errorCode: 'rate_limit' });
-        return json(
-          {
+        const retryAfter = e.retryAfterSeconds ?? 60;
+        return new Response(
+          JSON.stringify({
             error: 'rate_limit',
-            detail: 'Muitas requisições. Aguarda 1 min e tenta de novo.',
+            detail: `Muitas requisições. Aguarda ~${retryAfter}s e tenta de novo.`,
+            retry_after_seconds: retryAfter,
+          }),
+          {
+            status: 429,
+            headers: {
+              'Access-Control-Allow-Origin': '*',
+              'Content-Type': 'application/json',
+              'Retry-After': String(retryAfter),
+            },
           },
-          429,
         );
       }
       if (e.kind === 'groq_api_error') {
