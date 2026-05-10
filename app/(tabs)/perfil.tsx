@@ -32,6 +32,7 @@ import { useDailyOnboardingUsage } from '@/hooks/useAiUsage';
 import { useOnboardingStore } from '@/stores/useOnboardingStore';
 import { Button, Card, ConfirmModal, Screen } from '@/components/ui';
 import CoachCard from '@/components/CoachCard';
+import StudentAssessmentCard from '@/components/StudentAssessmentCard';
 import Disclaimer from '@/components/Disclaimer';
 import { colors } from '@/lib/theme';
 import { bmi, bmiCategory } from '@/lib/biometrics';
@@ -382,6 +383,10 @@ export default function PerfilScreen() {
 
         {isStudent && profile?.coach_id && (
           <CoachCard coachId={profile.coach_id} />
+        )}
+
+        {isStudent && profile?.id && (
+          <StudentAssessmentCard studentId={profile.id} />
         )}
 
         <Disclaimer />
