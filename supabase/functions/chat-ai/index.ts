@@ -437,14 +437,28 @@ serve(async (req: Request) => {
 
       if (groqRes.status === 429) {
         await logEvent({ status: 'error', errorCode: 'rate_limit' });
-        return json(
-          {
+        const retryAfterHeader = groqRes.headers.get('Retry-After');
+        const retryAfter = (() => {
+          if (!retryAfterHeader) return 60;
+          const n = Number(retryAfterHeader);
+          if (Number.isFinite(n) && n > 0) return Math.ceil(n);
+          return 60;
+        })();
+        return new Response(
+          JSON.stringify({
             error: 'rate_limit',
-            detail:
-              'Muitas requisições de uma vez. Aguarda ~1 minuto e tenta de novo.',
+            detail: `Muitas requisições. Aguarda ~${retryAfter}s e tenta de novo.`,
+            retry_after_seconds: retryAfter,
             model: modelToUse,
+          }),
+          {
+            status: 429,
+            headers: {
+              'Access-Control-Allow-Origin': '*',
+              'Content-Type': 'application/json',
+              'Retry-After': String(retryAfter),
+            },
           },
-          429,
         );
       }
 

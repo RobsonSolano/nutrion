@@ -10,6 +10,8 @@ import { serve } from 'std/http/server.ts';
 import { createClient } from '@supabase/supabase-js';
 import { generatePlan, type PlanInput } from '../_shared/plan-generator.ts';
 import { formatAnamneseForPrompt } from '../_shared/anamneseFormatter.ts';
+import { buildFallbackPlan } from '../_shared/fallbackPlan.ts';
+import { getAiCircuitState } from '../_shared/aiCircuit.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
@@ -136,6 +138,22 @@ serve(async (req: Request) => {
       anamnese_summary: formatAnamneseForPrompt(anamnese),
     };
 
+    // Circuit breaker: se Groq está em surto de falhas, pula direto pro fallback.
+    const circuit = await getAiCircuitState(supabase);
+    if (circuit.open) {
+      console.warn(
+        `[onboarding-plan] circuit open (${circuit.recentFailures} rate_limits/1min), serving fallback`,
+      );
+      await logEvent({ status: 'error', errorCode: 'circuit_open_fallback' });
+      const fallbackPlan = await buildFallbackPlan(supabase, inputWithAnamnese);
+      return json({
+        plan: fallbackPlan,
+        model: 'fallback',
+        is_fallback: true,
+        fallback_reason: 'circuit_open',
+      });
+    }
+
     const result = await generatePlan(
       supabase,
       GROQ_API_KEY,
@@ -156,23 +174,20 @@ serve(async (req: Request) => {
           500,
         );
       }
-      if (e.kind === 'rate_limit') {
-        await logEvent({ status: 'error', errorCode: 'rate_limit' });
-        return json(
-          {
-            error: 'rate_limit',
-            detail:
-              'Muitas requisições. Aguarda ~1 minuto e tenta gerar o plano de novo.',
-          },
-          429,
-        );
-      }
-      if (e.kind === 'groq_api_error') {
-        await logEvent({ status: 'error', errorCode: 'groq_api_error' });
-        return json(
-          { error: 'groq_api_error', detail: `${e.status}: ${e.detail}` },
-          502,
-        );
+      if (e.kind === 'rate_limit' || e.kind === 'groq_api_error') {
+        // Fallback: gera plano genérico pra não travar o user no onboarding.
+        // Plano é marcado como is_fallback pra rastreabilidade.
+        await logEvent({
+          status: 'error',
+          errorCode: e.kind === 'rate_limit' ? 'rate_limit_fallback' : 'groq_api_error_fallback',
+        });
+        const fallbackPlan = await buildFallbackPlan(supabase, inputWithAnamnese);
+        return json({
+          plan: fallbackPlan,
+          model: 'fallback',
+          is_fallback: true,
+          fallback_reason: e.kind,
+        });
       }
       // parse_failed
       console.error('[onboarding-plan] parse_failed:', e.raw);

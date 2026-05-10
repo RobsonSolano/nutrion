@@ -515,9 +515,21 @@ function nullableInt(v: unknown): number | null {
 
 export type GeneratePlanError =
   | { kind: 'empty_catalog' }
-  | { kind: 'rate_limit' }
+  | { kind: 'rate_limit'; retryAfterSeconds: number | null }
   | { kind: 'groq_api_error'; status: number; detail: string }
   | { kind: 'parse_failed'; raw: string };
+
+/** Extrai segundos de espera do header Retry-After (RFC 7231).
+ *  Aceita formato em segundos (ex: "60") ou data HTTP. */
+export function parseRetryAfter(header: string | null): number | null {
+  if (!header) return null;
+  const asInt = Number(header);
+  if (Number.isFinite(asInt) && asInt > 0) return Math.ceil(asInt);
+  const asDate = Date.parse(header);
+  if (!Number.isFinite(asDate)) return null;
+  const diff = Math.ceil((asDate - Date.now()) / 1000);
+  return diff > 0 ? diff : null;
+}
 
 /**
  * Gera um plano completo via Groq. Pure function: não toca em RLS, não
@@ -589,7 +601,10 @@ export async function generatePlan(
       // raw
     }
     if (groqRes.status === 429) {
-      return { error: { kind: 'rate_limit' } };
+      const retryAfterSeconds = parseRetryAfter(
+        groqRes.headers.get('Retry-After'),
+      );
+      return { error: { kind: 'rate_limit', retryAfterSeconds } };
     }
     return {
       error: { kind: 'groq_api_error', status: groqRes.status, detail },
