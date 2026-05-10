@@ -18,7 +18,9 @@ import {
   Save,
   CheckCircle2,
   PlusCircle,
+  CirclePlay,
 } from 'lucide-react-native';
+import { openYouTubeSearchForExercise } from '@/lib/youtube';
 import * as Haptics from 'expo-haptics';
 import {
   useExerciseGroups,
@@ -479,6 +481,13 @@ function ExerciseDraftRow({
           )}
         </View>
         {hasImages && <PreviewEyeButton onPress={onPreview} marginRight />}
+        <Pressable
+          onPress={() => openYouTubeSearchForExercise(draft.exercise_name)}
+          hitSlop={8}
+          className="h-8 w-8 rounded-lg bg-surface border border-border items-center justify-center active:opacity-70 mr-2"
+        >
+          <CirclePlay size={14} color={colors.danger} />
+        </Pressable>
         <Pressable
           onPress={onRemove}
           hitSlop={8}
