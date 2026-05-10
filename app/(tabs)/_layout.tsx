@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
 import { useUnreadStudentRequests } from '@/hooks/useRequests';
+import { useAutoRequestPushPermission } from '@/hooks/useAutoRequestPushPermission';
 import { useUiStore } from '@/stores/useUiStore';
 import { colors } from '@/lib/theme';
 
@@ -17,6 +18,8 @@ export default function TabsLayout() {
   const insets = useSafeAreaInsets();
   const isStudent = profileQ.data?.role === 'aluno';
   const unreadCount = isStudent ? unreadQ.data ?? 0 : 0;
+
+  useAutoRequestPushPermission();
 
   if (isBootstrapping) return null;
   // Trava redirects enquanto signup-professor está em curso (evita
