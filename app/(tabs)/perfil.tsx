@@ -262,6 +262,15 @@ export default function PerfilScreen() {
                 icon={<Download size={14} color={colors.textDim} />}
               />
             </View>
+            <View style={{ width: '48.5%' }}>
+              <Button
+                label="Notificações"
+                onPress={() => router.push('/notificacoes' as Href)}
+                variant="ghost"
+                size="md"
+                icon={<Bell size={14} color={colors.textDim} />}
+              />
+            </View>
           </View>
         </Card>
 
