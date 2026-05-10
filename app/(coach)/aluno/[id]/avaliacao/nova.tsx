@@ -1,11 +1,36 @@
-import { Pressable, Text, View } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
 import { Card, Screen } from '@/components/ui';
+import AssessmentForm from '@/components/coach/AssessmentForm';
+import { useCreatePhysicalAssessment } from '@/hooks/usePhysicalAssessments';
+import { useStudentDetail } from '@/hooks/useStudents';
 import { colors } from '@/lib/theme';
+import type { PhysicalAssessmentInput } from '@/types/database';
 
-export default function NovaAvaliacaoPlaceholder() {
+export default function NovaAvaliacaoScreen() {
   const router = useRouter();
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const detailQ = useStudentDetail(id ?? null);
+  const createM = useCreatePhysicalAssessment();
+
+  if (!id) return null;
+
+  const studentName = detailQ.data?.profile.full_name ?? 'aluno';
+  const studentSex = detailQ.data?.profile.sex ?? null;
+
+  async function handleSubmit(input: PhysicalAssessmentInput) {
+    try {
+      await createM.mutateAsync(input);
+      router.back();
+    } catch (err) {
+      Alert.alert(
+        'Não consegui salvar',
+        err instanceof Error ? err.message : 'Tente novamente.',
+      );
+    }
+  }
+
   return (
     <>
       <Stack.Screen
@@ -23,14 +48,42 @@ export default function NovaAvaliacaoPlaceholder() {
           <Text className="text-text font-semibold">Nova avaliação</Text>
           <View style={{ width: 40 }} />
         </View>
-        <View className="flex-1 p-5">
-          <Card padding="md">
-            <Text className="text-text font-semibold mb-2">Em construção</Text>
-            <Text className="text-text-muted text-xs leading-relaxed">
-              Formulário de cadastro vai entrar nesta tela na próxima fase.
-            </Text>
-          </Card>
-        </View>
+
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={{ flex: 1 }}
+        >
+          <ScrollView
+            contentContainerStyle={{
+              padding: 20,
+              gap: 14,
+              paddingBottom: 80,
+            }}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <Card padding="md">
+              <Text className="text-text-dim text-[11px] uppercase tracking-widest mb-2">
+                Aluno
+              </Text>
+              <Text className="text-text font-semibold">{studentName}</Text>
+              {studentSex == null && (
+                <Text className="text-warn text-xs mt-2 leading-relaxed">
+                  Sexo não preenchido no cadastro do aluno — % de gordura não
+                  será calculado até atualizar o perfil.
+                </Text>
+              )}
+            </Card>
+
+            <AssessmentForm
+              studentId={id}
+              studentSex={studentSex}
+              submitting={createM.isPending}
+              onSubmit={handleSubmit}
+              onCancel={() => router.back()}
+            />
+          </ScrollView>
+        </KeyboardAvoidingView>
       </Screen>
     </>
   );
