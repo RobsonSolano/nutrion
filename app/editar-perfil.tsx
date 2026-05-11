@@ -15,6 +15,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useProfile, useUpdateProfile } from '@/hooks/useProfile';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { Button, Card, Input, Screen } from '@/components/ui';
+import AvatarPicker from '@/components/AvatarPicker';
 import { useAlert } from '@/components/GlobalAlertProvider';
 import { colors } from '@/lib/theme';
 import {
@@ -159,6 +160,12 @@ export default function EditarPerfilScreen() {
                 <Text className="text-text-dim text-[11px] uppercase tracking-widest">
                   Identidade
                 </Text>
+              </View>
+              <View className="my-3">
+                <AvatarPicker
+                  avatarUrl={profileQ.data?.avatar_url ?? null}
+                  name={fullName || profileQ.data?.full_name || null}
+                />
               </View>
               <View className="gap-3 mt-3">
                 <Input
