@@ -97,15 +97,20 @@ export async function uploadPosturePhoto(params: {
   studentId: string;
   assessmentId: string;
   index: number;
-  fileBlob: Blob;
+  localUri: string;
   contentType: string;
 }): Promise<string> {
   const ext = params.contentType.split('/')[1] ?? 'jpg';
   const path = `${params.studentId}/${params.assessmentId}/${params.index}.${ext}`;
 
+  // ArrayBuffer via expo-file-system — fetch(uri).blob() em RN devolve
+  // blob vazio e o Supabase Storage rejeita com "Network error".
+  const { readFileAsArrayBuffer } = await import('@/lib/uploadFile');
+  const buffer = await readFileAsArrayBuffer(params.localUri);
+
   const { error } = await supabase.storage
     .from('posture-photos')
-    .upload(path, params.fileBlob, {
+    .upload(path, buffer, {
       contentType: params.contentType,
       upsert: true,
     });
