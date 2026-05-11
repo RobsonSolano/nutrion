@@ -1,5 +1,6 @@
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { supabase } from './supabase';
+import { readFileAsArrayBuffer } from '@/lib/uploadFile';
 
 const BUCKET = 'profile-photos';
 const TARGET_WIDTH = 512; // suficiente pra avatar em qualquer tela do app
@@ -23,12 +24,12 @@ export async function uploadAvatar(localUri: string): Promise<string> {
     { compress: 0.85, format: SaveFormat.JPEG },
   );
 
-  const blob = await fileUriToBlob(resized.uri);
+  const buffer = await readFileAsArrayBuffer(resized.uri);
   const path = `${user.id}/avatar-${Date.now()}.jpg`;
 
   const { error: upErr } = await supabase.storage
     .from(BUCKET)
-    .upload(path, blob, { contentType: 'image/jpeg', upsert: true });
+    .upload(path, buffer, { contentType: 'image/jpeg', upsert: true });
   if (upErr) throw upErr;
 
   const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(path);
@@ -69,11 +70,6 @@ export async function removeAvatar(): Promise<void> {
 // =====================================================================
 // Helpers
 // =====================================================================
-async function fileUriToBlob(uri: string): Promise<Blob> {
-  const res = await fetch(uri);
-  return await res.blob();
-}
-
 async function cleanupOldAvatars(userId: string, keepPath: string) {
   try {
     const { data: files } = await supabase.storage.from(BUCKET).list(userId);
