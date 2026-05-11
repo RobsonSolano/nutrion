@@ -1,3 +1,4 @@
+export { default as Avatar } from './Avatar';
 export { default as Screen } from './Screen';
 export { default as Logo } from './Logo';
 export { default as Button } from './Button';

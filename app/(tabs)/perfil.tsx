@@ -34,6 +34,7 @@ import { useOnboardingStore } from '@/stores/useOnboardingStore';
 import { Button, Card, ConfirmModal, Screen } from '@/components/ui';
 import CoachCard from '@/components/CoachCard';
 import StudentAssessmentCard from '@/components/StudentAssessmentCard';
+import { Avatar } from '@/components/ui';
 import Disclaimer from '@/components/Disclaimer';
 import { colors } from '@/lib/theme';
 import { bmi, bmiCategory } from '@/lib/biometrics';
@@ -96,8 +97,6 @@ export default function PerfilScreen() {
     user?.email ??
     'Atleta NutriOn';
 
-  const initial = displayName.charAt(0).toUpperCase();
-
   const formatKg = (v: number | null | undefined) =>
     v == null ? '—' : `${v.toLocaleString('pt-BR')} kg`;
   const formatCm = (v: number | null | undefined) =>
@@ -116,16 +115,21 @@ export default function PerfilScreen() {
       <ScrollView contentContainerStyle={{ padding: 20, gap: 16, paddingBottom: 140 }}>
         <View className="items-center mt-4 mb-2">
           <View
-            className="h-24 w-24 rounded-full bg-surface-raised border border-border-strong items-center justify-center"
             style={{
               shadowColor: colors.violet,
               shadowOffset: { width: 0, height: 0 },
               shadowOpacity: 0.4,
               shadowRadius: 18,
               elevation: 8,
+              borderRadius: 48,
             }}
           >
-            <Text className="text-accent text-3xl font-bold">{initial}</Text>
+            <Avatar
+              url={profile?.avatar_url}
+              name={displayName}
+              size={96}
+              accent="green"
+            />
           </View>
           <Text className="text-text text-xl font-bold mt-4">{displayName}</Text>
           {user?.email && (
