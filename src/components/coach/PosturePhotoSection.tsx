@@ -9,7 +9,6 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
-import * as FileSystem from 'expo-file-system/legacy';
 import { Camera, Image as ImageIcon, Plus, X } from 'lucide-react-native';
 import {
   deletePosturePhoto,
@@ -79,12 +78,11 @@ export default function PosturePhotoSection({
           : [],
         { compress: 0.85, format: SaveFormat.JPEG },
       );
-      const blob = await fileUriToBlob(resized.uri);
       const path = await uploadPosturePhoto({
         studentId,
         assessmentId,
         index: nextIndex(photos),
-        fileBlob: blob,
+        localUri: resized.uri,
         contentType: 'image/jpeg',
       });
       await updateM.mutateAsync({
@@ -263,13 +261,6 @@ function AddTile({
 // =====================================================================
 // Helpers
 // =====================================================================
-async function fileUriToBlob(uri: string): Promise<Blob> {
-  // Em RN, fetch(uri) pra file:// retorna um Response do qual conseguimos
-  // o blob. Funciona tanto em iOS quanto Android com expo-image-manipulator.
-  const res = await fetch(uri);
-  return await res.blob();
-}
-
 function nextIndex(photos: string[]): number {
   // Extrai os índices dos paths existentes (pattern: <student>/<assessment>/<n>.jpg)
   const taken = new Set(
