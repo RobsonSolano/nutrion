@@ -49,6 +49,7 @@ import {
 import { useCoachNotes } from '@/hooks/useCoachNotes';
 import { useApplyTemplates } from '@/hooks/useTemplates';
 import StudentAnamneseCard from '@/components/coach/StudentAnamneseCard';
+import { Avatar } from '@/components/ui';
 import TemplatePicker from '@/components/coach/TemplatePicker';
 import { bmi, bmiCategory } from '@/lib/biometrics';
 import type { OnboardingPlan } from '@/services/onboarding';
@@ -176,7 +177,6 @@ export default function AlunoDetalheScreen() {
   }
 
   const { profile, routines } = detailQ.data;
-  const initial = (profile.full_name ?? '?').slice(0, 1).toUpperCase();
   const age =
     profile.birth_year != null
       ? new Date().getFullYear() - profile.birth_year
@@ -230,11 +230,12 @@ export default function AlunoDetalheScreen() {
       >
         <Card glow accent="violet" padding="md">
           <View className="flex-row items-center gap-3">
-            <View className="h-14 w-14 rounded-2xl bg-violet/15 border border-violet/40 items-center justify-center">
-              <Text className="text-violet-soft text-xl font-bold">
-                {initial}
-              </Text>
-            </View>
+            <Avatar
+              url={profile.avatar_url}
+              name={profile.full_name}
+              size={56}
+              accent="violet"
+            />
             <View className="flex-1">
               <Text className="text-text text-lg font-bold" numberOfLines={1}>
                 {profile.full_name ?? 'Sem nome'}
