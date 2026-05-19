@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   Text,
@@ -10,7 +9,6 @@ import {
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import {
   ArrowLeft,
-  Activity,
   Droplet,
   Flame,
   Beef,
@@ -19,7 +17,6 @@ import {
   Send,
   Dumbbell,
   Target,
-  Ruler,
   Pencil,
   ChevronRight,
   Trash2,
@@ -31,11 +28,13 @@ import {
   TrendingUp,
 } from 'lucide-react-native';
 import {
+  Avatar,
   Button,
   Card,
   ConfirmModal,
   MarkdownText,
   Screen,
+  SegmentedControl,
 } from '@/components/ui';
 import { useAlert } from '@/components/GlobalAlertProvider';
 import { colors } from '@/lib/theme';
@@ -49,7 +48,6 @@ import {
 import { useCoachNotes } from '@/hooks/useCoachNotes';
 import { useApplyTemplates } from '@/hooks/useTemplates';
 import StudentAnamneseCard from '@/components/coach/StudentAnamneseCard';
-import { Avatar } from '@/components/ui';
 import TemplatePicker from '@/components/coach/TemplatePicker';
 import { bmi, bmiCategory } from '@/lib/biometrics';
 import type { OnboardingPlan } from '@/services/onboarding';
@@ -72,6 +70,14 @@ type Phase =
   | 'confirm_delete'
   | 'deleting';
 
+type Tab = 'visao' | 'plano' | 'historico';
+
+const TAB_OPTIONS = [
+  { value: 'visao', label: 'Visão' },
+  { value: 'plano', label: 'Plano' },
+  { value: 'historico', label: 'Histórico' },
+] as const;
+
 export default function AlunoDetalheScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -87,6 +93,7 @@ export default function AlunoDetalheScreen() {
   const [phase, setPhase] = useState<Phase>('idle');
   const [plan, setPlan] = useState<OnboardingPlan | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [tab, setTab] = useState<Tab>('visao');
 
   if (!id) return null;
 
@@ -192,7 +199,7 @@ export default function AlunoDetalheScreen() {
 
   return (
     <Screen variant="hero" edges={['top', 'bottom']}>
-      <View className="flex-row items-center gap-3 px-5 py-3 border-b border-border-subtle">
+      <View className="flex-row items-center gap-2 px-5 py-3 border-b border-border-subtle">
         <Pressable
           onPress={() => router.back()}
           hitSlop={12}
@@ -204,326 +211,55 @@ export default function AlunoDetalheScreen() {
           {profile.full_name ?? 'Aluno'}
         </Text>
         <Pressable
-          onPress={() =>
-            router.push(`/(coach)/aluno/${id}/editar` as Href)
-          }
-          hitSlop={8}
-          className="rounded-full border border-border bg-surface-muted px-3 py-1.5 active:opacity-70"
+          onPress={() => router.push(`/(coach)/aluno/${id}/editar` as Href)}
+          hitSlop={10}
+          className="h-10 w-10 rounded-2xl bg-surface-raised border border-border items-center justify-center active:opacity-70"
         >
-          <View className="flex-row items-center gap-1.5">
-            <Pencil size={11} color={colors.textDim} />
-            <Text className="text-text-dim text-[11px] font-semibold">
-              Editar
-            </Text>
-          </View>
+          <Pencil size={16} color={colors.textDim} />
+        </Pressable>
+        <Pressable
+          onPress={() => setPhase('confirm_delete')}
+          hitSlop={10}
+          className="h-10 w-10 rounded-2xl bg-surface-raised border border-border items-center justify-center active:opacity-70"
+        >
+          <Trash2 size={16} color={colors.danger} />
         </Pressable>
       </View>
 
-      <ScrollView
-        contentContainerStyle={{
-          paddingHorizontal: 20,
-          paddingTop: 20,
-          paddingBottom: 80,
-          gap: 14,
-        }}
-        showsVerticalScrollIndicator={false}
-      >
-        <Card glow accent="violet" padding="md">
-          <View className="flex-row items-center gap-3">
-            <Avatar
-              url={profile.avatar_url}
-              name={profile.full_name}
-              size={56}
-              accent="violet"
-            />
-            <View className="flex-1">
-              <Text className="text-text text-lg font-bold" numberOfLines={1}>
-                {profile.full_name ?? 'Sem nome'}
-              </Text>
-              <View className="flex-row flex-wrap items-center gap-2 mt-1">
-                {age != null && (
-                  <Text className="text-text-dim text-xs">{age} anos</Text>
-                )}
-                {profile.weight_kg != null && (
-                  <Text className="text-text-dim text-xs">
-                    {profile.weight_kg}kg
-                  </Text>
-                )}
-                {profile.height_cm != null && (
-                  <Text className="text-text-dim text-xs">
-                    {profile.height_cm}cm
-                  </Text>
-                )}
-              </View>
-              {goalLabel && (
-                <View className="flex-row items-center gap-1 mt-1.5">
-                  <Target size={11} color={colors.violetSoft} />
-                  <Text className="text-violet-soft text-[11px] font-semibold">
-                    {goalLabel}
-                  </Text>
-                </View>
-              )}
-            </View>
-          </View>
-        </Card>
-
-        {imcValue && imcCat && (
-          <Card padding="md">
-            <Text className="text-text-dim text-[11px] uppercase tracking-widest mb-2">
-              IMC
-            </Text>
-            <View className="flex-row items-end gap-3">
-              <Text className="text-text text-3xl font-bold">
-                {imcValue.toFixed(1)}
-              </Text>
-              <View
-                className="rounded-full px-2.5 py-0.5 border mb-1"
-                style={{
-                  backgroundColor: `${imcCat.color}15`,
-                  borderColor: `${imcCat.color}60`,
-                }}
-              >
-                <Text
-                  className="text-xs font-semibold"
-                  style={{ color: imcCat.color }}
-                >
-                  {imcCat.label}
-                </Text>
-              </View>
-            </View>
-          </Card>
-        )}
-
-        {trackingQ.data && (
-          <TodayCard tracking={trackingQ.data} profile={profile} />
-        )}
-
-        {trackingQ.data && (
-          <WeekAdherenceCard tracking={trackingQ.data} />
-        )}
-
-        <Card padding="md">
-          <Text className="text-text-dim text-[11px] uppercase tracking-widest mb-3">
-            Metas atuais
-          </Text>
-          <View className="gap-2.5">
-            <MetaRow
-              icon={<Flame size={14} color={colors.accent} />}
-              label="Calorias"
-              value={`${(profile.daily_calorie_goal ?? 0).toLocaleString('pt-BR')} kcal`}
-            />
-            <MetaRow
-              icon={<Beef size={14} color={colors.violetSoft} />}
-              label="Proteína"
-              value={`${profile.protein_goal_g ?? 0} g`}
-            />
-            <MetaRow
-              icon={<Droplet size={14} color={colors.info} />}
-              label="Água"
-              value={`${((profile.water_goal_ml ?? 0) / 1000).toFixed(1)} L`}
-            />
-          </View>
-        </Card>
-
-        {(profile.allergies || profile.physical_limitations || profile.bio) && (
-          <Card padding="md">
-            <Text className="text-text-dim text-[11px] uppercase tracking-widest mb-3">
-              Saúde / contexto
-            </Text>
-            <View className="gap-2">
-              {profile.allergies && (
-                <InfoLine label="Alergias" value={profile.allergies} />
-              )}
-              {profile.physical_limitations && (
-                <InfoLine
-                  label="Limitações"
-                  value={profile.physical_limitations}
-                />
-              )}
-              {profile.bio && <InfoLine label="Bio" value={profile.bio} />}
-            </View>
-          </Card>
-        )}
-
-        <Card padding="md">
-          <View className="flex-row items-center gap-2 mb-3">
-            <Dumbbell size={14} color={colors.accent} />
-            <Text className="text-text-dim text-[11px] uppercase tracking-widest">
-              Treinos prescritos ({routines.length})
-            </Text>
-          </View>
-          {routines.length === 0 ? (
-            <Text className="text-text-muted text-xs py-3">
-              Sem rotinas ativas. Gere um plano novo abaixo.
-            </Text>
-          ) : (
-            <View className="gap-2">
-              {routines.map((r) => (
-                <Pressable
-                  key={r.id}
-                  onPress={() =>
-                    router.push(
-                      `/(coach)/aluno/${id}/rotina/${r.id}` as Href,
-                    )
-                  }
-                  className="flex-row items-center gap-2 rounded-2xl border border-border bg-surface-muted px-3 py-2.5 active:opacity-70"
-                >
-                  <View className="flex-1">
-                    <Text
-                      className="text-text text-sm font-semibold"
-                      numberOfLines={1}
-                    >
-                      {r.name}
-                    </Text>
-                    <Text className="text-text-muted text-[11px] mt-0.5">
-                      {r.exercises_count} exercícios
-                      {r.description ? ` · ${r.description}` : ''}
-                    </Text>
-                  </View>
-                  <View className="flex-row items-center gap-1 rounded-full border border-violet/40 bg-violet/10 px-2 py-1">
-                    <Pencil size={10} color={colors.violetSoft} />
-                    <Text className="text-violet-soft text-[10px] font-semibold">
-                      Editar
-                    </Text>
-                  </View>
-                  <ChevronRight size={14} color={colors.textDim} />
-                </Pressable>
-              ))}
-            </View>
-          )}
-        </Card>
-
-        <Pressable
-          onPress={() =>
-            router.push(`/(coach)/aluno/${id}/notas` as Href)
-          }
-          className="active:opacity-80"
-        >
-          <Card padding="md">
-            <View className="flex-row items-center gap-3">
-              <View className="h-11 w-11 rounded-2xl bg-violet/10 border border-violet/30 items-center justify-center">
-                <NotebookPen size={20} color={colors.violetSoft} />
-              </View>
-              <View className="flex-1">
-                <Text className="text-text text-sm font-semibold">
-                  Anotações privadas
-                </Text>
-                <Text className="text-text-muted text-[11px] mt-0.5">
-                  {notesQ.data && notesQ.data.length > 0
-                    ? `${notesQ.data.length} anotação${notesQ.data.length === 1 ? '' : 'ões'} · só você vê`
-                    : 'Nenhuma anotação · só você vê'}
-                </Text>
-              </View>
-              <ChevronRight size={16} color={colors.textDim} />
-            </View>
-          </Card>
-        </Pressable>
-
-        {id && <StudentAnamneseCard studentId={id} />}
-
-        <Pressable
-          onPress={() =>
-            router.push(`/(coach)/aluno/${id}/historico` as Href)
-          }
-          className="active:opacity-80"
-        >
-          <Card padding="md">
-            <View className="flex-row items-center gap-3">
-              <View className="h-11 w-11 rounded-2xl bg-accent/10 border border-accent/30 items-center justify-center">
-                <History size={20} color={colors.accent} />
-              </View>
-              <View className="flex-1">
-                <Text className="text-text text-sm font-semibold">
-                  Histórico de planos
-                </Text>
-                <Text className="text-text-muted text-[11px] mt-0.5">
-                  Cada plano gerado fica registrado pra consulta
-                </Text>
-              </View>
-              <ChevronRight size={16} color={colors.textDim} />
-            </View>
-          </Card>
-        </Pressable>
-
-        <Pressable
-          onPress={() =>
-            router.push(`/(coach)/aluno/${id}/contrato` as Href)
-          }
-          className="active:opacity-80"
-        >
-          <Card padding="md">
-            <View className="flex-row items-center gap-3">
-              <View className="h-11 w-11 rounded-2xl bg-violet/10 border border-violet/30 items-center justify-center">
-                <FileText size={20} color={colors.violetSoft} />
-              </View>
-              <View className="flex-1">
-                <Text className="text-text text-sm font-semibold">
-                  Contrato
-                </Text>
-                <Text className="text-text-muted text-[11px] mt-0.5">
-                  Tipo de contratação, valor e pagamento
-                </Text>
-              </View>
-              <ChevronRight size={16} color={colors.textDim} />
-            </View>
-          </Card>
-        </Pressable>
-
-        <Pressable
-          onPress={() =>
-            router.push(`/(coach)/aluno/${id}/evolucao` as Href)
-          }
-          className="active:opacity-80"
-        >
-          <Card padding="md">
-            <View className="flex-row items-center gap-3">
-              <View className="h-11 w-11 rounded-2xl bg-accent/10 border border-accent/30 items-center justify-center">
-                <TrendingUp size={20} color={colors.accent} />
-              </View>
-              <View className="flex-1">
-                <Text className="text-text text-sm font-semibold">
-                  Evolução
-                </Text>
-                <Text className="text-text-muted text-[11px] mt-0.5">
-                  Linha do tempo de conquistas e marcos do aluno
-                </Text>
-              </View>
-              <ChevronRight size={16} color={colors.textDim} />
-            </View>
-          </Card>
-        </Pressable>
-
-        <Button
-          label="Gerar novo plano com IA"
-          onPress={() => setPhase('confirm_regenerate')}
-          variant="primary"
-          icon={<Sparkles size={16} color={colors.textInverse} />}
+      <View className="px-5 pt-3 pb-1 border-b border-border-subtle">
+        <SegmentedControl
+          variant="tabs"
+          options={TAB_OPTIONS}
+          value={tab}
+          onChange={setTab}
         />
+      </View>
 
-        <Text className="text-text-muted text-[11px] text-center px-2 leading-relaxed">
-          Gerar novo plano arquiva as rotinas atuais (histórico preservado) e
-          cria as novas baseadas na ficha.
-        </Text>
-
-        <Button
-          label="Aplicar template da biblioteca"
-          onPress={() => setPickerOpen(true)}
-          variant="secondary"
-          icon={<BookOpen size={16} color={colors.text} />}
+      {tab === 'visao' && (
+        <VisaoTab
+          profile={profile}
+          age={age}
+          goalLabel={goalLabel}
+          imcValue={imcValue}
+          imcCat={imcCat}
+          tracking={trackingQ.data ?? null}
         />
-
-        <Text className="text-text-muted text-[11px] text-center px-2 leading-relaxed">
-          Os treinos do template são copiados pro aluno como rotinas novas (não
-          arquiva as atuais — soma).
-        </Text>
-
-        <Button
-          label="Excluir aluno"
-          onPress={() => setPhase('confirm_delete')}
-          variant="danger"
-          icon={<Trash2 size={16} color={colors.danger} />}
+      )}
+      {tab === 'plano' && (
+        <PlanoTab
+          studentId={id}
+          profile={profile}
+          routines={routines}
+          onRegenerate={() => setPhase('confirm_regenerate')}
+          onOpenTemplates={() => setPickerOpen(true)}
         />
-      </ScrollView>
+      )}
+      {tab === 'historico' && (
+        <HistoricoTab
+          studentId={id}
+          notesCount={notesQ.data?.length ?? 0}
+        />
+      )}
 
       <TemplatePicker
         visible={pickerOpen}
@@ -604,6 +340,371 @@ export default function AlunoDetalheScreen() {
     </Screen>
   );
 }
+
+// =====================================================================
+// Tabs
+// =====================================================================
+
+type StudentProfile = NonNullable<
+  ReturnType<typeof useStudentDetail>['data']
+>['profile'];
+type StudentRoutine = NonNullable<
+  ReturnType<typeof useStudentDetail>['data']
+>['routines'][number];
+
+function VisaoTab({
+  profile,
+  age,
+  goalLabel,
+  imcValue,
+  imcCat,
+  tracking,
+}: {
+  profile: StudentProfile;
+  age: number | null;
+  goalLabel: string | null;
+  imcValue: number | null;
+  imcCat: { label: string; color: string } | null;
+  tracking: StudentTracking | null;
+}) {
+  return (
+    <ScrollView
+      contentContainerStyle={{
+        paddingHorizontal: 20,
+        paddingTop: 16,
+        paddingBottom: 60,
+        gap: 14,
+      }}
+      showsVerticalScrollIndicator={false}
+    >
+      <Card glow accent="violet" padding="md">
+        <View className="flex-row items-center gap-3">
+          <Avatar
+            url={profile.avatar_url}
+            name={profile.full_name}
+            size={56}
+            accent="violet"
+          />
+          <View className="flex-1">
+            <Text className="text-text text-lg font-bold" numberOfLines={1}>
+              {profile.full_name ?? 'Sem nome'}
+            </Text>
+            <View className="flex-row flex-wrap items-center gap-2 mt-1">
+              {age != null && (
+                <Text className="text-text-dim text-xs">{age} anos</Text>
+              )}
+              {profile.weight_kg != null && (
+                <Text className="text-text-dim text-xs">
+                  {profile.weight_kg}kg
+                </Text>
+              )}
+              {profile.height_cm != null && (
+                <Text className="text-text-dim text-xs">
+                  {profile.height_cm}cm
+                </Text>
+              )}
+            </View>
+            {goalLabel && (
+              <View className="flex-row items-center gap-1 mt-1.5">
+                <Target size={11} color={colors.violetSoft} />
+                <Text className="text-violet-soft text-[11px] font-semibold">
+                  {goalLabel}
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </Card>
+
+      {imcValue && imcCat && (
+        <Card padding="md">
+          <Text className="text-text-dim text-[11px] uppercase tracking-widest mb-2">
+            IMC
+          </Text>
+          <View className="flex-row items-end gap-3">
+            <Text className="text-text text-3xl font-bold">
+              {imcValue.toFixed(1)}
+            </Text>
+            <View
+              className="rounded-full px-2.5 py-0.5 border mb-1"
+              style={{
+                backgroundColor: `${imcCat.color}15`,
+                borderColor: `${imcCat.color}60`,
+              }}
+            >
+              <Text
+                className="text-xs font-semibold"
+                style={{ color: imcCat.color }}
+              >
+                {imcCat.label}
+              </Text>
+            </View>
+          </View>
+        </Card>
+      )}
+
+      {tracking && <TodayCard tracking={tracking} profile={profile} />}
+      {tracking && <WeekAdherenceCard tracking={tracking} />}
+    </ScrollView>
+  );
+}
+
+function PlanoTab({
+  studentId,
+  profile,
+  routines,
+  onRegenerate,
+  onOpenTemplates,
+}: {
+  studentId: string;
+  profile: StudentProfile;
+  routines: StudentRoutine[];
+  onRegenerate: () => void;
+  onOpenTemplates: () => void;
+}) {
+  const router = useRouter();
+
+  return (
+    <ScrollView
+      contentContainerStyle={{
+        paddingHorizontal: 20,
+        paddingTop: 16,
+        paddingBottom: 60,
+        gap: 14,
+      }}
+      showsVerticalScrollIndicator={false}
+    >
+      <Card padding="md">
+        <Text className="text-text-dim text-[11px] uppercase tracking-widest mb-3">
+          Metas atuais
+        </Text>
+        <View className="gap-2.5">
+          <MetaRow
+            icon={<Flame size={14} color={colors.accent} />}
+            label="Calorias"
+            value={`${(profile.daily_calorie_goal ?? 0).toLocaleString('pt-BR')} kcal`}
+          />
+          <MetaRow
+            icon={<Beef size={14} color={colors.violetSoft} />}
+            label="Proteína"
+            value={`${profile.protein_goal_g ?? 0} g`}
+          />
+          <MetaRow
+            icon={<Droplet size={14} color={colors.info} />}
+            label="Água"
+            value={`${((profile.water_goal_ml ?? 0) / 1000).toFixed(1)} L`}
+          />
+        </View>
+      </Card>
+
+      {(profile.allergies || profile.physical_limitations || profile.bio) && (
+        <Card padding="md">
+          <Text className="text-text-dim text-[11px] uppercase tracking-widest mb-3">
+            Saúde / contexto
+          </Text>
+          <View className="gap-2">
+            {profile.allergies && (
+              <InfoLine label="Alergias" value={profile.allergies} />
+            )}
+            {profile.physical_limitations && (
+              <InfoLine
+                label="Limitações"
+                value={profile.physical_limitations}
+              />
+            )}
+            {profile.bio && <InfoLine label="Bio" value={profile.bio} />}
+          </View>
+        </Card>
+      )}
+
+      <Card padding="md">
+        <View className="flex-row items-center gap-2 mb-3">
+          <Dumbbell size={14} color={colors.accent} />
+          <Text className="text-text-dim text-[11px] uppercase tracking-widest">
+            Treinos prescritos ({routines.length})
+          </Text>
+        </View>
+        {routines.length === 0 ? (
+          <Text className="text-text-muted text-xs py-3">
+            Sem rotinas ativas. Gere um plano novo abaixo.
+          </Text>
+        ) : (
+          <View className="gap-2">
+            {routines.map((r) => (
+              <Pressable
+                key={r.id}
+                onPress={() =>
+                  router.push(
+                    `/(coach)/aluno/${studentId}/rotina/${r.id}` as Href,
+                  )
+                }
+                className="flex-row items-center gap-2 rounded-2xl border border-border bg-surface-muted px-3 py-2.5 active:opacity-70"
+              >
+                <View className="flex-1">
+                  <Text
+                    className="text-text text-sm font-semibold"
+                    numberOfLines={1}
+                  >
+                    {r.name}
+                  </Text>
+                  <Text className="text-text-muted text-[11px] mt-0.5">
+                    {r.exercises_count} exercícios
+                    {r.description ? ` · ${r.description}` : ''}
+                  </Text>
+                </View>
+                <View className="flex-row items-center gap-1 rounded-full border border-violet/40 bg-violet/10 px-2 py-1">
+                  <Pencil size={10} color={colors.violetSoft} />
+                  <Text className="text-violet-soft text-[10px] font-semibold">
+                    Editar
+                  </Text>
+                </View>
+                <ChevronRight size={14} color={colors.textDim} />
+              </Pressable>
+            ))}
+          </View>
+        )}
+      </Card>
+
+      <Button
+        label="Gerar novo plano com IA"
+        onPress={onRegenerate}
+        variant="primary"
+        icon={<Sparkles size={16} color={colors.textInverse} />}
+      />
+      <Text className="text-text-muted text-[11px] text-center px-2 leading-relaxed">
+        Gerar novo plano arquiva as rotinas atuais (histórico preservado) e
+        cria as novas baseadas na ficha.
+      </Text>
+
+      <Button
+        label="Aplicar template da biblioteca"
+        onPress={onOpenTemplates}
+        variant="secondary"
+        icon={<BookOpen size={16} color={colors.text} />}
+      />
+      <Text className="text-text-muted text-[11px] text-center px-2 leading-relaxed">
+        Os treinos do template são copiados pro aluno como rotinas novas (não
+        arquiva as atuais — soma).
+      </Text>
+    </ScrollView>
+  );
+}
+
+function HistoricoTab({
+  studentId,
+  notesCount,
+}: {
+  studentId: string;
+  notesCount: number;
+}) {
+  const router = useRouter();
+  return (
+    <ScrollView
+      contentContainerStyle={{
+        paddingHorizontal: 20,
+        paddingTop: 16,
+        paddingBottom: 60,
+        gap: 14,
+      }}
+      showsVerticalScrollIndicator={false}
+    >
+      <Pressable
+        onPress={() => router.push(`/(coach)/aluno/${studentId}/notas` as Href)}
+        className="active:opacity-80"
+      >
+        <Card padding="md">
+          <View className="flex-row items-center gap-3">
+            <View className="h-11 w-11 rounded-2xl bg-violet/10 border border-violet/30 items-center justify-center">
+              <NotebookPen size={20} color={colors.violetSoft} />
+            </View>
+            <View className="flex-1">
+              <Text className="text-text text-sm font-semibold">
+                Anotações privadas
+              </Text>
+              <Text className="text-text-muted text-[11px] mt-0.5">
+                {notesCount > 0
+                  ? `${notesCount} anotação${notesCount === 1 ? '' : 'ões'} · só você vê`
+                  : 'Nenhuma anotação · só você vê'}
+              </Text>
+            </View>
+            <ChevronRight size={16} color={colors.textDim} />
+          </View>
+        </Card>
+      </Pressable>
+
+      <StudentAnamneseCard studentId={studentId} />
+
+      <Pressable
+        onPress={() =>
+          router.push(`/(coach)/aluno/${studentId}/historico` as Href)
+        }
+        className="active:opacity-80"
+      >
+        <Card padding="md">
+          <View className="flex-row items-center gap-3">
+            <View className="h-11 w-11 rounded-2xl bg-accent/10 border border-accent/30 items-center justify-center">
+              <History size={20} color={colors.accent} />
+            </View>
+            <View className="flex-1">
+              <Text className="text-text text-sm font-semibold">
+                Histórico de planos
+              </Text>
+              <Text className="text-text-muted text-[11px] mt-0.5">
+                Cada plano gerado fica registrado pra consulta
+              </Text>
+            </View>
+            <ChevronRight size={16} color={colors.textDim} />
+          </View>
+        </Card>
+      </Pressable>
+
+      <Pressable
+        onPress={() =>
+          router.push(`/(coach)/aluno/${studentId}/contrato` as Href)
+        }
+        className="active:opacity-80"
+      >
+        <Card padding="md">
+          <View className="flex-row items-center gap-3">
+            <View className="h-11 w-11 rounded-2xl bg-violet/10 border border-violet/30 items-center justify-center">
+              <FileText size={20} color={colors.violetSoft} />
+            </View>
+            <View className="flex-1">
+              <Text className="text-text text-sm font-semibold">Contrato</Text>
+              <Text className="text-text-muted text-[11px] mt-0.5">
+                Tipo de contratação, valor e pagamento
+              </Text>
+            </View>
+            <ChevronRight size={16} color={colors.textDim} />
+          </View>
+        </Card>
+      </Pressable>
+
+      <Pressable
+        onPress={() =>
+          router.push(`/(coach)/aluno/${studentId}/evolucao` as Href)
+        }
+        className="active:opacity-80"
+      >
+        <Card padding="md">
+          <View className="flex-row items-center gap-3">
+            <View className="h-11 w-11 rounded-2xl bg-accent/10 border border-accent/30 items-center justify-center">
+              <TrendingUp size={20} color={colors.accent} />
+            </View>
+            <View className="flex-1">
+              <Text className="text-text text-sm font-semibold">Evolução</Text>
+              <Text className="text-text-muted text-[11px] mt-0.5">
+                Linha do tempo de conquistas e marcos do aluno
+              </Text>
+            </View>
+            <ChevronRight size={16} color={colors.textDim} />
+          </View>
+        </Card>
+      </Pressable>
+    </ScrollView>
+  );
+}
+
 
 function MetaRow({
   icon,
