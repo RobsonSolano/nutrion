@@ -12,6 +12,7 @@ import {
   type UpdateStudentPatch,
 } from '@/services/students';
 import {
+  deleteRoutine,
   replaceRoutineExercises,
   updateRoutine,
 } from '@/services/routines';
@@ -195,6 +196,25 @@ export function useUpdateStudentRoutine() {
       });
       void qc.invalidateQueries({
         queryKey: queryKeys.routineDetail(vars.routineId),
+      });
+    },
+  });
+}
+
+/**
+ * Deleta uma rotina de um aluno do professor (hard delete, cascata
+ * remove os exercícios da rotina). RLS permite via routines_delete_coach
+ * (migration 20260508). Usado quando o coach quer substituir o plano
+ * gerado pela IA pelos treinos dele.
+ */
+export function useDeleteStudentRoutine() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (params: { studentId: string; routineId: string }) =>
+      deleteRoutine(params.routineId),
+    onSuccess: (_data, vars) => {
+      void qc.invalidateQueries({
+        queryKey: studentDetailKey(vars.studentId),
       });
     },
   });
