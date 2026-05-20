@@ -16,6 +16,16 @@ export async function readFileAsArrayBuffer(uri: string): Promise<ArrayBuffer> {
   return base64ToArrayBuffer(base64);
 }
 
+/**
+ * Lê um arquivo local e devolve apenas o conteúdo base64 (sem prefixo
+ * `data:...`). Útil pra enviar imagens em payload JSON.
+ */
+export async function readFileAsBase64(uri: string): Promise<string> {
+  return FileSystem.readAsStringAsync(uri, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
+}
+
 function base64ToArrayBuffer(b64: string): ArrayBuffer {
   // atob disponível globalmente no Hermes (RN 0.71+).
   const binary = globalThis.atob(b64);
