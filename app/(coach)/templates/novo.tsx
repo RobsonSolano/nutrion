@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { KeyboardAvoidingView, Pressable, Text, View } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useRouter, type Href } from 'expo-router';
 import { X } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import RoutineEditor from '@/components/routine/RoutineEditor';
@@ -7,10 +8,12 @@ import { useCreateTemplate } from '@/hooks/useTemplates';
 import { Screen } from '@/components/ui';
 import { colors } from '@/lib/theme';
 import type { TemplateExerciseInsert } from '@/types/database';
+import CreateRoutineChoiceModal from '@/components/coach/CreateRoutineChoiceModal';
 
 export default function NovoTemplateScreen() {
   const router = useRouter();
   const create = useCreateTemplate();
+  const [choiceOpen, setChoiceOpen] = useState(true);
 
   return (
     <>
@@ -54,6 +57,20 @@ export default function NovoTemplateScreen() {
           />
         </KeyboardAvoidingView>
       </Screen>
+
+      <CreateRoutineChoiceModal
+        visible={choiceOpen}
+        destination="template"
+        onClose={() => {
+          setChoiceOpen(false);
+          // Se o usuário só fechou (sem escolher), assume 'criar do zero'.
+        }}
+        onCreateFromScratch={() => setChoiceOpen(false)}
+        onImportViaAi={() => {
+          setChoiceOpen(false);
+          router.replace('/(coach)/import-workout?destination=template' as Href);
+        }}
+      />
     </>
   );
 }

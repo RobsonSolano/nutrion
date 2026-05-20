@@ -586,6 +586,21 @@ function PlanoTab({
         Os treinos do template são copiados pro aluno como rotinas novas (não
         arquiva as atuais — soma).
       </Text>
+
+      <Button
+        label="Importar treino via IA (foto/texto)"
+        onPress={() =>
+          router.push(
+            `/(coach)/import-workout?destination=aluno&student_id=${studentId}` as Href,
+          )
+        }
+        variant="secondary"
+        icon={<Sparkles size={16} color={colors.text} />}
+      />
+      <Text className="text-text-muted text-[11px] text-center px-2 leading-relaxed">
+        Envie fotos da ficha ou cole a descrição. A IA monta o treino e você
+        revisa antes de salvar.
+      </Text>
     </ScrollView>
   );
 }
