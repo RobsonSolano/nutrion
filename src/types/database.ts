@@ -132,6 +132,7 @@ export type Exercise = {
   equipment: string | null;
   is_compound: boolean | null;
   image_urls: string[] | null;
+  video_url: string | null;
   modality: Modality;
 };
 
@@ -308,4 +309,172 @@ export type ProgressEntry = {
   created_at: string;
   updated_at: string;
 };
+
+export type AssessmentProtocol = 'pollock_3' | 'pollock_7' | 'none';
+
+export type PhysicalAssessment = {
+  id: string;
+  student_id: string;
+  coach_id: string;
+  assessed_at: string; // YYYY-MM-DD
+
+  protocol: AssessmentProtocol;
+
+  weight_kg: number | null;
+  height_cm: number | null;
+
+  perim_arm_r_cm: number | null;
+  perim_arm_l_cm: number | null;
+  perim_forearm_r_cm: number | null;
+  perim_forearm_l_cm: number | null;
+  perim_chest_cm: number | null;
+  perim_waist_cm: number | null;
+  perim_hip_cm: number | null;
+  perim_thigh_r_cm: number | null;
+  perim_thigh_l_cm: number | null;
+  perim_calf_r_cm: number | null;
+  perim_calf_l_cm: number | null;
+
+  skin_chest_mm: number | null;
+  skin_midaxillary_mm: number | null;
+  skin_triceps_mm: number | null;
+  skin_subscapular_mm: number | null;
+  skin_abdominal_mm: number | null;
+  skin_suprailiac_mm: number | null;
+  skin_thigh_mm: number | null;
+
+  body_density: number | null;
+  body_fat_pct: number | null;
+  fat_mass_kg: number | null;
+  lean_mass_kg: number | null;
+  bmi: number | null;
+
+  posture_notes: string | null;
+  posture_photos: string[];
+  notes: string | null;
+
+  created_at: string;
+  updated_at: string;
+};
+
+export type PhysicalAssessmentInput = Omit<
+  PhysicalAssessment,
+  | 'id'
+  | 'coach_id'
+  | 'body_density'
+  | 'body_fat_pct'
+  | 'fat_mass_kg'
+  | 'lean_mass_kg'
+  | 'bmi'
+  | 'created_at'
+  | 'updated_at'
+>;
+
+export type PhysicalAssessmentPatch = Partial<
+  Omit<
+    PhysicalAssessmentInput,
+    'student_id'
+  >
+>;
+
+export type PushType =
+  | 'inactivity_reminder'
+  | 'streak_celebration'
+  | 'daily_workout_reminder'
+  | 'water_reminder'
+  | 'weekly_summary'
+  | 'coach_adherence_alert'
+  | 'coach_plan_update'
+  | 'goal_achieved';
+
+export type PushPreference = {
+  user_id: string;
+  type: PushType;
+  enabled: boolean;
+  preferred_time: string | null;
+  updated_at: string;
+};
+
+export type PushHistoryStatus = 'sent' | 'failed' | 'skipped';
+export type PushHistorySkipReason =
+  | 'no_token'
+  | 'opted_out'
+  | 'cooldown'
+  | 'rate_limit'
+  | 'quiet_hours'
+  | 'ai_failed'
+  | 'expo_failed';
+
+export type PushHistoryEntry = {
+  id: string;
+  user_id: string;
+  type: PushType;
+  title: string;
+  body: string;
+  data: Record<string, unknown> | null;
+  ai_generated: boolean;
+  ai_tokens: number | null;
+  expo_response: Record<string, unknown> | null;
+  status: PushHistoryStatus;
+  skip_reason: PushHistorySkipReason | null;
+  sent_at: string;
+};
+
+export type InjuryTag =
+  | 'ombro_d' | 'ombro_e'
+  | 'cotovelo_d' | 'cotovelo_e'
+  | 'punho_d' | 'punho_e'
+  | 'lombar' | 'cervical'
+  | 'quadril_d' | 'quadril_e'
+  | 'joelho_d' | 'joelho_e'
+  | 'tornozelo_d' | 'tornozelo_e'
+  | 'outros';
+
+export type ChronicConditionTag =
+  | 'hipertensao' | 'diabetes_t1' | 'diabetes_t2'
+  | 'hipotireoidismo' | 'hipertireoidismo'
+  | 'asma' | 'cardiopatia' | 'dislipidemia'
+  | 'artrose' | 'artrite' | 'fibromialgia' | 'epilepsia'
+  | 'depressao' | 'ansiedade'
+  | 'outros';
+
+export type DietaryRestrictionTag =
+  | 'vegetariano' | 'vegano' | 'ovolactovegetariano' | 'pescetariano'
+  | 'sem_gluten' | 'sem_lactose' | 'low_carb'
+  | 'kosher' | 'halal' | 'jejum_intermitente'
+  | 'outros';
+
+export type Surgery = {
+  date: string; // 'YYYY' ou 'YYYY-MM'
+  type: string;
+  notes?: string;
+};
+
+export type StudentAnamnese = {
+  user_id: string;
+  injuries: InjuryTag[];
+  injuries_notes: string | null;
+  surgeries: Surgery[];
+  chronic_conditions: ChronicConditionTag[];
+  chronic_conditions_notes: string | null;
+  medications: string | null;
+  allergy_food: string | null;
+  allergy_medication: string | null;
+  allergy_environmental: string | null;
+  dietary_restrictions: DietaryRestrictionTag[];
+  dietary_notes: string | null;
+  emergency_contact_name: string | null;
+  emergency_contact_phone: string | null;
+  emergency_contact_relation: string | null;
+  sport_history: string | null;
+  goal_notes: string | null;
+  has_medical_clearance: boolean | null;
+  medical_clearance_notes: string | null;
+  filled_at: string | null;
+  updated_at: string;
+};
+
+export type StudentAnamnesePatch = Partial<
+  Omit<StudentAnamnese, 'user_id' | 'updated_at'>
+>;
 

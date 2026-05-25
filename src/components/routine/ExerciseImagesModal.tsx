@@ -10,9 +10,10 @@ import {
   Text,
   View,
 } from 'react-native';
-import { X, ChevronLeft, ChevronRight, Eye } from 'lucide-react-native';
+import { X, ChevronLeft, ChevronRight, Eye, CirclePlay } from 'lucide-react-native';
 import { Button, Card } from '@/components/ui';
 import { colors } from '@/lib/theme';
+import { openYouTubeSearchForExercise } from '@/lib/youtube';
 
 type Props = {
   visible: boolean;
@@ -225,7 +226,13 @@ export default function ExerciseImagesModal({
             </View>
           </View>
 
-          <View className="px-5 mt-3">
+          <View className="px-5 mt-3 gap-2">
+            <Button
+              label="Buscar vídeo no YouTube"
+              onPress={() => openYouTubeSearchForExercise(exerciseName)}
+              variant="secondary"
+              icon={<CirclePlay size={16} color={colors.text} />}
+            />
             <Button label="Voltar" onPress={onClose} variant="ghost" />
           </View>
         </ScrollView>

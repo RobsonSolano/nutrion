@@ -87,10 +87,14 @@ function parseError(err: unknown): { title: string; message: string } {
     };
   }
   if (lower.includes('rate_limit') || lower.match(/^429\b/)) {
+    // Extrai segundos do detail (ex: "Aguarda ~45s e tenta de novo")
+    const secondsMatch = raw.match(/~?(\d+)\s*s\b/);
+    const seconds = secondsMatch ? Number(secondsMatch[1]) : null;
     return {
       title: 'Muitas requisições',
-      message:
-        'Aguarde alguns segundos e tenta de novo. Se continuar, tente mais tarde.',
+      message: seconds
+        ? `Aguarde ~${seconds}s e tenta de novo. Se continuar, tente mais tarde.`
+        : 'Aguarde alguns segundos e tenta de novo. Se continuar, tente mais tarde.',
     };
   }
   if (lower.includes('daily_limit') || lower.includes('limit reached')) {

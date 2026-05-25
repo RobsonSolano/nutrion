@@ -20,6 +20,7 @@ import {
   Bell,
   BellOff,
   TrendingUp,
+  HeartPulse,
 } from 'lucide-react-native';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
@@ -32,6 +33,8 @@ import { useDailyOnboardingUsage } from '@/hooks/useAiUsage';
 import { useOnboardingStore } from '@/stores/useOnboardingStore';
 import { Button, Card, ConfirmModal, Screen } from '@/components/ui';
 import CoachCard from '@/components/CoachCard';
+import StudentAssessmentCard from '@/components/StudentAssessmentCard';
+import { Avatar } from '@/components/ui';
 import Disclaimer from '@/components/Disclaimer';
 import { colors } from '@/lib/theme';
 import { bmi, bmiCategory } from '@/lib/biometrics';
@@ -94,8 +97,6 @@ export default function PerfilScreen() {
     user?.email ??
     'Atleta NutriOn';
 
-  const initial = displayName.charAt(0).toUpperCase();
-
   const formatKg = (v: number | null | undefined) =>
     v == null ? '—' : `${v.toLocaleString('pt-BR')} kg`;
   const formatCm = (v: number | null | undefined) =>
@@ -114,16 +115,21 @@ export default function PerfilScreen() {
       <ScrollView contentContainerStyle={{ padding: 20, gap: 16, paddingBottom: 140 }}>
         <View className="items-center mt-4 mb-2">
           <View
-            className="h-24 w-24 rounded-full bg-surface-raised border border-border-strong items-center justify-center"
             style={{
               shadowColor: colors.violet,
               shadowOffset: { width: 0, height: 0 },
               shadowOpacity: 0.4,
               shadowRadius: 18,
               elevation: 8,
+              borderRadius: 48,
             }}
           >
-            <Text className="text-accent text-3xl font-bold">{initial}</Text>
+            <Avatar
+              url={profile?.avatar_url}
+              name={displayName}
+              size={96}
+              accent="green"
+            />
           </View>
           <Text className="text-text text-xl font-bold mt-4">{displayName}</Text>
           {user?.email && (
@@ -261,6 +267,24 @@ export default function PerfilScreen() {
                 icon={<Download size={14} color={colors.textDim} />}
               />
             </View>
+            <View style={{ width: '48.5%' }}>
+              <Button
+                label="Notificações"
+                onPress={() => router.push('/notificacoes' as Href)}
+                variant="ghost"
+                size="md"
+                icon={<Bell size={14} color={colors.textDim} />}
+              />
+            </View>
+            <View style={{ width: '48.5%' }}>
+              <Button
+                label="Anamnese clínica"
+                onPress={() => router.push('/anamnese' as Href)}
+                variant="ghost"
+                size="md"
+                icon={<HeartPulse size={14} color={colors.violetSoft} />}
+              />
+            </View>
           </View>
         </Card>
 
@@ -382,6 +406,10 @@ export default function PerfilScreen() {
 
         {isStudent && profile?.coach_id && (
           <CoachCard coachId={profile.coach_id} />
+        )}
+
+        {isStudent && profile?.id && (
+          <StudentAssessmentCard studentId={profile.id} />
         )}
 
         <Disclaimer />

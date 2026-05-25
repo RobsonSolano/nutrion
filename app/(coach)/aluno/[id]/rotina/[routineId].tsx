@@ -7,15 +7,18 @@ import {
   View,
 } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, BookmarkPlus } from 'lucide-react-native';
+import { AlertTriangle, ArrowLeft, BookmarkPlus, Trash2 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import RoutineEditor from '@/components/routine/RoutineEditor';
 import SaveAsTemplateModal from '@/components/coach/SaveAsTemplateModal';
 import { useRoutineDetail } from '@/hooks/useRoutines';
 import { useCreateTemplate } from '@/hooks/useTemplates';
-import { useUpdateStudentRoutine } from '@/hooks/useStudents';
+import {
+  useDeleteStudentRoutine,
+  useUpdateStudentRoutine,
+} from '@/hooks/useStudents';
 import { useAlert } from '@/components/GlobalAlertProvider';
-import { Screen } from '@/components/ui';
+import { ConfirmModal, Screen } from '@/components/ui';
 import { colors } from '@/lib/theme';
 
 export default function CoachEditarRotinaAluno() {
@@ -26,9 +29,25 @@ export default function CoachEditarRotinaAluno() {
   }>();
   const detailQ = useRoutineDetail(routineId ?? null);
   const update = useUpdateStudentRoutine();
+  const deleteM = useDeleteStudentRoutine();
   const createTemplate = useCreateTemplate();
   const alert = useAlert();
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+
+  async function handleDelete() {
+    if (!id || !routineId) return;
+    try {
+      await deleteM.mutateAsync({ studentId: id, routineId });
+      void Haptics.notificationAsync(
+        Haptics.NotificationFeedbackType.Success,
+      );
+      setConfirmDeleteOpen(false);
+      router.back();
+    } catch (err) {
+      alert.showError(err);
+    }
+  }
 
   if (!id || !routineId) return null;
 
@@ -90,13 +109,22 @@ export default function CoachEditarRotinaAluno() {
               Editar treino do aluno
             </Text>
             {detailQ.data ? (
-              <Pressable
-                onPress={() => setSaveTemplateOpen(true)}
-                hitSlop={12}
-                className="h-10 w-10 rounded-2xl bg-violet/10 border border-violet/40 items-center justify-center active:opacity-70"
-              >
-                <BookmarkPlus size={18} color={colors.violetSoft} />
-              </Pressable>
+              <View className="flex-row gap-2">
+                <Pressable
+                  onPress={() => setSaveTemplateOpen(true)}
+                  hitSlop={10}
+                  className="h-10 w-10 rounded-2xl bg-violet/10 border border-violet/40 items-center justify-center active:opacity-70"
+                >
+                  <BookmarkPlus size={18} color={colors.violetSoft} />
+                </Pressable>
+                <Pressable
+                  onPress={() => setConfirmDeleteOpen(true)}
+                  hitSlop={10}
+                  className="h-10 w-10 rounded-2xl bg-surface-raised border border-border items-center justify-center active:opacity-70"
+                >
+                  <Trash2 size={16} color={colors.danger} />
+                </Pressable>
+              </View>
             ) : (
               <View style={{ width: 40 }} />
             )}
@@ -159,6 +187,31 @@ export default function CoachEditarRotinaAluno() {
         defaultName={detailQ.data?.name ?? ''}
         loading={createTemplate.isPending}
         onConfirm={handleSaveAsTemplate}
+      />
+
+      <ConfirmModal
+        visible={confirmDeleteOpen}
+        onClose={() => setConfirmDeleteOpen(false)}
+        title={`Excluir "${detailQ.data?.name ?? 'esse treino'}"?`}
+        message={
+          'O treino será removido do plano do aluno. As execuções já registradas ficam preservadas no histórico. Essa ação não pode ser desfeita.'
+        }
+        icon={<AlertTriangle size={26} color={colors.danger} />}
+        dismissable={!deleteM.isPending}
+        actions={[
+          {
+            label: 'Excluir treino',
+            variant: 'danger',
+            onPress: handleDelete,
+            loading: deleteM.isPending,
+          },
+          {
+            label: 'Cancelar',
+            variant: 'ghost',
+            onPress: () => setConfirmDeleteOpen(false),
+            disabled: deleteM.isPending,
+          },
+        ]}
       />
     </>
   );

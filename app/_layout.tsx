@@ -8,6 +8,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useEffect, useMemo } from 'react';
 import { useAuthBootstrap } from '@/hooks/useAuth';
 import { useNotificationRouter } from '@/hooks/useNotificationRouter';
+import { useOtaUpdate } from '@/hooks/useOtaUpdate';
 import { useSessionStore } from '@/stores/useSessionStore';
 import { initSentry, Sentry, setSentryUser } from '@/lib/sentry';
 import {
@@ -15,6 +16,9 @@ import {
   ensureAndroidChannel,
 } from '@/services/pushNotifications';
 import { GlobalAlertProvider } from '@/components/GlobalAlertProvider';
+import { ConfirmModal } from '@/components/ui';
+import { Sparkles } from 'lucide-react-native';
+import { colors } from '@/lib/theme';
 
 initSentry();
 configurePushHandler();
@@ -23,6 +27,7 @@ function Providers({ children }: { children: React.ReactNode }) {
   useAuthBootstrap();
   useNotificationRouter();
   const userId = useSessionStore((s) => s.user?.id ?? null);
+  const ota = useOtaUpdate();
 
   useEffect(() => {
     setSentryUser(userId);
@@ -33,7 +38,33 @@ function Providers({ children }: { children: React.ReactNode }) {
     void ensureAndroidChannel();
   }, []);
 
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      <ConfirmModal
+        visible={ota.isReady}
+        onClose={ota.dismiss}
+        title="Atualização disponível"
+        message="Uma nova versão do app foi baixada. Aplicar agora reinicia o NutriOn em alguns segundos."
+        icon={<Sparkles size={26} color={colors.accent} />}
+        dismissable={!ota.isApplying}
+        actions={[
+          {
+            label: 'Atualizar agora',
+            variant: 'primary',
+            onPress: ota.apply,
+            loading: ota.isApplying,
+          },
+          {
+            label: 'Mais tarde',
+            variant: 'ghost',
+            onPress: ota.dismiss,
+            disabled: ota.isApplying,
+          },
+        ]}
+      />
+    </>
+  );
 }
 
 function RootLayout() {

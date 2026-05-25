@@ -1,0 +1,97 @@
+import { useEffect, useState } from 'react';
+import * as Updates from 'expo-updates';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const DISMISS_KEY = 'ota:update-dismissed-at';
+const DISMISS_WINDOW_MS = 24 * 60 * 60 * 1000; // 24h
+
+type Phase =
+  | 'idle'
+  | 'checking'
+  | 'downloading'
+  | 'ready'
+  | 'applying'
+  | 'unavailable'
+  | 'error';
+
+/**
+ * Verifica updates OTA (expo-updates) no mount.
+ * Se há update disponível, baixa em background e expõe `isReady=true`
+ * para o consumidor renderizar um aviso. `apply()` recarrega o app.
+ *
+ * Anti-spam: se o usuário clicou "Mais tarde", não pergunta de novo
+ * por 24h. A próxima checagem reabre o fluxo natural.
+ *
+ * Em Expo Go / dev (`Updates.isEnabled === false`) o hook é no-op.
+ */
+export function useOtaUpdate() {
+  const [phase, setPhase] = useState<Phase>('idle');
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!Updates.isEnabled) return;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const dismissedAt = await AsyncStorage.getItem(DISMISS_KEY);
+        if (
+          dismissedAt &&
+          Date.now() - Number(dismissedAt) < DISMISS_WINDOW_MS
+        ) {
+          return;
+        }
+
+        setPhase('checking');
+        const check = await Updates.checkForUpdateAsync();
+        if (cancelled) return;
+        if (!check.isAvailable) {
+          setPhase('unavailable');
+          return;
+        }
+
+        setPhase('downloading');
+        await Updates.fetchUpdateAsync();
+        if (cancelled) return;
+        setPhase('ready');
+      } catch (err) {
+        if (cancelled) return;
+        setPhase('error');
+        setError(
+          err instanceof Error
+            ? err.message
+            : 'Erro ao verificar atualização',
+        );
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function apply() {
+    setPhase('applying');
+    try {
+      await Updates.reloadAsync();
+    } catch (err) {
+      setPhase('error');
+      setError(
+        err instanceof Error ? err.message : 'Erro ao aplicar atualização',
+      );
+    }
+  }
+
+  async function dismiss() {
+    await AsyncStorage.setItem(DISMISS_KEY, String(Date.now()));
+    setPhase('idle');
+  }
+
+  return {
+    isReady: phase === 'ready',
+    isApplying: phase === 'applying',
+    error,
+    apply,
+    dismiss,
+  };
+}

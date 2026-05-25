@@ -45,7 +45,7 @@ export default function OnboardingHabitos() {
           <View className="flex-row items-center gap-2 mb-2">
             <Droplets size={14} color={colors.info} />
             <Text className="text-text-dim text-xs uppercase tracking-widest">
-              Água por dia (ml)
+              Quanto você consome de água por dia?
             </Text>
           </View>
           <Input
@@ -57,7 +57,8 @@ export default function OnboardingHabitos() {
             onSubmitEditing={() => allergiesRef.current?.focus()}
           />
           <Text className="text-text-muted text-[11px] mt-1">
-            A IA ajusta conforme seu peso e treinos.
+            Informe em ml o que você bebe hoje (ex: 2000 = 2L). A IA ajusta
+            conforme seu peso e treinos.
           </Text>
         </View>
 

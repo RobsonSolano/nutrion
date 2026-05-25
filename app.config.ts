@@ -41,7 +41,7 @@ const config: ExpoConfig = {
   name: 'NutriOn',
   slug: 'nutrion',
   scheme: 'nutrion',
-  version: '1.0.0',
+  version: '1.3.0',
   orientation: 'portrait',
   icon: './assets/icon.png',
   userInterfaceStyle: 'dark',
@@ -65,6 +65,17 @@ const config: ExpoConfig = {
   plugins,
   experiments: {
     typedRoutes: true,
+  },
+  // OTA updates via EAS Update.
+  // runtimeVersion=appVersion: updates só atingem builds da mesma version.
+  // Quando subir version (ex: 1.0.0 -> 1.1.0) é porque mudou algo nativo,
+  // o APK velho fica preso no último JS compatível dele.
+  runtimeVersion: {
+    policy: 'appVersion',
+  },
+  updates: {
+    url: 'https://u.expo.dev/6aed6bd3-078e-4424-b7e1-5d4afbd9d624',
+    fallbackToCacheTimeout: 0,
   },
   extra: {
     eas: {

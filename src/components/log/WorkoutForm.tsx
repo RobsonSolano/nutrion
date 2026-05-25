@@ -48,8 +48,12 @@ export default function WorkoutForm() {
   const [selectedRoutine, setSelectedRoutine] = useState<WorkoutRoutine | null>(
     null,
   );
-  const [durationMin, setDurationMin] = useState('');
+  const [durationHours, setDurationHours] = useState('');
+  const [durationMinutes, setDurationMinutes] = useState('');
   const [notes, setNotes] = useState('');
+
+  const totalDurationMin =
+    (Number(durationHours) || 0) * 60 + (Number(durationMinutes) || 0);
 
   const routines = routinesQ.data ?? [];
   const groupsById = new Map<string, ExerciseGroup>(
@@ -69,12 +73,13 @@ export default function WorkoutForm() {
       await createSession.mutateAsync({
         routineId: selectedRoutine.id,
         routineName: selectedRoutine.name,
-        durationMin: durationMin ? Number(durationMin) : null,
+        durationMin: totalDurationMin > 0 ? totalDurationMin : null,
         notes: notes.trim() || null,
       });
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setSelectedRoutine(null);
-      setDurationMin('');
+      setDurationHours('');
+      setDurationMinutes('');
       setNotes('');
     } catch (err) {
       Alert.alert(
@@ -164,7 +169,7 @@ export default function WorkoutForm() {
                   </Text>
                   {s.duration_min != null && (
                     <Text className="text-text-muted text-[11px] mt-0.5">
-                      {s.duration_min} min
+                      {formatDuration(s.duration_min)}
                     </Text>
                   )}
                 </View>
@@ -245,14 +250,38 @@ export default function WorkoutForm() {
             </Text>
           </View>
           <View className="gap-3">
-            <Input
-              label="Duração (minutos)"
-              value={durationMin}
-              onChangeText={setDurationMin}
-              placeholder="45"
-              keyboardType="number-pad"
-              leftIcon={<Clock size={16} color={colors.textMuted} />}
-            />
+            <View>
+              <View className="flex-row items-center gap-2 mb-2">
+                <Clock size={14} color={colors.textMuted} />
+                <Text className="text-text-dim text-xs uppercase tracking-widest">
+                  Duração
+                </Text>
+              </View>
+              <View className="flex-row gap-3">
+                <View className="flex-1">
+                  <Input
+                    value={durationHours}
+                    onChangeText={(v) =>
+                      setDurationHours(v.replace(/\D/g, '').slice(0, 2))
+                    }
+                    placeholder="0"
+                    keyboardType="number-pad"
+                    hint="Horas"
+                  />
+                </View>
+                <View className="flex-1">
+                  <Input
+                    value={durationMinutes}
+                    onChangeText={(v) =>
+                      setDurationMinutes(v.replace(/\D/g, '').slice(0, 3))
+                    }
+                    placeholder="45"
+                    keyboardType="number-pad"
+                    hint="Minutos"
+                  />
+                </View>
+              </View>
+            </View>
             <Input
               label="Notas"
               value={notes}
@@ -273,4 +302,11 @@ export default function WorkoutForm() {
       />
     </ScrollView>
   );
+}
+
+function formatDuration(totalMin: number): string {
+  if (totalMin < 60) return `${totalMin} min`;
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  return m === 0 ? `${h}h` : `${h}h ${m}min`;
 }
