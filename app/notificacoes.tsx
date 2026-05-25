@@ -40,7 +40,27 @@ const ITEMS: PushTypeMeta[] = [
   {
     type: 'water_reminder',
     label: 'Lembrete de água',
-    description: 'Aviso à tarde se você está longe da meta diária.',
+    description: 'Aviso no fim do dia se a meta de água ainda está longe.',
+    audience: 'todos',
+  },
+  {
+    type: 'protein_reminder',
+    label: 'Lembrete de proteína',
+    description: 'Aviso no fim do dia se a meta de proteína ainda está longe.',
+    audience: 'todos',
+  },
+  {
+    type: 'daily_workout_check',
+    label: 'Cobrança de treino',
+    description:
+      'À noite, em dias que você costuma treinar, lembra se ainda não treinou.',
+    audience: 'todos',
+  },
+  {
+    type: 'streak_warning',
+    label: 'Aviso de sequência',
+    description:
+      'Se você está em uma sequência e ainda não registrou hoje, recebe um lembrete à noite.',
     audience: 'todos',
   },
   {

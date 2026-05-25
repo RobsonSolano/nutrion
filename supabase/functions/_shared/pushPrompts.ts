@@ -9,7 +9,10 @@ export type PushType =
   | 'weekly_summary'
   | 'coach_adherence_alert'
   | 'coach_plan_update'
-  | 'goal_achieved';
+  | 'goal_achieved'
+  | 'protein_reminder'
+  | 'daily_workout_check'
+  | 'streak_warning';
 
 export const PERSONA_SYSTEM = `Você é a voz do NutriOn — um app de nutrição e treino com pegada brasileira, direta, sem fofura. Fala "você", não "tu". Não usa emoji. Não usa frases clichês de coach motivacional ("acredite em você", "vamos juntos"). É um amigo que entende do assunto: curto, específico, e que conhece a pessoa.
 
@@ -39,6 +42,12 @@ export function aiUsageFeature(type: PushType): string {
     case 'water_reminder':
       // Water reminder não usa IA (template fixo).
       return 'push_workout';
+    case 'protein_reminder':
+      return 'push_protein';
+    case 'daily_workout_check':
+      return 'push_workout_check';
+    case 'streak_warning':
+      return 'push_streak_warning';
   }
 }
 
@@ -121,6 +130,35 @@ Gere um push celebrando o marco. Forte, curto, específico. Cita o número (kg, 
     case 'water_reminder':
       // Não usa IA — template fixo. Caller deve usar staticTemplate.
       return '';
+
+    case 'protein_reminder':
+      return `Contexto:
+- Nome: ${ctx.full_name ?? 'aluno'}
+- Proteína consumida hoje: ${ctx.protein_consumed_g ?? 0}g
+- Meta diária: ${ctx.protein_goal_g ?? 0}g
+- Gap (faltam): ${ctx.gap_g ?? 0}g
+- Refeições registradas hoje: ${ctx.meals_logged_today ?? 0}
+- Objetivo: ${ctx.goal_type ?? 'manutenção'}
+
+Gere um push avisando do gap de proteína. Cita o número em gramas. Sugere ação prática (shake, ovos, atum, frango). Não culpa nem moraliza. Se o gap é pequeno (<20g), tom leve; se é grande (>50g), tom mais direto.`;
+
+    case 'daily_workout_check':
+      return `Contexto:
+- Nome: ${ctx.full_name ?? 'aluno'}
+- Hoje é: ${ctx.weekday_pt ?? 'hoje'} (${ctx.date_brt ?? ''})
+- Treinos esta semana: ${ctx.weekly_workouts_done ?? 0}
+- Padrão (últimas 4 semanas): você costuma treinar em ${ctx.typical_weekdays_pt ?? 'alguns dias'}
+- Objetivo: ${ctx.goal_type ?? 'manutenção'}
+
+Gere um push perguntando se hoje é descanso ou esquecimento. Reconhece que pode ser descanso planejado. Curto e leve. Não cobra.`;
+
+    case 'streak_warning':
+      return `Contexto:
+- Nome: ${ctx.full_name ?? 'aluno'}
+- Sequência atual (até ontem): ${ctx.current_streak ?? 0} dias
+- Objetivo: ${ctx.goal_type ?? 'manutenção'}
+
+Gere um push avisando que a sequência pode quebrar se não houver registro hoje. Cita o número exato. Tom de alerta de amigo — sem desespero. Sugere ação rápida (água, refeição ou treino).`;
   }
 }
 
@@ -132,8 +170,8 @@ export function staticTemplate(
   switch (type) {
     case 'water_reminder':
       return {
-        title: 'Hora da água',
-        body: `Você bebeu ${ctx.water_now_ml ?? 0}ml hoje. Meta: ${ctx.water_goal_ml ?? 2500}ml.`,
+        title: 'Faltando água',
+        body: `Você bebeu ${ctx.water_now_ml ?? 0}ml de ${ctx.water_goal_ml ?? 2500}ml hoje. Ainda dá tempo.`,
       };
     case 'inactivity_reminder':
       return {
@@ -169,6 +207,21 @@ export function staticTemplate(
       return {
         title: 'Marco atingido',
         body: 'Você bateu mais um marco. Bom trabalho.',
+      };
+    case 'protein_reminder':
+      return {
+        title: 'Faltando proteína',
+        body: `Você fez ${ctx.protein_consumed_g ?? 0}g de ${ctx.protein_goal_g ?? 0}g hoje. Ainda dá tempo.`,
+      };
+    case 'daily_workout_check':
+      return {
+        title: 'Não treinou hoje?',
+        body: 'Se hoje é descanso, ignora. Senão, ainda dá tempo de mexer.',
+      };
+    case 'streak_warning':
+      return {
+        title: `${ctx.current_streak ?? 0} dias — não quebre`,
+        body: 'Falta um registro hoje pra manter a sequência. Vai um copo de água?',
       };
   }
 }
