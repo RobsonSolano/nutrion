@@ -154,6 +154,7 @@ export type WorkoutRoutine = {
   is_archived: boolean;
   created_by_coach: string | null;
   source_template_id: string | null;
+  sort_order: number;
   created_at: string;
   updated_at: string;
 };
