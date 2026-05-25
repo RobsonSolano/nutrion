@@ -7,6 +7,7 @@ import {
   insertSession,
   listRoutines,
   listTodaySessions,
+  reorderRoutines,
   replaceRoutineExercises,
   updateRoutine,
 } from '@/services/routines';
@@ -17,6 +18,7 @@ import type {
   RoutineExerciseInsert,
   WorkoutRoutine,
 } from '@/types/database';
+import type { StudentDetail } from '@/services/students';
 
 export function useRoutines() {
   const { user } = useAuth();
@@ -97,6 +99,80 @@ export function useDeleteRoutine() {
     onSuccess: () => {
       if (!user?.id) return;
       void qc.invalidateQueries({ queryKey: queryKeys.routines(user.id) });
+    },
+  });
+}
+
+// Reordena rotinas via drag-and-drop. Usa optimistic update tanto na
+// query `routines(userId)` (vista do dono) quanto em `student_detail`
+// (vista do coach), porque a tela do coach é a única que dispara hoje.
+export function useReorderRoutines(targetUserId: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (orderedIds: string[]) => {
+      if (!targetUserId) throw new Error('targetUserId ausente');
+      await reorderRoutines(targetUserId, orderedIds);
+    },
+    onMutate: async (orderedIds) => {
+      if (!targetUserId) return;
+      const routinesKey = queryKeys.routines(targetUserId);
+      const studentDetailKey = ['student_detail', targetUserId] as const;
+
+      await Promise.all([
+        qc.cancelQueries({ queryKey: routinesKey }),
+        qc.cancelQueries({ queryKey: studentDetailKey }),
+      ]);
+
+      const prevRoutines = qc.getQueryData(routinesKey);
+      const prevStudentDetail =
+        qc.getQueryData<StudentDetail>(studentDetailKey);
+
+      // Reorder helper: cria array novo na ordem dos IDs e atualiza
+      // sort_order pra refletir a nova posição (1-based, igual à RPC).
+      const reorder = <T extends { id: string; sort_order: number }>(
+        items: T[],
+      ): T[] => {
+        const byId = new Map(items.map((it) => [it.id, it]));
+        return orderedIds
+          .map((id, i) => {
+            const it = byId.get(id);
+            return it ? { ...it, sort_order: i + 1 } : null;
+          })
+          .filter((x): x is T => x !== null);
+      };
+
+      if (Array.isArray(prevRoutines)) {
+        qc.setQueryData(routinesKey, reorder(prevRoutines));
+      }
+      if (prevStudentDetail) {
+        qc.setQueryData(studentDetailKey, {
+          ...prevStudentDetail,
+          routines: reorder(prevStudentDetail.routines),
+        });
+      }
+
+      return { prevRoutines, prevStudentDetail };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (!targetUserId || !ctx) return;
+      if (ctx.prevRoutines !== undefined) {
+        qc.setQueryData(queryKeys.routines(targetUserId), ctx.prevRoutines);
+      }
+      if (ctx.prevStudentDetail !== undefined) {
+        qc.setQueryData(
+          ['student_detail', targetUserId],
+          ctx.prevStudentDetail,
+        );
+      }
+    },
+    onSettled: () => {
+      if (!targetUserId) return;
+      void qc.invalidateQueries({
+        queryKey: queryKeys.routines(targetUserId),
+      });
+      void qc.invalidateQueries({
+        queryKey: ['student_detail', targetUserId],
+      });
     },
   });
 }

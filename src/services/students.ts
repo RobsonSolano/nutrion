@@ -32,6 +32,7 @@ export type StudentRoutineLite = {
   description: string | null;
   exercises_count: number;
   created_at: string;
+  sort_order: number;
 };
 
 export type StudentDetail = {
@@ -51,10 +52,11 @@ export async function getStudentDetail(
 
   const { data: routines, error: rErr } = await supabase
     .from('workout_routines')
-    .select('id, name, modality, description, created_at, exercises:workout_routine_exercises(count)')
+    .select('id, name, modality, description, created_at, sort_order, exercises:workout_routine_exercises(count)')
     .eq('user_id', studentId)
     .eq('is_archived', false)
-    .order('created_at', { ascending: false });
+    .order('sort_order', { ascending: true })
+    .order('created_at', { ascending: true });
   if (rErr) throw rErr;
 
   const routinesLite = (routines ?? []).map((r) => {
@@ -64,6 +66,7 @@ export async function getStudentDetail(
       modality: string;
       description: string | null;
       created_at: string;
+      sort_order: number;
       exercises: { count: number }[] | null;
     };
     return {
