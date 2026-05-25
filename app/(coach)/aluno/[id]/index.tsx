@@ -49,6 +49,7 @@ import { useCoachNotes } from '@/hooks/useCoachNotes';
 import { useApplyTemplates } from '@/hooks/useTemplates';
 import StudentAnamneseCard from '@/components/coach/StudentAnamneseCard';
 import TemplatePicker from '@/components/coach/TemplatePicker';
+import { RoutinesReorderList } from '@/components/coach/RoutinesReorderList';
 import { bmi, bmiCategory } from '@/lib/biometrics';
 import type { OnboardingPlan } from '@/services/onboarding';
 import type { DayActivity, StudentTracking } from '@/services/studentTracking';
@@ -518,7 +519,7 @@ function PlanoTab({
       )}
 
       <Card padding="md">
-        <View className="flex-row items-center gap-2 mb-3">
+        <View className="flex-row items-center gap-2 mb-1">
           <Dumbbell size={14} color={colors.accent} />
           <Text className="text-text-dim text-[11px] uppercase tracking-widest">
             Treinos prescritos ({routines.length})
@@ -529,39 +530,20 @@ function PlanoTab({
             Sem rotinas ativas. Gere um plano novo abaixo.
           </Text>
         ) : (
-          <View className="gap-2">
-            {routines.map((r) => (
-              <Pressable
-                key={r.id}
-                onPress={() =>
-                  router.push(
-                    `/(coach)/aluno/${studentId}/rotina/${r.id}` as Href,
-                  )
-                }
-                className="flex-row items-center gap-2 rounded-2xl border border-border bg-surface-muted px-3 py-2.5 active:opacity-70"
-              >
-                <View className="flex-1">
-                  <Text
-                    className="text-text text-sm font-semibold"
-                    numberOfLines={1}
-                  >
-                    {r.name}
-                  </Text>
-                  <Text className="text-text-muted text-[11px] mt-0.5">
-                    {r.exercises_count} exercícios
-                    {r.description ? ` · ${r.description}` : ''}
-                  </Text>
-                </View>
-                <View className="flex-row items-center gap-1 rounded-full border border-violet/40 bg-violet/10 px-2 py-1">
-                  <Pencil size={10} color={colors.violetSoft} />
-                  <Text className="text-violet-soft text-[10px] font-semibold">
-                    Editar
-                  </Text>
-                </View>
-                <ChevronRight size={14} color={colors.textDim} />
-              </Pressable>
-            ))}
-          </View>
+          <>
+            <Text className="text-text-muted text-[10px] mb-2">
+              Segure no ícone à esquerda pra arrastar e reordenar.
+            </Text>
+            <RoutinesReorderList
+              studentId={studentId}
+              routines={routines}
+              onItemPress={(routineId) =>
+                router.push(
+                  `/(coach)/aluno/${studentId}/rotina/${routineId}` as Href,
+                )
+              }
+            />
+          </>
         )}
       </Card>
 
