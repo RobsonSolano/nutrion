@@ -74,17 +74,44 @@ serve(async (req: Request) => {
       });
     }
 
-    // 3. Lista admins com push_token (join admin_users -> profiles)
-    const { data: admins, error: admErr } = await supa
+    // 3. Lista admins com push_token. NÃO existe FK direta entre
+    //    admin_users e profiles (ambas referenciam auth.users) — então
+    //    PostgREST não consegue inferir o join, e a sintaxe `!inner`
+    //    falha. Faz em 2 etapas: pega IDs dos admins, depois cruza
+    //    com profiles.
+    const { data: adminRows, error: admErr } = await supa
       .from('admin_users')
-      .select('id, profiles!inner(expo_push_token)')
-      .not('profiles.expo_push_token', 'is', null);
+      .select('id');
     if (admErr) {
       return json({ error: 'admins_fetch_failed', detail: admErr.message }, 500);
     }
-
-    const targets = (admins ?? [])
+    const adminIds = (adminRows ?? [])
       .map((a: { id: string }) => a.id as string)
+      .filter(Boolean);
+    if (adminIds.length === 0) {
+      return json({
+        ok: true,
+        rateLimits,
+        threshold: THRESHOLD,
+        sent: false,
+        reason: 'no_admins',
+      });
+    }
+
+    const { data: adminsWithToken, error: profErr } = await supa
+      .from('profiles')
+      .select('id')
+      .in('id', adminIds)
+      .not('expo_push_token', 'is', null);
+    if (profErr) {
+      return json(
+        { error: 'admin_profiles_fetch_failed', detail: profErr.message },
+        500,
+      );
+    }
+
+    const targets = (adminsWithToken ?? [])
+      .map((p: { id: string }) => p.id as string)
       .filter(Boolean);
     if (targets.length === 0) {
       return json({
