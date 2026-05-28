@@ -154,6 +154,7 @@ export type WorkoutRoutine = {
   is_archived: boolean;
   created_by_coach: string | null;
   source_template_id: string | null;
+  sort_order: number;
   created_at: string;
   updated_at: string;
 };
@@ -385,7 +386,10 @@ export type PushType =
   | 'weekly_summary'
   | 'coach_adherence_alert'
   | 'coach_plan_update'
-  | 'goal_achieved';
+  | 'goal_achieved'
+  | 'protein_reminder'
+  | 'daily_workout_check'
+  | 'streak_warning';
 
 export type PushPreference = {
   user_id: string;
@@ -403,7 +407,14 @@ export type PushHistorySkipReason =
   | 'rate_limit'
   | 'quiet_hours'
   | 'ai_failed'
-  | 'expo_failed';
+  | 'expo_failed'
+  | 'no_goal'
+  | 'goal_met'
+  | 'rest_day'
+  | 'not_enough_history'
+  | 'already_trained'
+  | 'streak_too_short'
+  | 'active_today';
 
 export type PushHistoryEntry = {
   id: string;

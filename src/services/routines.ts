@@ -13,12 +13,16 @@ export async function listRoutines(
   userId: string,
 ): Promise<WorkoutRoutineListItem[]> {
   // PostgREST aggregate: traz o count de exercícios numa única round-trip.
+  // Ordena por sort_order ASC (definido pelo coach via drag-and-drop) e usa
+  // created_at como desempate quando duas linhas têm o mesmo sort_order
+  // (ex: recém-criadas com default 0).
   const { data, error } = await supabase
     .from('workout_routines')
     .select('*, exercises:workout_routine_exercises(count)')
     .eq('user_id', userId)
     .eq('is_archived', false)
-    .order('created_at', { ascending: false });
+    .order('sort_order', { ascending: true })
+    .order('created_at', { ascending: true });
 
   if (error) throw error;
 
@@ -195,5 +199,20 @@ export async function deleteSession(sessionId: string): Promise<void> {
     .from('workout_sessions')
     .delete()
     .eq('id', sessionId);
+  if (error) throw error;
+}
+
+// Reordena as rotinas de um usuário num batch atômico via RPC.
+// orderedIds: array de IDs na nova ordem (índice 0 = primeira posição).
+// RLS é respeitada pelo security invoker da RPC — o caller precisa ter
+// permissão de UPDATE em workout_routines (dono ou coach do aluno).
+export async function reorderRoutines(
+  userId: string,
+  orderedIds: string[],
+): Promise<void> {
+  const { error } = await supabase.rpc('reorder_routines', {
+    p_user_id: userId,
+    p_ordered_ids: orderedIds,
+  });
   if (error) throw error;
 }

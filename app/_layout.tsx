@@ -1,9 +1,19 @@
 import '../global.css';
 import 'react-native-url-polyfill/auto';
 
+import { LogBox } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+
+// O DraggableFlatList em RoutinesReorderList vive dentro de um
+// ScrollView vertical (PlanoTab) com altura fixa propositalmente — não
+// virtualiza. RN avisa que isso *pode* quebrar windowing; no caso de
+// uso (≤10 rotinas/aluno) não há impacto. Suprimimos só esse aviso.
+LogBox.ignoreLogs([
+  'VirtualizedLists should never be nested inside plain ScrollViews',
+]);
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useEffect, useMemo } from 'react';
 import { useAuthBootstrap } from '@/hooks/useAuth';
@@ -82,22 +92,24 @@ function RootLayout() {
   );
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <SafeAreaProvider>
-        <StatusBar style="light" />
-        <GlobalAlertProvider>
-          <Providers>
-            <Stack
-              screenOptions={{
-                headerShown: false,
-                contentStyle: { backgroundColor: '#000000' },
-                animation: 'fade',
-              }}
-            />
-          </Providers>
-        </GlobalAlertProvider>
-      </SafeAreaProvider>
-    </QueryClientProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <QueryClientProvider client={queryClient}>
+        <SafeAreaProvider>
+          <StatusBar style="light" />
+          <GlobalAlertProvider>
+            <Providers>
+              <Stack
+                screenOptions={{
+                  headerShown: false,
+                  contentStyle: { backgroundColor: '#000000' },
+                  animation: 'fade',
+                }}
+              />
+            </Providers>
+          </GlobalAlertProvider>
+        </SafeAreaProvider>
+      </QueryClientProvider>
+    </GestureHandlerRootView>
   );
 }
 

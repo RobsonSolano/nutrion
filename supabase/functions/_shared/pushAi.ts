@@ -32,11 +32,14 @@ const COOLDOWN_HOURS_BY_TYPE: Record<PushType, number> = {
   inactivity_reminder: 24,
   streak_celebration: 24, // marco é único; 24h evita refazer
   daily_workout_reminder: 12,
-  water_reminder: 4,
+  water_reminder: 20, // 20h = garante 1×/dia mesmo se cron rodar duas vezes
   weekly_summary: 6 * 24,
   coach_adherence_alert: 48,
   coach_plan_update: 0,
   goal_achieved: 0,
+  protein_reminder: 20,
+  daily_workout_check: 20,
+  streak_warning: 20,
 };
 
 const GLOBAL_DAILY_MAX = 3; // máx 3 pushes/dia
