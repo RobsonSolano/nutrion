@@ -239,13 +239,26 @@ async function callGroq(
 }
 
 function clampTitle(s: string): string {
-  const trimmed = s.trim().replace(/^["']|["']$/g, '');
-  return trimmed.length > 50 ? trimmed.slice(0, 50) : trimmed;
+  return smartClamp(s, 50);
 }
 
 function clampBody(s: string): string {
+  return smartClamp(s, 120);
+}
+
+// Corta no último boundary de palavra antes do limite e acrescenta "…".
+// Evita o problema de notificações terminando no meio da palavra
+// (ex.: "...desfoque do seu objetiv") quando o LLM extrapola o limite.
+function smartClamp(s: string, max: number): string {
   const trimmed = s.trim().replace(/^["']|["']$/g, '');
-  return trimmed.length > 120 ? trimmed.slice(0, 120) : trimmed;
+  if (trimmed.length <= max) return trimmed;
+  // Reserva 1 char pro caractere de reticência "…".
+  const budget = max - 1;
+  const slice = trimmed.slice(0, budget);
+  // Última fronteira de palavra/pontuação dentro do budget.
+  const boundary = slice.search(/[\s.,;:!?—–-]+[^\s.,;:!?—–-]*$/);
+  const cut = boundary > budget * 0.5 ? slice.slice(0, boundary) : slice;
+  return `${cut.replace(/[\s.,;:!?—–-]+$/, '')}…`;
 }
 
 function isQuietHourBrt(): boolean {
