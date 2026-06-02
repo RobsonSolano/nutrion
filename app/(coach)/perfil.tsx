@@ -12,6 +12,9 @@ import { ArrowLeft, Save } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { Button, Card, Input, Screen } from '@/components/ui';
 import AvatarPicker from '@/components/AvatarPicker';
+import DangerZone from '@/components/DangerZone';
+import { useStudents } from '@/hooks/useStudents';
+import type { Href } from 'expo-router';
 import { useAlert } from '@/components/GlobalAlertProvider';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
@@ -28,7 +31,9 @@ export default function CoachPerfilScreen() {
   const profileQ = useProfile();
   const coachQ = useCoachContact(user?.id ?? null);
   const update = useUpdateCoachSettings();
+  const studentsQ = useStudents();
   const alert = useAlert();
+  const studentCount = studentsQ.data?.length ?? 0;
 
   const [bio, setBio] = useState('');
   const [cref, setCref] = useState('');
@@ -203,6 +208,17 @@ export default function CoachPerfilScreen() {
               disabled={!canSave}
               loading={update.isPending}
               icon={<Save size={16} color={colors.textInverse} />}
+            />
+
+            <DangerZone
+              blockedReason={
+                studentCount > 0
+                  ? {
+                      studentCount,
+                      seeStudentsHref: '/(coach)' as Href,
+                    }
+                  : null
+              }
             />
           </ScrollView>
         )}
