@@ -1,4 +1,14 @@
 // NutriOn — Edge Function coach-delete-student
+//
+// @deprecated Desde 2026-06-02 (feature account-deletion).
+// Coach não tem mais poder de excluir conta do aluno — LGPD/Play
+// Store exigem que apenas o próprio usuário faça isso. Use
+// `coach-unlink-student` pra remover o vínculo (aluno vira comum).
+// Esta function permanece deployada apenas pra backward compat com
+// clients antigos que ainda chamam. Remover quando o histórico de
+// invocations confirmar zero uso por X dias.
+//
+// Comportamento original (mantido):
 // Permite que o professor exclua um aluno. Usa
 // supabase.auth.admin.deleteUser que deleta o auth.users — cascade
 // limpa profile, food/water/workout logs, sessions, chat_messages,

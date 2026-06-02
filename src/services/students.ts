@@ -216,8 +216,19 @@ export async function updateStudent(
   });
 }
 
-export async function deleteStudent(studentId: string): Promise<{ ok: true }> {
-  return callFn<{ ok: true }>('coach-delete-student', {
+/**
+ * Desvincula um aluno do coach: o aluno vira `role='comum'`,
+ * perde `coach_id`, e o coach perde acesso aos dados dele. Notas
+ * privadas do coach são apagadas. Plan revisions têm coach_id
+ * setado pra null (aluno mantém histórico). Aluno recebe push
+ * `coach_unlinked` fire-and-forget.
+ *
+ * Substitui a antiga `deleteStudent` (que excluía a conta do
+ * aluno). Coach não tem mais esse poder — LGPD/loja exige que
+ * apenas o próprio usuário possa excluir a própria conta.
+ */
+export async function unlinkStudent(studentId: string): Promise<{ ok: true }> {
+  return callFn<{ ok: true }>('coach-unlink-student', {
     student_id: studentId,
   });
 }
