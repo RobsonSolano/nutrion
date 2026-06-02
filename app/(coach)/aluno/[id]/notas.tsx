@@ -137,6 +137,7 @@ export default function NotasScreen() {
                 loading={createMutation.isPending}
                 disabled={draft.trim().length === 0}
                 size="md"
+                fullWidth={false}
                 icon={<Plus size={16} color={colors.textInverse} />}
               />
             </View>
