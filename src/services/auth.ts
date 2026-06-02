@@ -179,3 +179,62 @@ export async function requestPasswordReset(rawEmail: string) {
   const { error } = await supabase.auth.resetPasswordForEmail(email);
   if (error) throw error;
 }
+
+export type DeleteMyAccountError =
+  | { code: 'has_students'; studentCount: number; studentIds: string[] }
+  | { code: 'unauthorized' }
+  | { code: 'unknown'; detail?: string };
+
+/**
+ * Excluir minha própria conta — fluxo LGPD / Play Store / App Store.
+ *
+ * - Se professor com alunos vinculados → erro `has_students` (UI
+ *   precisa redirecionar pra desvincular antes).
+ * - Caso contrário → hard delete em auth.users (cascade limpa tudo);
+ *   se aluno, coach recebe push antes do delete.
+ *
+ * Após sucesso, o caller DEVE fazer signOut local + limpar caches.
+ * A sessão fica inválida no próximo refresh do JWT.
+ */
+export async function deleteMyAccount(reason: string | null): Promise<void> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) {
+    const err = new Error('Sessão expirada.') as Error & {
+      info?: DeleteMyAccountError;
+    };
+    err.info = { code: 'unauthorized' };
+    throw err;
+  }
+
+  const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
+  const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
+
+  const res = await fetch(`${supabaseUrl}/functions/v1/delete-my-account`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session.access_token}`,
+      apikey: anonKey,
+    },
+    body: JSON.stringify({ reason: reason ?? null }),
+  });
+
+  if (res.ok) return;
+
+  const payload = await res.json().catch(() => ({}));
+  const err = new Error(
+    payload?.detail || payload?.error || 'Falha ao excluir conta.',
+  ) as Error & { info?: DeleteMyAccountError };
+  if (res.status === 409 && payload?.error === 'has_students') {
+    err.info = {
+      code: 'has_students',
+      studentCount: payload.student_count ?? 0,
+      studentIds: payload.student_ids ?? [],
+    };
+  } else if (res.status === 401) {
+    err.info = { code: 'unauthorized' };
+  } else {
+    err.info = { code: 'unknown', detail: payload?.detail };
+  }
+  throw err;
+}
