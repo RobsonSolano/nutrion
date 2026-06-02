@@ -25,6 +25,8 @@ const QUIET_END_BRT = 7; // 7h
 const CRITICAL_TYPES: PushType[] = [
   'coach_plan_update',
   'goal_achieved',
+  'student_account_deleted',
+  'coach_unlinked',
 ];
 
 // Cooldown por tipo (em horas) — entre 2 envios do MESMO tipo pro MESMO user
@@ -40,6 +42,8 @@ const COOLDOWN_HOURS_BY_TYPE: Record<PushType, number> = {
   protein_reminder: 20,
   daily_workout_check: 20,
   streak_warning: 20,
+  student_account_deleted: 0, // evento único, sempre enviar
+  coach_unlinked: 0, // evento único, sempre enviar
 };
 
 const GLOBAL_DAILY_MAX = 3; // máx 3 pushes/dia

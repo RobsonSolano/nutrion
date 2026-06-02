@@ -389,7 +389,9 @@ export type PushType =
   | 'goal_achieved'
   | 'protein_reminder'
   | 'daily_workout_check'
-  | 'streak_warning';
+  | 'streak_warning'
+  | 'student_account_deleted'
+  | 'coach_unlinked';
 
 export type PushPreference = {
   user_id: string;
