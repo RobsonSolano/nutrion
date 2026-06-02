@@ -8,9 +8,10 @@ import {
   View,
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
-import { ArrowLeft, GraduationCap, Save } from 'lucide-react-native';
+import { ArrowLeft, Save } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { Button, Card, Input, Screen } from '@/components/ui';
+import AvatarPicker from '@/components/AvatarPicker';
 import { useAlert } from '@/components/GlobalAlertProvider';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
@@ -106,11 +107,12 @@ export default function CoachPerfilScreen() {
             keyboardShouldPersistTaps="handled"
           >
             <Card padding="md">
-              <View className="flex-row items-center gap-3">
-                <View className="h-12 w-12 rounded-2xl bg-violet/10 border border-violet/30 items-center justify-center">
-                  <GraduationCap size={22} color={colors.violetSoft} />
-                </View>
-                <View className="flex-1">
+              <View className="items-center gap-3">
+                <AvatarPicker
+                  avatarUrl={profileQ.data?.avatar_url ?? null}
+                  name={profileQ.data?.full_name ?? null}
+                />
+                <View className="items-center">
                   <Text className="text-text font-semibold">
                     {profileQ.data?.full_name ?? 'Professor'}
                   </Text>
