@@ -12,7 +12,9 @@ export type PushType =
   | 'goal_achieved'
   | 'protein_reminder'
   | 'daily_workout_check'
-  | 'streak_warning';
+  | 'streak_warning'
+  | 'student_account_deleted'
+  | 'coach_unlinked';
 
 export const PERSONA_SYSTEM = `Você é a voz do NutriOn — um app de nutrição e treino com pegada brasileira, direta, sem fofura. Fala "você", não "tu". Não usa emoji. Não usa frases clichês de coach motivacional ("acredite em você", "vamos juntos"). É um amigo que entende do assunto: curto, específico, e que conhece a pessoa.
 
@@ -48,6 +50,10 @@ export function aiUsageFeature(type: PushType): string {
       return 'push_workout_check';
     case 'streak_warning':
       return 'push_streak_warning';
+    case 'student_account_deleted':
+      return 'push_account_deleted';
+    case 'coach_unlinked':
+      return 'push_coach_unlinked';
   }
 }
 
@@ -159,6 +165,21 @@ Gere um push perguntando se hoje é descanso ou esquecimento. Reconhece que pode
 - Objetivo: ${ctx.goal_type ?? 'manutenção'}
 
 Gere um push avisando que a sequência pode quebrar se não houver registro hoje. Cita o número exato. Tom de alerta de amigo — sem desespero. Sugere ação rápida (água, refeição ou treino).`;
+
+    case 'student_account_deleted':
+      return `Contexto:
+- Aluno: ${ctx.student_name ?? 'aluno'}
+- Tempo como aluno: ${ctx.account_age_days ?? 0} dias
+- Última atividade: ${ctx.last_activity_summary ?? 'sem registro recente'}
+
+Você está escrevendo pra um PROFESSOR (coach), avisando que um aluno acabou de excluir a conta no app. Tom: operacional, curto, sem lamento ou clichê. Cita o nome e o tempo se relevante. Sugere ação prática quando faz sentido (ex: vale uma mensagem se quiser entender o motivo). NÃO use emoji. NÃO use a palavra infelizmente.`;
+
+    case 'coach_unlinked':
+      return `Contexto:
+- Coach: ${ctx.coach_name ?? 'seu professor'}
+- Tempo com o coach: ${ctx.days_with_coach ?? 0} dias
+
+Você está escrevendo pra um ALUNO que acabou de ser desvinculado pelo professor dele. Tom: factual, sem culpa nem dramatização. Reconhece a mudança e enfatiza que agora ele gerencia o próprio plano. NÃO use emoji. NÃO julga o motivo do desvínculo.`;
   }
 }
 
@@ -222,6 +243,16 @@ export function staticTemplate(
       return {
         title: `${ctx.current_streak ?? 0} dias — não quebre`,
         body: 'Falta um registro hoje pra manter a sequência. Vai um copo de água?',
+      };
+    case 'student_account_deleted':
+      return {
+        title: 'Aluno saiu',
+        body: `${ctx.student_name ?? 'Um aluno'} excluiu a conta.`,
+      };
+    case 'coach_unlinked':
+      return {
+        title: 'Plano agora é seu',
+        body: 'Seu professor encerrou o vínculo. Você continua com seus treinos e agora pode editá-los.',
       };
   }
 }

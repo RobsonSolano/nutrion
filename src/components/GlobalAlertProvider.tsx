@@ -125,6 +125,16 @@ function parseError(err: unknown): { title: string; message: string } {
     };
   }
   if (
+    lower.includes('invalid login credentials') ||
+    lower.includes('invalid_credentials') ||
+    lower.includes('invalid email or password')
+  ) {
+    return {
+      title: 'Login inválido',
+      message: 'Usuário e/ou senha incorreto.',
+    };
+  }
+  if (
     lower.includes('network request failed') ||
     lower.includes('fetch failed') ||
     lower.includes('failed to fetch')

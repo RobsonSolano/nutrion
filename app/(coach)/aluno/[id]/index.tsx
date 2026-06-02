@@ -40,7 +40,7 @@ import {
 import { useAlert } from '@/components/GlobalAlertProvider';
 import { colors } from '@/lib/theme';
 import {
-  useDeleteStudent,
+  useUnlinkStudent,
   useGenerateStudentPlan,
   useSaveStudentPlan,
   useStudentDetail,
@@ -69,7 +69,7 @@ type Phase =
   | 'generating'
   | 'preview'
   | 'saving'
-  | 'confirm_delete'
+  | 'confirm_unlink'
   | 'deleting';
 
 type Tab = 'visao' | 'plano' | 'historico';
@@ -88,7 +88,7 @@ export default function AlunoDetalheScreen() {
   const notesQ = useCoachNotes(id ?? null);
   const generateMutation = useGenerateStudentPlan();
   const saveMutation = useSaveStudentPlan();
-  const deleteMutation = useDeleteStudent();
+  const unlinkMutation = useUnlinkStudent();
   const applyTemplates = useApplyTemplates();
   const alert = useAlert();
 
@@ -134,14 +134,14 @@ export default function AlunoDetalheScreen() {
     }
   }
 
-  async function handleDelete() {
+  async function handleUnlink() {
     if (!id) return;
     setPhase('deleting');
     try {
-      await deleteMutation.mutateAsync(id);
+      await unlinkMutation.mutateAsync(id);
       router.back();
     } catch (err) {
-      captureError(err, { feature: 'coach_delete_student' });
+      captureError(err, { feature: 'coach_unlink_student' });
       setPhase('idle');
       alert.showError(err);
     }
@@ -220,7 +220,7 @@ export default function AlunoDetalheScreen() {
           <Pencil size={16} color={colors.textDim} />
         </Pressable>
         <Pressable
-          onPress={() => setPhase('confirm_delete')}
+          onPress={() => setPhase('confirm_unlink')}
           hitSlop={10}
           className="h-10 w-10 rounded-2xl bg-surface-raised border border-border items-center justify-center active:opacity-70"
         >
@@ -316,26 +316,26 @@ export default function AlunoDetalheScreen() {
       />
 
       <ConfirmModal
-        visible={phase === 'confirm_delete'}
+        visible={phase === 'confirm_unlink'}
         onClose={() => setPhase('idle')}
-        title={`Excluir ${profile.full_name ?? 'esse aluno'}?`}
+        title={`Desvincular ${profile.full_name ?? 'esse aluno'}?`}
         message={
-          'Essa ação NÃO pode ser desfeita. A conta do aluno, rotinas, logs (refeições, água, treinos), chat com a IA e solicitações serão removidos definitivamente.'
+          'O aluno volta a ser usuário comum e mantém o treino prescrito. Suas notas privadas sobre ele serão apagadas e você não verá mais os dados dele aqui. Essa ação não pode ser desfeita.'
         }
         icon={<AlertTriangle size={26} color={colors.danger} />}
-        dismissable={!deleteMutation.isPending}
+        dismissable={!unlinkMutation.isPending}
         actions={[
           {
-            label: 'Excluir definitivamente',
+            label: 'Desvincular aluno',
             variant: 'danger',
-            onPress: handleDelete,
-            loading: deleteMutation.isPending,
+            onPress: handleUnlink,
+            loading: unlinkMutation.isPending,
           },
           {
             label: 'Cancelar',
             variant: 'ghost',
             onPress: () => setPhase('idle'),
-            disabled: deleteMutation.isPending,
+            disabled: unlinkMutation.isPending,
           },
         ]}
       />

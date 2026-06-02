@@ -1,12 +1,12 @@
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   createStudent,
-  deleteStudent,
   generatePlanForStudent,
   getStudentDetail,
   listStudents,
   saveStudentPlan,
   sendStudentCredentials,
+  unlinkStudent,
   updateStudent,
   type CreateStudentInput,
   type UpdateStudentPatch,
@@ -153,11 +153,20 @@ export function useUpdateStudent() {
   });
 }
 
-export function useDeleteStudent() {
+/**
+ * Desvincula um aluno do coach. Aluno vira `role='comum'`, perde
+ * `coach_id`, coach perde acesso aos dados. Notas privadas do
+ * coach sobre o aluno são apagadas. Aluno recebe push avisando.
+ *
+ * Substitui o antigo `useDeleteStudent` (que excluía a conta do
+ * aluno). Coach não tem mais esse poder — LGPD/loja exige que
+ * apenas o próprio usuário possa excluir a própria conta.
+ */
+export function useUnlinkStudent() {
   const { user } = useAuth();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (studentId: string) => deleteStudent(studentId),
+    mutationFn: (studentId: string) => unlinkStudent(studentId),
     onSuccess: () => {
       if (user?.id) {
         void qc.invalidateQueries({ queryKey: studentsKey(user.id) });
