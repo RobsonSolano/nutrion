@@ -18,6 +18,7 @@ import {
   Dumbbell,
   Target,
   Pencil,
+  Plus,
   ChevronRight,
   Trash2,
   AlertTriangle,
@@ -519,15 +520,29 @@ function PlanoTab({
       )}
 
       <Card padding="md">
-        <View className="flex-row items-center gap-2 mb-1">
-          <Dumbbell size={14} color={colors.accent} />
-          <Text className="text-text-dim text-[11px] uppercase tracking-widest">
-            Treinos prescritos ({routines.length})
-          </Text>
+        <View className="flex-row items-center justify-between mb-1">
+          <View className="flex-row items-center gap-2 flex-1">
+            <Dumbbell size={14} color={colors.accent} />
+            <Text className="text-text-dim text-[11px] uppercase tracking-widest">
+              Treinos prescritos ({routines.length})
+            </Text>
+          </View>
+          <Pressable
+            onPress={() =>
+              router.push(
+                `/(coach)/aluno/${studentId}/rotina/nova` as Href,
+              )
+            }
+            hitSlop={8}
+            className="h-8 w-8 rounded-xl border border-accent/40 bg-accent/10 items-center justify-center active:opacity-70"
+          >
+            <Plus size={14} color={colors.accent} strokeWidth={3} />
+          </Pressable>
         </View>
         {routines.length === 0 ? (
           <Text className="text-text-muted text-xs py-3">
-            Sem rotinas ativas. Gere um plano novo abaixo.
+            Sem rotinas ativas. Adicione manualmente pelo + acima ou gere
+            um plano com IA abaixo.
           </Text>
         ) : (
           <>
