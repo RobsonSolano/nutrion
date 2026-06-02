@@ -68,6 +68,12 @@ export async function createRoutine(params: {
   groupId: string | null;
   description: string | null;
   exercises: RoutineExerciseInsert[];
+  /**
+   * Quando coach cria rotina pro aluno, passar o id do coach aqui pra
+   * marcar `created_by_coach` (lock contra edição/delete pelo aluno).
+   * Null = rotina do próprio dono.
+   */
+  createdByCoach?: string | null;
 }): Promise<WorkoutRoutine> {
   const { data: routine, error } = await supabase
     .from('workout_routines')
@@ -77,6 +83,7 @@ export async function createRoutine(params: {
       modality: params.modality,
       group_id: params.groupId,
       description: params.description,
+      created_by_coach: params.createdByCoach ?? null,
     })
     .select('*')
     .single();
