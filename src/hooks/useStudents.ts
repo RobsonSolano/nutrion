@@ -12,6 +12,7 @@ import {
   type UpdateStudentPatch,
 } from '@/services/students';
 import {
+  createRoutine,
   deleteRoutine,
   replaceRoutineExercises,
   updateRoutine,
@@ -19,6 +20,7 @@ import {
 import { getStudentTracking } from '@/services/studentTracking';
 import type { OnboardingPlan } from '@/services/onboarding';
 import type {
+  Modality,
   RoutineExerciseInsert,
   WorkoutRoutine,
 } from '@/types/database';
@@ -196,6 +198,42 @@ export function useUpdateStudentRoutine() {
       });
       void qc.invalidateQueries({
         queryKey: queryKeys.routineDetail(vars.routineId),
+      });
+    },
+  });
+}
+
+/**
+ * Cria uma rotina nova pra um aluno, marcando created_by_coach pra que
+ * o aluno não consiga editar/deletar pelo app dele (lock). RLS permite
+ * a escrita via routines_insert_coach (migration 20260508).
+ */
+export function useCreateStudentRoutine() {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: {
+      studentId: string;
+      name: string;
+      modality: Modality;
+      groupId: string | null;
+      description: string | null;
+      exercises: RoutineExerciseInsert[];
+    }) => {
+      if (!user?.id) throw new Error('Sessão expirada.');
+      return createRoutine({
+        userId: params.studentId,
+        name: params.name,
+        modality: params.modality,
+        groupId: params.groupId,
+        description: params.description,
+        exercises: params.exercises,
+        createdByCoach: user.id,
+      });
+    },
+    onSuccess: (_data, vars) => {
+      void qc.invalidateQueries({
+        queryKey: studentDetailKey(vars.studentId),
       });
     },
   });
