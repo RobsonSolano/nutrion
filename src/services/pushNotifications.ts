@@ -54,7 +54,7 @@ export async function ensureAndroidChannel() {
   if (!Notifications) return;
   if (Platform.OS !== 'android') return;
   await Notifications.setNotificationChannelAsync('default', {
-    name: 'NutriOn',
+    name: 'Persona Fit',
     importance: Notifications.AndroidImportance.DEFAULT,
     vibrationPattern: [0, 250, 250, 250],
     lightColor: '#39ff14',

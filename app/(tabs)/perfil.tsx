@@ -95,7 +95,7 @@ export default function PerfilScreen() {
     user?.user_metadata?.full_name ??
     user?.user_metadata?.name ??
     user?.email ??
-    'Atleta NutriOn';
+    'Atleta Persona Fit';
 
   const formatKg = (v: number | null | undefined) =>
     v == null ? '—' : `${v.toLocaleString('pt-BR')} kg`;

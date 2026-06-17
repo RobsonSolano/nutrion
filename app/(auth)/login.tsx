@@ -280,7 +280,7 @@ export default function LoginScreen() {
             <View className="mt-5 rounded-2xl bg-violet/10 border border-violet/30 px-4 py-3">
               <Text className="text-violet-soft text-[11px] leading-relaxed">
                 💡 Você está no Expo Go. Login com Google fica disponível no APK
-                (development build) do NutriOn.
+                (development build) do Persona Fit.
               </Text>
             </View>
           )}
