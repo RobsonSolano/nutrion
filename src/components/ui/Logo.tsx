@@ -1,29 +1,35 @@
-import { Text, View } from 'react-native';
+import { Image, Text, View } from 'react-native';
+import symbol from './logo-symbol.png';
 
 type Props = {
   size?: 'sm' | 'md' | 'lg' | 'xl';
   tagline?: boolean;
 };
 
-const sizeMap = {
-  sm: 'text-2xl',
-  md: 'text-4xl',
-  lg: 'text-5xl',
-  xl: 'text-6xl',
+const symbolSize = {
+  sm: 36,
+  md: 52,
+  lg: 76,
+  xl: 104,
+} as const;
+
+const textSize = {
+  sm: 'text-xl',
+  md: 'text-3xl',
+  lg: 'text-4xl',
+  xl: 'text-5xl',
 } as const;
 
 export default function Logo({ size = 'lg', tagline = false }: Props) {
   return (
     <View className="items-center">
-      <Text
-        className={`${sizeMap[size]} font-bold tracking-tight text-text`}
-        style={{
-          textShadowColor: 'rgba(57,255,20,0.35)',
-          textShadowOffset: { width: 0, height: 0 },
-          textShadowRadius: 20,
-        }}
-      >
-        Nutri<Text className="text-accent">On</Text>
+      <Image
+        source={symbol}
+        style={{ width: symbolSize[size], height: symbolSize[size] }}
+        resizeMode="contain"
+      />
+      <Text className={`${textSize[size]} font-bold tracking-tight text-text mt-3`}>
+        Persona <Text className="text-accent">Fit</Text>
       </Text>
       {tagline && (
         <Text className="text-text-dim text-xs tracking-[3px] uppercase mt-2">

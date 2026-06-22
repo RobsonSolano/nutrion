@@ -92,9 +92,9 @@ export function testSentry() {
   addBreadcrumb('Botão Testar Sentry pressionado', 'test', {
     timestamp: Date.now(),
   });
-  Sentry.captureMessage('NutriOn — teste de integração Sentry', 'info');
+  Sentry.captureMessage('Persona Fit — teste de integração Sentry', 'info');
   // Também dispara uma exception pra cobrir ambos os caminhos.
-  captureError(new Error('NutriOn test exception'), {
+  captureError(new Error('Persona Fit test exception'), {
     feature: 'sentry_test',
     intentional: true,
   });

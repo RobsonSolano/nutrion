@@ -12,9 +12,9 @@ const plugins: ExpoConfig['plugins'] = [
     'expo-image-picker',
     {
       photosPermission:
-        'O NutriOn precisa acessar suas fotos para analisar refeições.',
+        'O Persona Fit precisa acessar suas fotos para analisar refeições.',
       cameraPermission:
-        'O NutriOn precisa da câmera para registrar pratos em tempo real.',
+        'O Persona Fit precisa da câmera para registrar pratos em tempo real.',
     },
   ],
   // Sentry plugin desabilitado temporariamente — upload de source maps
@@ -38,7 +38,7 @@ if (!IS_EXPO_GO) {
 }
 
 const config: ExpoConfig = {
-  name: 'NutriOn',
+  name: 'Persona Fit',
   slug: 'nutrion',
   scheme: 'nutrion',
   version: '1.3.0',

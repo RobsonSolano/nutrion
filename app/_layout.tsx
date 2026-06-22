@@ -55,7 +55,7 @@ function Providers({ children }: { children: React.ReactNode }) {
         visible={ota.isReady}
         onClose={ota.dismiss}
         title="Atualização disponível"
-        message="Uma nova versão do app foi baixada. Aplicar agora reinicia o NutriOn em alguns segundos."
+        message="Uma nova versão do app foi baixada. Aplicar agora reinicia o Persona Fit em alguns segundos."
         icon={<Sparkles size={26} color={colors.accent} />}
         dismissable={!ota.isApplying}
         actions={[
