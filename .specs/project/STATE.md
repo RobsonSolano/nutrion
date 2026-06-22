@@ -78,6 +78,28 @@ Próxima: **#4 legal-docs** e **#5 revenuecat-integration** (deploy conjunto + l
 (a) se precisa publicar na Play pra assinar, (b) valor mínimo de assinatura, (c) cupom p/ assinar
 no valor mínimo. É território do #5; entregar como adendo (pesquisa web + `manual-2-billing-play-store.md`).
 
+### legal-docs (spec #4) — implementado em 2026-06-22 (branch `feature/billing-legal-docs`)
+
+**Decisões (L1–L7):** ver `.specs/features/2026-06-22-legal-docs/context.md`.
+
+- **Entrega:** `legal_documents` (catálogo versionado, 3 docs, URLs placeholder) + `legal_acceptances`
+  (PK `user_id,doc_type,version` + RLS own) + service/hook (`recordLegalAcceptance` idempotente) +
+  componentes `Checkbox`/`TermsAcceptance` + aceite inline no cadastro de **usuário normal** e
+  **professor** + trava no **"Continuar com Google"** + URL de privacidade no `app.config.ts`.
+- **L1:** só infra (texto jurídico = advogado, fora do repo). **L2/L7:** só novos cadastros;
+  **sem backfill/gate** — existentes não recadastram, logo nunca são re-perguntados. **L5:** login
+  por email não exige aceite.
+- **Validado:** migration aplica (3 docs seedados, RLS habilitada, idempotente; schema real local);
+  vitest 26/26; typecheck verde.
+- **Pendente (UAT/deploy):** runtime do aceite + enforcement RLS (auth real).
+- **TODO publicação:** trocar URLs placeholder (`personafit.app/legal/*`) pelas reais do hotsite —
+  em `legal_documents` (sem release) e `app.config.ts` (release). Texto jurídico + hospedagem do
+  hotsite são deliverables externos (advogado/site separado).
+
+**Estado da iniciativa:** #1 billing-core · #2 paywall-ui · #3 trial-e-migração em `develop`;
+#4 legal-docs nesta branch. **Falta: #5 revenuecat-integration** (loja + compra + cupons + downgrade
+"escolhe quem fica" + manual-4 já escrito orientando a config).
+
 ## Dívida técnica conhecida (pré-existente, fora do escopo billing-core)
 
 - **Lint do app:** `npm run lint` acusa **6 erros + 34 warnings** em arquivos `app/`/`src/`
