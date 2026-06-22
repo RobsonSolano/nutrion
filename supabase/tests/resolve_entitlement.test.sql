@@ -1,21 +1,22 @@
 -- =====================================================================
 -- Teste do RPC _resolve_entitlement (billing-core, [BILL]-04,05,06)
--- Transacional + ROLLBACK: não polui o banco. Rodar em LOCAL:
---   supabase start && supabase db reset
---   psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f supabase/tests/resolve_entitlement.test.sql
+-- Transacional + ROLLBACK: não polui o banco. Rodar contra o LOCAL:
+--   supabase start   (use `npx supabase@latest start` se o seu CLI pinado falhar
+--                      no sync de vector buckets)
+--   docker exec -i supabase_db_nutrion psql -U postgres -d postgres \
+--     -v ON_ERROR_STOP=1 < supabase/tests/resolve_entitlement.test.sql
 -- Saída esperada ao final: NOTICE "RESOLVE_ENTITLEMENT: ALL PASS".
--- Qualquer divergência → WARNING por caso + EXCEPTION final (teste falha).
+--
+-- Nota: o seeding usa `session_replication_role = replica` p/ bypassar os
+-- triggers do schema real (on_auth_user_created cria profile sozinho;
+-- profiles_guard_role_changes bloqueia setar role) e a FK p/ auth.users.
+-- O RPC só LÊ profiles/subscriptions, então isso não afeta o que se testa.
 -- =====================================================================
 begin;
-
--- Fixtures: auth.users (FK de profiles). UUID = aaaaaaaa-0000-0000-0000-<NN>.
-insert into auth.users (id, instance_id, aud, role, email, encrypted_password, created_at, updated_at)
-select ('aaaaaaaa-0000-0000-0000-' || lpad(g::text, 12, '0'))::uuid,
-       '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
-       'bill-test-' || g || '@test.local', '', now(), now()
-from generate_series(1, 14) g;
+set local session_replication_role = replica;
 
 -- profiles (role + coach_id + user_number). is_early_adopter é gerado de user_number.
+-- user_number alto (9xxx) = NÃO early; 5 = early.
 insert into public.profiles (id, role, coach_id, user_number) values
   ('aaaaaaaa-0000-0000-0000-000000000001','comum',     null, 9001), -- comum free
   ('aaaaaaaa-0000-0000-0000-000000000002','comum',     null, 9002), -- comum grandfather
