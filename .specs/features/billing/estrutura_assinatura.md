@@ -40,10 +40,10 @@ e **professor**, desbloqueando recursos de IA e capacidade de gestão de alunos.
 | Quem | Plano | Preço/mês | Libera |
 |------|-------|-----------|--------|
 | Comum | Free | R$ 0 | Tudo, **exceto** Chat IA e Sanity Check (mostra "seja Pro") |
-| Comum | Pro | R$ 19,90 | Chat IA + Sanity Check |
+| Comum | Pro | R$ 15,90 | Chat IA + Sanity Check |
 | Professor | Free | R$ 0 | Até **5** alunos · **sem** IA de coach · alunos **sem** IA |
-| Professor | Pro | R$ 19,90 | Até **20** alunos · IA de coach · alunos com Chat+Sanity |
-| Professor | Premium | R$ 39,90 | Alunos **ilimitados** + tudo do Pro |
+| Professor | Pro | R$ 15,90 | Até **20** alunos · IA de coach · alunos com Chat+Sanity |
+| Professor | Premium | R$ 29,90 | Alunos **ilimitados** + tudo do Pro |
 
 **Regras transversais:**
 
@@ -170,7 +170,16 @@ commits divididos → db:push → fn:deploy → eas update preview → merge →
 | 2 | `paywall-ui` | Leitura de entitlement no app, telas "seja Pro", matriz de planos | ❌ |
 | 3 | `trial-e-migracao` | Trial de servidor, fluxo ex-aluno (`coach-unlink-student`), downgrade "escolhe quem fica" | ❌ |
 | 4 | `legal-docs` | **3 páginas públicas no hotsite** (Privacidade/Uso/Contrato) + `legal_documents` + `legal_acceptances` + aceite no cadastro **linkando pras URLs do hotsite** | ❌ |
-| 5 | `revenuecat-integration` | SDK no app, edge `revenuecat-webhook`, produtos, compra real | ✅ (teste interno basta) |
+| 5 | `revenuecat-integration` | SDK no app, edge `revenuecat-webhook`, produtos, compra real, **cupons/códigos promocionais** (promo codes + offer codes da Play) | ✅ (teste interno basta) |
+
+> **Cupons / códigos promocionais.** A Play Store suporta **promo codes** (resgate
+> avulso, quantidade limitada) e **offer codes / ofertas promocionais** de
+> assinatura (configuradas no base plan, integráveis via RevenueCat). Um cupom
+> resgatado **passa pela loja** → vira compra → webhook → `subscriptions`, então
+> **não exige mudança no `billing-core`** (entitlement é tier-based). Detalhar na
+> spec #5 / manual-2. (Se no futuro quisermos cupom **server-side** sem loja — tipo
+> grant promocional — aí sim entra um `source='promo'` em `subscriptions`; fora do
+> escopo atual.)
 
 ### Manuais operacionais (passo a passo de configuração)
 
@@ -272,7 +281,7 @@ de verdade — o hotsite):
 ### 7.2 Termos de Contrato (assinatura paga)
 
 - **Objeto**: licença de uso do plano pago (Pro/Premium) e seus recursos.
-- **Preço e periodicidade**: valores mensais (R$ 19,90 / R$ 39,90), em BRL,
+- **Preço e periodicidade**: valores mensais (R$ 15,90 / R$ 29,90), em BRL,
   **renovação automática** mensal até cancelamento.
 - **Vendedor / cobrança**: deixar claro que a **cobrança é processada pela loja**
   (Google Play / Apple) como *merchant of record*; o nome na fatura é o da loja.

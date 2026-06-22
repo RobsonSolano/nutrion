@@ -10,6 +10,7 @@ import {
   type StoredChatMessage,
 } from '@/services/chatMessages';
 import { queryKeys, todayKey } from '@/lib/queryKeys';
+import { handleNeedsUpgrade } from '@/lib/paywall';
 import { useAuth } from './useAuth';
 
 export type ChatMessage = {
@@ -198,6 +199,10 @@ export function useChat() {
           }
         }
       } catch (err) {
+        // Gating do billing-core: 402 needs_upgrade → paywall, sem erro inline.
+        // O check é antes de gastar/persistir no servidor, então nada foi consumido.
+        if (handleNeedsUpgrade(err)) return;
+
         const wasAborted = abortController.signal.aborted;
 
         if (!wasAborted) {

@@ -12,6 +12,7 @@ import { createClient } from '@supabase/supabase-js';
 import { generatePlan, type PlanInput } from '../_shared/plan-generator.ts';
 import { formatAnamneseForPrompt } from '../_shared/anamneseFormatter.ts';
 import { getAiCircuitState } from '../_shared/aiCircuit.ts';
+import { getEntitlement, needsUpgrade } from '../_shared/entitlement.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
@@ -71,6 +72,12 @@ serve(async (req: Request) => {
     } = await supabaseAuth.auth.getUser();
     if (callerErr || !caller) {
       return json({ error: 'Unauthorized' }, 401);
+    }
+
+    // Gating de IA de coach (billing-core).
+    const ent = await getEntitlement(supabaseAuth);
+    if (!ent.ai_coach) {
+      return needsUpgrade('coach_generate_plan', CORS);
     }
 
     const body = (await req.json().catch(() => null)) as Body | null;
