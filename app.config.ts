@@ -81,6 +81,9 @@ const config: ExpoConfig = {
     eas: {
       projectId: '6aed6bd3-078e-4424-b7e1-5d4afbd9d624',
     },
+    // URL pública da Política de Privacidade (exigida pela Google Play / App Store).
+    // TODO: trocar pelo URL real quando o hotsite existir (deve casar com legal_documents.privacidade).
+    privacyPolicyUrl: 'https://personafit.app/legal/privacidade',
   },
 };
 
