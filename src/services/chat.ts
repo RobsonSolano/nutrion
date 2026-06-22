@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import type { ChatAiRequest, ChatAiResponse } from '@/types/database';
+import { parseNeedsUpgrade } from '@/lib/needsUpgrade';
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!;
 const ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
@@ -54,6 +55,9 @@ export async function invokeChatAi(
 
   if (!res.ok) {
     const text = await res.text();
+    // Gating do billing-core: 402 needs_upgrade → erro tipado pro paywall.
+    const nu = parseNeedsUpgrade(res.status, text);
+    if (nu) throw nu;
     let detail = text;
     let code: string | null = null;
     try {
