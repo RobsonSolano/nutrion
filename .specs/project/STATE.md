@@ -100,6 +100,26 @@ no valor mínimo. É território do #5; entregar como adendo (pesquisa web + `ma
 #4 legal-docs nesta branch. **Falta: #5 revenuecat-integration** (loja + compra + cupons + downgrade
 "escolhe quem fica" + manual-4 já escrito orientando a config).
 
+### revenuecat-integration #5a (server-first) — implementado em 2026-06-22 (branch `feature/billing-revenuecat-webhook`)
+
+**Decisões (R1–R6):** ver `.specs/features/2026-06-22-revenuecat-integration/context.md`.
+
+- **Entrega:** edge `revenuecat-webhook` (auth por header secreto, `--no-verify-jwt`, upsert em
+  `subscriptions` via service_role; mapa de evento puro `mapEvent.ts` testável) + downgrade
+  "escolhe quem fica" (o adiado do #3): `needsStudentChoice` (puro; dispara só pra professor
+  over-limit não-grandfather — D5) + banner no coach index + tela `escolher-alunos` (marca quem
+  fica ≤ limite, desvincula o resto via `coach-unlink-student` em `Promise.allSettled`).
+- **R1:** #5b (SDK `react-native-purchases` + compra real + ligar a CTA do paywall + `appUserID`)
+  ADIADO pra quando houver Play Console + RevenueCat + dev build. Guiado por manual-2/3/4.
+- **Validado:** `mapEvent` 10 + `downgrade` 5 testes vitest (41/41 total); typecheck verde.
+- **Pendente (UAT/deploy):** webhook por simulação curl + tela de downgrade (auth real);
+  `supabase secrets set RC_WEBHOOK_SECRET` + URL no RevenueCat (operacional).
+
+**Iniciativa de billing:** specs #1–#4 + #5a em develop após merge; **#5b é o que falta** (depende
+do setup operacional da loja — fora de código). `manual-4` orienta a config + responde as dúvidas
+do dev (publicação/valor mínimo/cupom). **Dinheiro:** Google é merchant of record (taxa ~10-15%
+assinatura + impostos), payout automático mensal (~dia 15) na conta bancária do perfil de pagamentos.
+
 ## Dívida técnica conhecida (pré-existente, fora do escopo billing-core)
 
 - **Lint do app:** `npm run lint` acusa **6 erros + 34 warnings** em arquivos `app/`/`src/`
