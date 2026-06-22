@@ -32,6 +32,29 @@
 `Updating vector buckets` (409 FeatureNotEnabled) — incompatibilidade do CLI no local. Workaround:
 `npx supabase@latest start`. Considerar bumpar o pin do CLI (afeta `npm run db:push`/`fn:deploy`).
 
+### paywall-ui (spec #2) — implementado em 2026-06-22 (mesma branch)
+
+**Decisões (C1–C7):** ver `.specs/features/2026-06-22-paywall-ui/context.md`.
+
+- **Entrega:** leitura de entitlement (`useEntitlement` + hooks derivados `useAiPersonalLocked`/
+  `useAiCoachLocked`), detecção tipada do `402 needs_upgrade` (`NeedsUpgradeError` em **4** call
+  sites — incluindo `sanityCheck.ts`, achado no execute), rota modal `app/paywall.tsx` por
+  `feature`, helper `handleNeedsUpgrade`, e gating proativo híbrido (componente `PaywallNotice`)
+  nas 5 superfícies (chat, sanity, gerar plano, import treino, limite de alunos).
+- **CTA "Assinar" = placeholder "em breve" (C1):** compra real (RevenueCat/IAP) é a spec #5.
+  Aluno não vê CTA (C4): IA herdada do coach.
+- **CONCERN de deploy do billing-core RESOLVIDO:** esta é a UI que trata o `402`. Agora o
+  deploy conjunto pode acontecer (`db:push` + `fn:deploy`, ver billing-core VERIFY.md §4) ao
+  fechar a branch. **Ainda não deployado** — fazer no fechamento da branch.
+
+**Tooling:** introduzido **vitest** (`npm test`, `vitest.config.ts`) escopado a `src/lib/**`
+(lógica pura, sem JSX/RN) — primeira base de testes unitários JS do projeto. 19 testes GREEN
+(needsUpgrade, paywall, paywallContent, studentLimit).
+
+**Validado (evidência fresca, 2026-06-22):** `typecheck` verde; `npm test` 19/19; lint dos
+arquivos tocados sem warning/erro **novo**. **Pendente (UAT manual):** runtime das 5 superfícies
+com usuário sem/com direito (guia em `.specs/features/2026-06-22-paywall-ui/VERIFY.md`).
+
 ## Dívida técnica conhecida (pré-existente, fora do escopo billing-core)
 
 - **Lint do app:** `npm run lint` acusa **6 erros + 34 warnings** em arquivos `app/`/`src/`
