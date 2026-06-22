@@ -38,9 +38,14 @@ import {
   useGenerateStudentPlan,
   useSaveStudentPlan,
   useSendStudentCredentials,
+  useStudents,
 } from '@/hooks/useStudents';
 import { useApplyTemplates, useTemplates } from '@/hooks/useTemplates';
+import { useEntitlement, useAiCoachLocked } from '@/hooks/useEntitlement';
 import TemplatePicker from '@/components/coach/TemplatePicker';
+import PaywallNotice from '@/components/ui/PaywallNotice';
+import { handleNeedsUpgrade, openPaywall } from '@/lib/paywall';
+import { isStudentLimitReached } from '@/lib/studentLimit';
 import type { OnboardingPlan } from '@/services/onboarding';
 import type { Profile, Sex, GoalType, WeeklyFrequency } from '@/types/database';
 import { captureError } from '@/lib/sentry';
@@ -105,6 +110,13 @@ export default function AlunoNovo() {
   const sendCredsMutation = useSendStudentCredentials();
   const applyTemplatesMutation = useApplyTemplates();
   const templatesQ = useTemplates({ archived: false });
+  const entQ = useEntitlement();
+  const studentsQ = useStudents();
+  // C6: só bloqueia com entitlement resolvido. IA de coach (gera plano/metas) exige ai_coach.
+  const aiCoachLocked = useAiCoachLocked();
+  const studentLimitReached = entQ.data
+    ? isStudentLimitReached(studentsQ.data?.length ?? 0, entQ.data.student_limit)
+    : false;
 
   const [phase, setPhase] = useState<Phase>('form');
   const [creationMode, setCreationMode] = useState<CreationMode>('ai');
@@ -157,6 +169,16 @@ export default function AlunoNovo() {
 
   async function handleCreateAndGenerate() {
     if (!canSubmitForm) return;
+    // Gating proativo (C6): limite de alunos tem prioridade (bloqueia criar);
+    // depois IA de coach (a tela gera metas por IA nos dois modos).
+    if (studentLimitReached) {
+      openPaywall('student_limit');
+      return;
+    }
+    if (aiCoachLocked) {
+      openPaywall('coach_generate_plan');
+      return;
+    }
     setPhase('generating');
     try {
       // 1. Cria a conta + ficha completa
@@ -212,8 +234,10 @@ export default function AlunoNovo() {
       setPhase('preview');
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err) {
-      captureError(err, { feature: 'coach_create_student' });
       setPhase('form');
+      // Gating do billing-core: 402 (student_limit ou coach_generate_plan) → paywall.
+      if (handleNeedsUpgrade(err)) return;
+      captureError(err, { feature: 'coach_create_student' });
       alert.showError(err);
     }
   }
@@ -228,8 +252,9 @@ export default function AlunoNovo() {
       setPlan(regenerated);
       setPhase('preview');
     } catch (err) {
-      captureError(err, { feature: 'coach_regenerate_plan' });
       setPhase('preview');
+      if (handleNeedsUpgrade(err)) return;
+      captureError(err, { feature: 'coach_regenerate_plan' });
       alert.showError(err);
     }
   }
@@ -535,6 +560,20 @@ export default function AlunoNovo() {
               </View>
             )}
           </Section>
+
+          {studentLimitReached ? (
+            <PaywallNotice
+              feature="student_limit"
+              title="Limite de alunos atingido"
+              description="Você atingiu o limite de alunos do seu plano. Assine pra adicionar mais. Toque pra ver os planos."
+            />
+          ) : aiCoachLocked ? (
+            <PaywallNotice
+              feature="coach_generate_plan"
+              title="IA de professor é um recurso Pro"
+              description="Gere planos e metas dos seus alunos com IA. Assine pra desbloquear. Toque pra ver os planos."
+            />
+          ) : null}
 
           <Button
             label={
