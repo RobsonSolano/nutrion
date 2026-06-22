@@ -24,12 +24,14 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { signUpWithPassword } from '@/services/auth';
+import { recordLegalAcceptanceSafe } from '@/services/legal';
 import { promoteToProfessor } from '@/services/coach';
 import { supabase } from '@/services/supabase';
 import { useUiStore } from '@/stores/useUiStore';
 import { queryKeys } from '@/lib/queryKeys';
 import { colors } from '@/lib/theme';
 import { Button, Input, Logo, Screen } from '@/components/ui';
+import TermsAcceptance from '@/components/TermsAcceptance';
 import { useAlert } from '@/components/GlobalAlertProvider';
 import { captureError } from '@/lib/sentry';
 
@@ -50,6 +52,7 @@ export default function SignupProfessorScreen() {
   const [password, setPassword] = useState('');
   const [bio, setBio] = useState('');
   const [cref, setCref] = useState('');
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   const emailRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
@@ -69,6 +72,8 @@ export default function SignupProfessorScreen() {
         email: email.trim(),
         password,
       });
+      // 1.5) Registra o aceite legal (best-effort, não bloqueia o cadastro).
+      await recordLegalAcceptanceSafe();
       // 2) Promove pra role=professor + cria row em coaches.
       await promoteToProfessor({
         bio: bio.trim() || null,
@@ -96,7 +101,8 @@ export default function SignupProfessorScreen() {
     fullName.trim().length >= 2 &&
     cref.trim().length >= 4 &&
     cref.length <= MAX_CREF &&
-    bio.length <= MAX_BIO;
+    bio.length <= MAX_BIO &&
+    acceptedTerms;
 
   return (
     <Screen variant="hero" edges={['top', 'bottom']}>
@@ -211,6 +217,13 @@ export default function SignupProfessorScreen() {
             <Text className="text-text-muted text-[11px] px-1">
               {bio.length}/{MAX_BIO}
             </Text>
+
+            <View className="mt-1">
+              <TermsAcceptance
+                accepted={acceptedTerms}
+                onChange={setAcceptedTerms}
+              />
+            </View>
 
             <View className="mt-2">
               <Button
