@@ -150,15 +150,15 @@ Regras de resolução por `profiles.role`:
 
 | ID | Descrição | Status |
 |----|-----------|--------|
-| [BILL]-01 | Tabela `subscriptions` | Pending |
-| [BILL]-02 | RLS subscriptions | Pending |
-| [BILL]-03 | Backfill grandfather | Pending |
-| [BILL]-04 | resolve_entitlement — comum | Pending |
-| [BILL]-05 | resolve_entitlement — aluno (herança) | Pending |
-| [BILL]-06 | resolve_entitlement — professor | Pending |
-| [BILL]-07 | Helper `_shared/entitlement.ts` | Pending |
-| [BILL]-08 | Gating chat-ai (chat) | Pending |
-| [BILL]-09 | Gating chat-ai (sanity_check) | Pending |
-| [BILL]-10 | Gating coach-generate-plan | Pending |
-| [BILL]-11 | Gating coach-import-workout-ai | Pending |
-| [BILL]-12 | coach-create-student usa student_limit | Pending |
+| [BILL]-01 | Tabela `subscriptions` | Verified (migration aplica limpa no stub) |
+| [BILL]-02 | RLS subscriptions | Implemented (policy criada; enforcement a validar em e2e) |
+| [BILL]-03 | Backfill grandfather | Verified (1 sub/profile, source=grandfather) |
+| [BILL]-04 | resolve_entitlement — comum | Verified (teste SQL ALL PASS) |
+| [BILL]-05 | resolve_entitlement — aluno (herança) | Verified (teste SQL ALL PASS) |
+| [BILL]-06 | resolve_entitlement — professor | Verified (teste SQL ALL PASS) |
+| [BILL]-07 | Helper `_shared/entitlement.ts` | Implemented (sem typecheck Deno local; review ok) |
+| [BILL]-08 | Gating chat-ai (chat) | Implemented (review ok; runtime no deploy) |
+| [BILL]-09 | Gating chat-ai (sanity_check) | Implemented (review ok; runtime no deploy) |
+| [BILL]-10 | Gating coach-generate-plan | Implemented (review ok; runtime no deploy) |
+| [BILL]-11 | Gating coach-import-workout-ai | Implemented (review ok; runtime no deploy) |
+| [BILL]-12 | coach-create-student usa student_limit | Implemented (review ok; runtime no deploy) |
