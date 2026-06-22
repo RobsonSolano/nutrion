@@ -22,6 +22,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
 import { useStudents, useStudentsTracking } from '@/hooks/useStudents';
+import { useDowngradeStatus } from '@/hooks/useDowngradeStatus';
 import { useCoachRequests } from '@/hooks/useRequests';
 import { usePushToggle } from '@/hooks/usePushToggle';
 import { getMyCoach } from '@/services/coach';
@@ -39,6 +40,7 @@ export default function CoachHome() {
   const router = useRouter();
   const { logout, user } = useAuth();
   const profileQ = useProfile();
+  const downgrade = useDowngradeStatus();
   const studentsQ = useStudents();
   const openRequestsQ = useCoachRequests('open');
   const coachQ = useQuery({
@@ -87,6 +89,21 @@ export default function CoachHome() {
             )}
           </View>
         </View>
+
+        {downgrade.needsChoice && (
+          <Pressable
+            onPress={() => router.push('/(coach)/escolher-alunos' as Href)}
+            className="rounded-2xl border border-warn/50 bg-warn/10 px-4 py-3 active:opacity-80"
+          >
+            <Text className="text-warn text-[13px] font-semibold mb-1">
+              Seu plano agora permite {downgrade.studentLimit} alunos
+            </Text>
+            <Text className="text-text-dim text-[12px] leading-relaxed">
+              Você tem {downgrade.studentCount}. Escolha quais {downgrade.studentLimit}{' '}
+              continuam — os demais ({downgrade.overBy}) viram contas individuais. Toque pra resolver.
+            </Text>
+          </Pressable>
+        )}
 
         <Card padding="md">
           <View className="flex-row items-center justify-between mb-2">
