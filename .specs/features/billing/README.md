@@ -20,10 +20,10 @@ sempre quando IA virar premium) e `ai_usage_log`.
 | Quem | Plano | Preço/mês | Libera |
 |------|-------|-----------|--------|
 | Comum | Free | R$0 | Tudo, **exceto** Chat IA e Sanity Check (mostra "seja Pro") |
-| Comum | Pro | R$19,90 | Chat IA + Sanity Check |
+| Comum | Pro | R$15,90 | Chat IA + Sanity Check |
 | Professor | Free | R$0 | Até **5** alunos · **sem** IA de coach (gerar treino com IA) · alunos **sem** IA |
-| Professor | Pro | R$19,90 | Até **20** alunos · IA de coach · alunos com Chat+Sanity |
-| Professor | Premium | R$39,90 | Alunos **ilimitados** + tudo do Pro |
+| Professor | Pro | R$15,90 | Até **20** alunos · IA de coach · alunos com Chat+Sanity |
+| Professor | Premium | R$29,90 | Alunos **ilimitados** + tudo do Pro |
 
 - **Trial de 7 dias**: todo **comum novo**, todo **ex-aluno desvinculado**, e
   professor nos planos pagos. 1 trial de servidor por vida (`trial_consumed`).
@@ -128,7 +128,7 @@ eas preview → merge → docs). Só **um** depende da Play Console:
 | 2 | `paywall-ui` — leitura de entitlement + telas "seja Pro" + matriz de planos | ❌ Não |
 | 3 | `trial-e-migracao` — trial de servidor + fluxo ex-aluno + downgrade "escolhe quem fica" | ❌ Não (trial não passa pela loja) |
 | 4 | `legal-docs` — 3 páginas públicas no hotsite (Privacidade/Uso/Contrato) + aceite versionado no cadastro (links → URLs do hotsite) | ❌ Não |
-| 5 | `revenuecat-integration` — SDK + webhook + compra real | ✅ Sim (teste interno basta) |
+| 5 | `revenuecat-integration` — SDK + webhook + compra real + cupons/códigos promocionais (loja) | ✅ Sim (teste interno basta) |
 
 ## Manuais passo a passo
 

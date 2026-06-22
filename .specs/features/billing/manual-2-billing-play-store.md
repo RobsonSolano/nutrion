@@ -40,9 +40,9 @@ exibida sendo **Persona Fit**:
 
 | Subscription ID | Quem | Preço base |
 |---|---|---|
-| `nutrion_comum_pro` | Usuário comum Pro | R$ 19,90 |
-| `nutrion_prof_pro` | Professor Pro | R$ 19,90 |
-| `nutrion_prof_premium` | Professor Premium | R$ 39,90 |
+| `nutrion_comum_pro` | Usuário comum Pro | R$ 15,90 |
+| `nutrion_prof_pro` | Professor Pro | R$ 15,90 |
+| `nutrion_prof_premium` | Professor Premium | R$ 29,90 |
 
 Para **cada** assinatura:
 
@@ -60,6 +60,21 @@ Para **cada** assinatura:
 3. **Ativar** o base plan.
 
 > 💡 Não crie planos anuais agora (YAGNI). Tudo mensal, como definido.
+
+### A4. Cupons / códigos promocionais (opcional)
+
+A Play Store oferece dois mecanismos de "cupom", ambos **sem mudança no app/backend**
+(o resgate vira uma compra normal → webhook → `subscriptions`):
+
+- **Promo codes**: **Monetizar → Códigos promocionais**. Códigos avulsos de resgate
+  (quantidade limitada por trimestre). Bom pra cortesias/influencers.
+- **Offer codes / ofertas promocionais**: ofertas vinculadas ao base plan (ex: 1º
+  mês grátis, X% por N meses), resgatáveis por código. Integráveis via RevenueCat
+  (Offerings/Promotional Offers).
+
+> Confirmar limites e disponibilidade na conta no momento da spec #5. Cupom
+> **server-side** (grant sem loja) não é coberto aqui — exigiria `source='promo'`
+> em `subscriptions` (fora do escopo atual).
 
 ### A3. Ficha da loja mínima
 
