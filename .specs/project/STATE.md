@@ -55,6 +55,29 @@
 arquivos tocados sem warning/erro **novo**. **Pendente (UAT manual):** runtime das 5 superfícies
 com usuário sem/com direito (guia em `.specs/features/2026-06-22-paywall-ui/VERIFY.md`).
 
+### trial-e-migração (spec #3) — implementado em 2026-06-22 (branch `feature/billing-trial-e-migracao`)
+
+**Decisões (T1–T7):** ver `.specs/features/2026-06-22-trial-e-migracao/context.md`.
+
+- **Entrega:** `grant_server_trial(uuid)` (concessão única, grandfather-safe + anti-abuso) +
+  **trigger** que concede ao **comum** que conclui/pula onboarding (keyed no onboarding, não no
+  insert — exclui alunos criados pelo coach, T1b) + `coach-unlink-student` concede ao **ex-aluno**
+  (best-effort) e o push `coach_unlinked` menciona o trial. Cliente: `trialDaysLeft` (puro) +
+  `useTrialStatus` + `TrialBanner` discreto no dashboard.
+- **ADIADO pro #5 (T2):** "escolhe quem fica" / downgrade de professor — gatilho real
+  (cancelamento via webhook) mora no #5. **Sem cron de expiração (T5):** `resolve_entitlement`
+  já trata `trial_end<now` ao vivo.
+- **Validado (evidência fresca):** `grant_server_trial.test.sql` → **ALL PASS** (6 casos, schema
+  real local via `npx supabase@latest`); migration limpa/idempotente; `npm test` 23/23; typecheck ok.
+- **Pendente (UAT/deploy):** runtime do trigger + do unlink (precisa `auth.users` real / deploy).
+
+**Estado da iniciativa:** specs #1 (billing-core) e #2 (paywall-ui) em `develop`; #3 nesta branch.
+Próxima: **#4 legal-docs** e **#5 revenuecat-integration** (deploy conjunto + loja).
+
+**Pendência cross-spec registrada (pedido do dev):** manual de configuração da loja respondendo
+(a) se precisa publicar na Play pra assinar, (b) valor mínimo de assinatura, (c) cupom p/ assinar
+no valor mínimo. É território do #5; entregar como adendo (pesquisa web + `manual-2-billing-play-store.md`).
+
 ## Dívida técnica conhecida (pré-existente, fora do escopo billing-core)
 
 - **Lint do app:** `npm run lint` acusa **6 erros + 34 warnings** em arquivos `app/`/`src/`
