@@ -14,6 +14,7 @@
 
 import { serve } from 'std/http/server.ts';
 import { createClient } from '@supabase/supabase-js';
+import { getEntitlement, needsUpgrade } from '../_shared/entitlement.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
@@ -114,31 +115,15 @@ serve(async (req: Request) => {
       );
     }
 
-    // 3. Limite de alunos (coaches.max_students vs count atual).
-    const { data: coach, error: coachErr } = await supabaseService
-      .from('coaches')
-      .select('max_students')
-      .eq('id', caller.id)
-      .single();
-    if (coachErr || !coach) {
-      return json(
-        { error: 'coach_not_found', detail: 'Registro de coach não encontrado.' },
-        500,
-      );
-    }
+    // 3. Limite de alunos (entitlement vs count atual).
+    const ent = await getEntitlement(supabaseAuth);
     const { count: studentsCount } = await supabaseService
       .from('profiles')
       .select('id', { count: 'exact', head: true })
       .eq('coach_id', caller.id)
       .eq('role', 'aluno');
-    if ((studentsCount ?? 0) >= coach.max_students) {
-      return json(
-        {
-          error: 'student_limit_reached',
-          detail: `Limite de ${coach.max_students} alunos atingido.`,
-        },
-        409,
-      );
+    if (ent.student_limit !== null && (studentsCount ?? 0) >= ent.student_limit) {
+      return needsUpgrade('student_limit', CORS);
     }
 
     // 4. Cria auth.users (já confirmado, sem flow de email).
