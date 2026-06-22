@@ -5,7 +5,7 @@
 
 ## O que é
 
-Monetização do NutriOn via **assinatura recorrente mensal** para usuário comum e
+Monetização do Persona Fit via **assinatura recorrente mensal** para usuário comum e
 professor, usando **billing das lojas** (Google Play agora, Apple depois) com
 **RevenueCat** como camada unificadora e **Supabase como fonte de verdade** do
 *entitlement* ("o que esse usuário pode fazer agora?").
@@ -73,6 +73,20 @@ Função `resolve_entitlement(user)` decide:
 - **Downgrade do professor com excedente**: tela "escolha quem fica" (até o novo
   limite); não-escolhidos passam pelo `coach-unlink-student` → cada um vira comum
   com trial.
+- **Cancelamento (assinatura paga)**: feito **pela loja** (Play/Apple), nunca no
+  app. Webhook leva `status` a `canceled` (acesso mantido até `period_end`) e
+  depois a `expired` → vira `free`. **Sem reembolso pro-rata** do período corrente.
+- **"Cancelar" durante o trial de servidor**: não há cobrança nem loja envolvida —
+  basta deixar **expirar** (vira `free` em 7d). A UI pode oferecer "não quero
+  continuar", mas é só informativo; `trial_consumed` **permanece** (o trial não se
+  renova).
+- **Cancelamento total do professor → free**: é um downgrade ao limite free (**5**)
+  e **reusa a mesma tela "escolhe quem fica"** (≤5); excedentes via
+  `coach-unlink-student` (viram comum + trial). Os alunos que ficam **perdem a IA
+  herdada** (coach passou a free) → disparar comunicado a eles.
+- **Reativação após cancelamento**: reassinar é **nova compra pela loja**; o
+  entitlement volta na hora pelo webhook. O **trial não se repete**
+  (`trial_consumed` já marcado).
 
 ## RevenueCat ↔ Supabase (uma porta só)
 
@@ -87,10 +101,16 @@ todos viram só linhas em `subscriptions`. Zero refator.
 
 ## Nomes / recebedor (decisão registrada)
 
+> **Marca vs. namespace técnico.** A marca pública é **Persona Fit** (nome do app,
+> "Vendido por", projeto no RevenueCat). O **namespace técnico continua `nutrion`**,
+> ancorado no package **imutável** `br.com.nutrion`: slug, IDs de produto de
+> assinatura (`nutrion_*`), projeto GCP e service account ficam nesse namespace.
+> Ver app não vira "Persona Fit" no package — só no que é exibido ao usuário.
+
 - **Fatura do cliente**: aparece "Google Play" / "APPLE.COM/BILL" — **nunca** o
   nome pessoal (loja é o *merchant of record*).
 - **Vendedor público na loja**:
-  - **Google Play**: conta individual pode exibir nome de marca ("NutriOn").
+  - **Google Play**: conta individual pode exibir nome de marca ("Persona Fit").
   - **Apple App Store**: conta **individual exibe nome legal pessoal**. Pra ocultar
     e usar nome de empresa → conta **Organization** (exige D-U-N-S ≈ CNPJ).
 - **Decisão**: começa PF/Android com a marca. CNPJ vira pré-requisito só quando
@@ -107,7 +127,7 @@ eas preview → merge → docs). Só **um** depende da Play Console:
 | 1 | `billing-core` — `subscriptions` + `resolve_entitlement` + gating server-side + grandfather | ❌ Não |
 | 2 | `paywall-ui` — leitura de entitlement + telas "seja Pro" + matriz de planos | ❌ Não |
 | 3 | `trial-e-migracao` — trial de servidor + fluxo ex-aluno + downgrade "escolhe quem fica" | ❌ Não (trial não passa pela loja) |
-| 4 | `legal-docs` — aceite + versionamento no cadastro | ❌ Não |
+| 4 | `legal-docs` — 3 páginas públicas no hotsite (Privacidade/Uso/Contrato) + aceite versionado no cadastro (links → URLs do hotsite) | ❌ Não |
 | 5 | `revenuecat-integration` — SDK + webhook + compra real | ✅ Sim (teste interno basta) |
 
 ## Manuais passo a passo
@@ -118,6 +138,11 @@ eas preview → merge → docs). Só **um** depende da Play Console:
 
 ## Pendências (fora de código)
 
+- **Páginas públicas no hotsite** — Privacidade, Termos de Uso e Termos de Contrato
+  com URLs estáveis, apontadas na publicação (Play Console / App Store Connect). A
+  de Privacidade já é obrigatória hoje no Google; Uso/Contrato viram obrigatórias na
+  Apple. O aceite no cadastro linka pra essas URLs. Falta configurar a URL de
+  privacidade no `app.config.ts`. (Detalhe em `estrutura_assinatura.md` §7.0.)
 - **Conteúdo jurídico** dos termos/contrato/cancelamento (validar com advogado).
   A infra (`legal_documents` + `legal_acceptances`) entra na spec `legal-docs`;
   o texto fica como placeholder.

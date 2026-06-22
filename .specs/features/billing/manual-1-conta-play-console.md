@@ -16,12 +16,16 @@
 | | Pessoal | Organização |
 |---|---|---|
 | Exige | CPF | **D-U-N-S number** (≈ CNPJ) |
-| Nome público de dev | Pode ser marca ("NutriOn") no Google | Nome da empresa |
+| Nome público de dev | Pode ser marca ("Persona Fit") no Google | Nome da empresa |
 | Recebimento | Cai no seu CPF | Cai na conta PJ |
 
 **Decisão do projeto (ver README):** começar **pessoal**. No Google dá pra exibir
-"NutriOn" como nome público mesmo em conta pessoal. CNPJ só vira necessário pra
+"Persona Fit" como nome público mesmo em conta pessoal. CNPJ só vira necessário pra
 App Store sem expor nome pessoal. ✅
+
+> **Namespace técnico.** A marca exibida é **Persona Fit**, mas o **package é o
+> imutável `br.com.nutrion`** e os identificadores técnicos (slug, IDs de produto,
+> projeto GCP) seguem o namespace `nutrion`. Não renomeie o package.
 
 ---
 
@@ -74,7 +78,7 @@ Pra vender assinatura você precisa de um **payments profile / conta de comercia
 
 1. **Todos os apps → Criar app**.
 2. Preencha:
-   - **Nome**: `NutriOn` (ou o nome novo — pode trocar depois, mas o
+   - **Nome**: `Persona Fit` (pode trocar depois, mas o
      **package `br.com.nutrion` é imutável**).
    - **Idioma padrão**: Português (Brasil).
    - **App ou jogo**: App. **Gratuito ou pago**: **Gratuito** (a monetização é por
@@ -84,7 +88,7 @@ Pra vender assinatura você precisa de um **payments profile / conta de comercia
 ## Passo 6 — Nome público de desenvolvedor (a marca)
 
 1. **Configuração → Conta de desenvolvedor → Detalhes do desenvolvedor**.
-2. Defina o **nome público** que aparece em "Vendido por" → `NutriOn`.
+2. Defina o **nome público** que aparece em "Vendido por" → `Persona Fit`.
    (No Google, conta pessoal pode usar nome de marca; a identidade verificada
    fica nos bastidores.)
 
@@ -109,7 +113,7 @@ Contas **pessoais novas** no Google hoje exigem, **antes de liberar produção**
 - [ ] Verificação de identidade **enviada** (aguardando ou aprovada).
 - [ ] Perfil de pagamentos criado + conta bancária verificada.
 - [ ] App `br.com.nutrion` criado, gratuito, PT-BR.
-- [ ] Nome público de dev = `NutriOn`.
+- [ ] Nome público de dev = `Persona Fit`.
 - [ ] (Opcional, em paralelo) 12 testers recrutados pro closed testing.
 
 ➡️ Com isso pronto, siga pro **[Manual 2 — billing Play Store](./manual-2-billing-play-store.md)**.

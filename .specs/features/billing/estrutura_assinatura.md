@@ -1,6 +1,6 @@
-# Estrutura de Assinatura — NutriOn
+# Estrutura de Assinatura — Persona Fit
 
-> **Documento mestre.** Consolida o planejamento de monetização do NutriOn:
+> **Documento mestre.** Consolida o planejamento de monetização do Persona Fit:
 > o que será implementado, planos, como funciona, o que usaremos, passos de
 > implementação (com apontamentos pros manuais), documentações/URLs de apoio e
 > os pontos jurídicos a salientar (contrato, uso, estorno).
@@ -13,8 +13,14 @@
 
 ## 1. O que será implementado
 
-Monetização do NutriOn via **assinatura recorrente mensal**, para **usuário comum**
+Monetização do Persona Fit via **assinatura recorrente mensal**, para **usuário comum**
 e **professor**, desbloqueando recursos de IA e capacidade de gestão de alunos.
+
+> **Marca vs. namespace técnico.** A marca pública é **Persona Fit** (nome do app,
+> "Vendido por" na loja, projeto no RevenueCat). O **namespace técnico continua
+> `nutrion`**, ancorado no package **imutável** `br.com.nutrion`: slug, IDs de
+> produto de assinatura (`nutrion_*`), projeto GCP e service account permanecem
+> nesse namespace. Os manuais 1 e 2 seguem essa convenção.
 
 - Cobrança pelo **billing das lojas** (Google Play agora; Apple App Store depois).
 - **RevenueCat** como camada unificadora entre lojas (e Stripe-web no futuro).
@@ -110,6 +116,29 @@ App lê resolve_entitlement → libera/bloqueia IA
   limite; não-escolhidos passam pelo `coach-unlink-student` → cada um vira comum
   com trial.
 
+### 3.6 Cancelamento e reativação (arestas fechadas)
+
+- **Cancelar assinatura paga**: sempre **pela loja** (Play Store / App Store) — o
+  app **não cancela** (loja é o *merchant of record*). A RTDN → RevenueCat →
+  webhook leva `status` a `canceled` (acesso **mantido até `period_end`**, sem
+  corte imediato) e, ao fim do ciclo, a `expired` → `resolve_entitlement` passa a
+  retornar `free`. **Sem reembolso pro-rata** do período já pago.
+- **"Cancelar" durante o trial de servidor**: como o trial de servidor **não passa
+  por loja nem cartão**, não há assinatura a cancelar — basta **deixar expirar**
+  (`trial_end` → vira `free` em 7d, zero cobrança em qualquer cenário). A UI **pode**
+  oferecer um "não quero continuar" (apenas informativo / esconde lembretes); ele
+  **não** zera `trial_consumed` — o trial de servidor continua sendo **1 por vida**.
+- **Cancelamento total do professor (Pro/Premium → free)**: é tratado como um
+  **downgrade ao limite free (5 alunos)** e **reusa a mesma tela "escolhe quem
+  fica" (≤5)**. Os excedentes passam pelo `coach-unlink-student` (viram comum +
+  trial); os alunos que **permanecem perdem a IA herdada** (o coach agora é free) →
+  disparar **comunicado** avisando que o acesso à IA mudou. (Se o professor tinha
+  ≤5 alunos, ninguém é desvinculado; só a IA herdada cai.)
+- **Reativação após cancelamento/expiração**: reassinar é uma **nova compra pela
+  loja**; o webhook reescreve `subscriptions` e o entitlement volta **na hora**. O
+  **trial não se repete** (`trial_consumed` já está marcado) — a reativação vai
+  direto pro plano pago.
+
 ---
 
 ## 4. O que vamos utilizar (stack de billing)
@@ -140,7 +169,7 @@ commits divididos → db:push → fn:deploy → eas update preview → merge →
 | 1 | `billing-core` | Tabela `subscriptions`, RPC `resolve_entitlement`, gating server-side nas edge de IA, honra grandfather | ❌ |
 | 2 | `paywall-ui` | Leitura de entitlement no app, telas "seja Pro", matriz de planos | ❌ |
 | 3 | `trial-e-migracao` | Trial de servidor, fluxo ex-aluno (`coach-unlink-student`), downgrade "escolhe quem fica" | ❌ |
-| 4 | `legal-docs` | `legal_documents` + `legal_acceptances`, aceite no cadastro, telas dos docs | ❌ |
+| 4 | `legal-docs` | **3 páginas públicas no hotsite** (Privacidade/Uso/Contrato) + `legal_documents` + `legal_acceptances` + aceite no cadastro **linkando pras URLs do hotsite** | ❌ |
 | 5 | `revenuecat-integration` | SDK no app, edge `revenuecat-webhook`, produtos, compra real | ✅ (teste interno basta) |
 
 ### Manuais operacionais (passo a passo de configuração)
@@ -179,6 +208,9 @@ commits divididos → db:push → fn:deploy → eas update preview → merge →
 | Apple — D-U-N-S (conta Organization) | https://developer.apple.com/support/D-U-N-S/ |
 | Expo — dev builds (EAS) | https://docs.expo.dev/develop/development-builds/introduction/ |
 | CDC art. 49 — direito de arrependimento | http://www.planalto.gov.br/ccivil_03/leis/l8078compilado.htm |
+| Google Play — exigência de Política de Privacidade | https://support.google.com/googleplay/android-developer/answer/10144311 |
+| Google Play — URL pública de exclusão de conta | https://support.google.com/googleplay/android-developer/answer/13327111 |
+| Apple — EULA / Terms of Use (assinaturas) | https://www.apple.com/legal/internet-services/itunes/dev/stdeula/ |
 
 ---
 
@@ -188,6 +220,36 @@ commits divididos → db:push → fn:deploy → eas update preview → merge →
 > na spec `legal-docs`; o **conteúdo** abaixo é um checklist de tópicos a cobrir,
 > a ser redigido/validado com advogado. Tudo em PT-BR, com versionamento e registro
 > de aceite (`legal_documents` + `legal_acceptances`).
+
+### 7.0 Onde os documentos vivem (hotsite público + aceite in-app)
+
+Cada documento tem **duas superfícies** servindo do **mesmo texto** (fonte única
+de verdade — o hotsite):
+
+1. **Páginas públicas no hotsite** (URLs estáveis, sem login). São o que se aponta
+   no **Play Console** e no **App Store Connect** na hora de publicar. Decisão:
+   começamos com **3 páginas** — **Privacidade**, **Termos de Uso** e **Termos de
+   Contrato** (assinatura).
+2. **Aceite in-app no cadastro** (spec `legal-docs`): checkbox **"Aceito os Termos
+   de Uso e o Termos de Contrato"**, **cada um com seu link** abrindo a página
+   pública do hotsite. O app registra qual **versão** foi aceita
+   (`legal_acceptances`); o **texto** não é duplicado no app — ele linka o hotsite.
+
+**Exigência por loja (por que isso é pré-requisito de publicação):**
+
+| Documento | Google Play | Apple (futuro) |
+|---|---|---|
+| **Política de Privacidade** | **Obrigatória** (listing + Data Safety) | **Obrigatória** |
+| **Termos de Uso** (EULA) | Recomendada | **Obrigatória** p/ apps com assinatura |
+| **Termos de Contrato** (assinatura) | Divulgação clara exigida | **Obrigatória** p/ assinatura auto-renovável |
+
+> ⚠️ Hoje **não há URL de Política de Privacidade** configurada no `app.config.ts`
+> nem na ficha da loja — é a lacuna mais imediata, pois a de Privacidade já é
+> obrigatória no Google **independentemente** de billing.
+>
+> 📌 Relacionado (fora do escopo destas 3 páginas): o Google também exige uma
+> **URL pública de solicitação de exclusão de conta** (a feature in-app já existe).
+> Tratar junto da publicação.
 
 ### 7.1 Termos de Uso (todos os usuários, free incluso)
 
@@ -220,7 +282,12 @@ commits divididos → db:push → fn:deploy → eas update preview → merge →
   **downgrade** (professor escolhe quem fica; excedentes desvinculados); efeito
   sobre a IA dos alunos (herdada do plano).
 - **Cancelamento**: como cancelar (**pela loja**: Play Store / App Store), e que o
-  acesso **permanece até o fim do período** já pago (sem corte imediato).
+  acesso **permanece até o fim do período** já pago (sem corte imediato). Deixar
+  claro que: (a) **cancelar durante o trial não gera cobrança** e a conta volta ao
+  Free ao fim dos 7 dias; (b) **reativar** depois é uma nova assinatura e **não
+  reativa o trial gratuito** (1 por usuário); (c) para o **professor**, cancelar
+  reduz o limite ao Free (5 alunos) — excedentes são desvinculados e a **IA herdada
+  dos alunos cessa** (ver §3.6). O detalhamento técnico desses fluxos está em §3.6.
 - **Reajuste de preço**: como eventuais reajustes são comunicados e aceitos.
 - **Suspensão/encerramento** por violação dos termos.
 - **Legislação aplicável e foro** (Brasil) e relação com o CDC.
@@ -244,6 +311,10 @@ commits divididos → db:push → fn:deploy → eas update preview → merge →
 
 ## 8. Pendências fora de código
 
+- **Páginas públicas no hotsite** (Privacidade, Termos de Uso, Termos de Contrato)
+  com **URLs estáveis** — **pré-requisito de publicação** (ver §7.0). A de
+  Privacidade já é obrigatória hoje; Uso/Contrato viram obrigatórias na Apple.
+  Configurar a **URL de privacidade** no `app.config.ts` / ficha da loja.
 - **Conteúdo jurídico** dos 3 documentos (seção 7) — redação + validação advogado.
 - **Burocracia fiscal**: recebimento PF (CPF) agora; avaliar MEI/CNPJ ao escalar e
   obrigatoriamente para conta **Organization** da Apple (ocultar nome pessoal).

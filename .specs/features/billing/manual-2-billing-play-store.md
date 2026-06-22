@@ -34,7 +34,9 @@ São **assinaturas** (subscriptions), **não** "produtos in-app" (one-time).
 
 ### A2. Criar as 3 assinaturas
 
-Sugestão de IDs (imutáveis depois de criados — escolha com cuidado):
+Sugestão de IDs (imutáveis depois de criados — escolha com cuidado). Seguem o
+**namespace técnico `nutrion`** (mesmo do package `br.com.nutrion`), mesmo a marca
+exibida sendo **Persona Fit**:
 
 | Subscription ID | Quem | Preço base |
 |---|---|---|
@@ -122,7 +124,7 @@ ficar correta.
 ## Parte D — Configurar o app Android no RevenueCat
 
 1. Crie conta em **https://app.revenuecat.com** (free tier cobre o início).
-2. **Create new project** → `NutriOn`.
+2. **Create new project** → `Persona Fit`.
 3. **Add app → Play Store**:
    - **Package name**: `br.com.nutrion`.
    - **Service Account credentials JSON**: cole o conteúdo do JSON do passo B2.
