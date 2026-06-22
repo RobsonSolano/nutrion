@@ -120,6 +120,34 @@ do setup operacional da loja — fora de código). `manual-4` orienta a config +
 do dev (publicação/valor mínimo/cupom). **Dinheiro:** Google é merchant of record (taxa ~10-15%
 assinatura + impostos), payout automático mensal (~dia 15) na conta bancária do perfil de pagamentos.
 
+### UAT de integração server-side (2026-06-22) — billing #1–#5a
+
+Validado localmente (`npx supabase@latest`, schema real):
+- **`supabase db reset`**: TODAS as migrations (incl. billing_core, server_trial, legal_docs)
+  aplicam **limpas do zero, em ordem, sem conflito** (integração #1–#5).
+- **`resolve_entitlement.test.sql` → ALL PASS** · **`grant_server_trial.test.sql` → ALL PASS**.
+- **legal_documents** seedado (3 docs) · objetos presentes (subscriptions, grant_server_trial,
+  trigger de onboarding, legal_acceptances).
+- **Webhook (`revenuecat-webhook`) ciclo completo por simulação (curl):** sem header→401;
+  INITIAL_PURCHASE(premium)→`premium/active` + entitlement `ai_personal=true`; CANCELLATION→
+  `canceled` mas acesso mantido (§3.6, ai_personal segue true até period_end); EXPIRATION→
+  `free/expired`+ai_personal=false. Mapeamento, colunas e onConflict corretos.
+
+> **⚠️ CAVEAT pro deploy (webhook):** no stack LOCAL, `service_role` não tem grant DML em tabelas
+> public (vale pra `subscriptions` E `profiles`/`coaches`) — quirk do `db reset` (o Supabase
+> hospedado concede via bootstrap; por isso os edges atuais escrevem `profiles` em prod sem
+> problema). O webhook foi validado concedendo o grant localmente. **Como o webhook dá ack 200 em
+> erro de upsert (pra não disparar retries do RevenueCat), uma eventual falha de grant em prod
+> seria SILENCIOSA** → **smoke-test obrigatório do webhook logo após o 1º deploy** (simular evento
+> e conferir que `subscriptions` atualizou). Se falhar, adicionar `grant insert,update,select on
+> public.subscriptions to service_role` numa migration.
+
+### #5b (SDK / compra real) — planejado, NÃO implementado
+
+Plano execução-ready em `.specs/features/2026-06-22-revenuecat-integration/plan-5b-sdk.md`.
+Bloqueado por setup operacional (Play Console + RevenueCat + dev build EAS). **Gotcha:**
+entitlements no RevenueCat devem se chamar `pro`/`premium` (o `mapEvent.ts` decide o tier por isso).
+
 ## Dívida técnica conhecida (pré-existente, fora do escopo billing-core)
 
 - **Lint do app:** `npm run lint` acusa **6 erros + 34 warnings** em arquivos `app/`/`src/`
