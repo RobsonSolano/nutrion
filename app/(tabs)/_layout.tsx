@@ -7,6 +7,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
 import { useUnreadStudentRequests } from '@/hooks/useRequests';
 import { useAutoRequestPushPermission } from '@/hooks/useAutoRequestPushPermission';
+import { useActiveWorkoutHeartbeat } from '@/hooks/useActiveWorkoutHeartbeat';
+import { PendingWorkoutModal } from '@/components/workout/PendingWorkoutModal';
 import { useUiStore } from '@/stores/useUiStore';
 import { colors } from '@/lib/theme';
 
@@ -20,6 +22,7 @@ export default function TabsLayout() {
   const unreadCount = isStudent ? unreadQ.data ?? 0 : 0;
 
   useAutoRequestPushPermission();
+  useActiveWorkoutHeartbeat();
 
   if (isBootstrapping) return null;
   // Trava redirects enquanto signup-professor está em curso (evita
@@ -47,6 +50,7 @@ export default function TabsLayout() {
   const tabBarHeight = baseHeight + insets.bottom;
 
   return (
+    <>
     <Tabs
       screenOptions={{
         headerShown: false,
@@ -147,6 +151,8 @@ export default function TabsLayout() {
         }}
       />
     </Tabs>
+    <PendingWorkoutModal />
+    </>
   );
 }
 
