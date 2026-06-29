@@ -183,6 +183,8 @@ export async function insertSession(
     routineName: string;
     durationMin?: number | null;
     notes?: string | null;
+    /** YYYY-MM-DD; default = hoje. Usado pelo ajuste do treino pendente. */
+    day?: string;
   },
 ): Promise<WorkoutSession> {
   const { data, error } = await supabase
@@ -191,7 +193,7 @@ export async function insertSession(
       user_id: userId,
       routine_id: payload.routineId,
       routine_name: payload.routineName,
-      day: dayKey(),
+      day: payload.day ?? dayKey(),
       duration_min: payload.durationMin ?? null,
       notes: payload.notes ?? null,
     })

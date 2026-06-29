@@ -199,6 +199,7 @@ export function useCreateSession() {
       routineName: string;
       durationMin?: number | null;
       notes?: string | null;
+      day?: string;
     }) => {
       if (!user?.id) throw new Error('Sessão expirada.');
       return insertSession(user.id, payload);
