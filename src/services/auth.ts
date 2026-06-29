@@ -1,5 +1,6 @@
 import { IS_EXPO_GO } from '@/lib/platform';
 import { supabase } from './supabase';
+import { unregisterPushNotifications } from './pushNotifications';
 
 const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
 
@@ -95,6 +96,16 @@ export async function signInWithGoogle() {
 }
 
 export async function signOut() {
+  // Limpa o push token do usuário ANTES de sair (precisa da sessão ativa
+  // pra passar na RLS). Sem isso, quem sai continuaria recebendo push no
+  // aparelho mesmo depois do logout, até outra conta logar e re-registrar.
+  // Best-effort: nunca bloqueia o logout.
+  try {
+    await unregisterPushNotifications();
+  } catch {
+    // ignora — sair é mais importante que limpar o token
+  }
+
   if (!IS_EXPO_GO && configured) {
     try {
       const { GoogleSignin } = loadGoogleSignin();
