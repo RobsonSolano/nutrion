@@ -8,13 +8,14 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import {
   X,
   Pencil,
   Trash2,
   GraduationCap,
   BookmarkPlus,
+  Play,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import RoutineEditor from '@/components/routine/RoutineEditor';
@@ -29,6 +30,7 @@ import {
 import { useCreateTemplate } from '@/hooks/useTemplates';
 import { useExerciseImagesMap } from '@/hooks/useExercises';
 import { useProfile } from '@/hooks/useProfile';
+import { useActiveWorkout } from '@/hooks/useActiveWorkout';
 import { useAlert } from '@/components/GlobalAlertProvider';
 import { Button, Card, Screen } from '@/components/ui';
 import Disclaimer from '@/components/Disclaimer';
@@ -50,6 +52,17 @@ export default function RotinaDetalheScreen() {
   const readOnly = isStudent && fromCoach;
   const createTemplate = useCreateTemplate();
   const alert = useAlert();
+  const { active: activeWorkout, start: startWorkout } = useActiveWorkout();
+
+  function handleStart() {
+    if (!detailQ.data) return;
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    // Um treino ativo por vez: se já há, vai pro cronômetro existente.
+    if (!activeWorkout) {
+      startWorkout({ id: detailQ.data.id, name: detailQ.data.name });
+    }
+    router.push('/treino-ativo' as Href);
+  }
 
   const [editing, setEditing] = useState(false);
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
@@ -237,6 +250,14 @@ export default function RotinaDetalheScreen() {
                   </Text>
                 )}
               </Card>
+
+              {!isCoach && (
+                <Button
+                  label={activeWorkout ? 'Ver treino em andamento' : 'Iniciar treino'}
+                  onPress={handleStart}
+                  icon={<Play size={18} color={colors.textInverse} fill={colors.textInverse} />}
+                />
+              )}
 
               <Card padding="md">
                 <Text className="text-text-dim text-[11px] uppercase tracking-widest mb-3">
