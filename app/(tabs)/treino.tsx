@@ -14,7 +14,7 @@ import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
 import { useRoutines } from '@/hooks/useRoutines';
-import { useActiveWorkout } from '@/hooks/useActiveWorkout';
+import { useStartWorkoutFlow } from '@/hooks/useStartWorkoutFlow';
 import { useExerciseGroups } from '@/hooks/useExercises';
 import { queryKeys } from '@/lib/queryKeys';
 import { Button, Card, Screen } from '@/components/ui';
@@ -34,7 +34,7 @@ export default function TreinoScreen() {
 
   const routinesQ = useRoutines();
   const groupsQ = useExerciseGroups();
-  const { active: activeWorkout, start: startWorkout } = useActiveWorkout();
+  const { requestStart } = useStartWorkoutFlow();
 
   const isStudent = profileQ.data?.role === 'aluno';
 
@@ -58,16 +58,6 @@ export default function TreinoScreen() {
     router.push('/rotina/nova' as Href);
   }
 
-  const handleStart = useCallback(
-    (routine: WorkoutRoutineListItem) => {
-      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      // Um treino ativo por vez: se já há um, vai pro cronômetro existente.
-      if (!activeWorkout) startWorkout({ id: routine.id, name: routine.name });
-      router.push('/treino-ativo' as Href);
-    },
-    [activeWorkout, startWorkout, router],
-  );
-
   const renderItem = useCallback(
     ({ item }: { item: WorkoutRoutineListItem }) => (
       <RoutineCard
@@ -77,10 +67,10 @@ export default function TreinoScreen() {
           void Haptics.selectionAsync();
           router.push(`/rotina/${item.id}` as Href);
         }}
-        onStart={() => handleStart(item)}
+        onStart={() => requestStart({ id: item.id, name: item.name })}
       />
     ),
-    [groupsById, router, handleStart],
+    [groupsById, router, requestStart],
   );
 
   const isEmpty = !routinesQ.isLoading && routines.length === 0;

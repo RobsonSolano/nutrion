@@ -9,6 +9,7 @@ import {
   statusOf,
   formatHMS,
   msToMinutes,
+  startAction,
 } from './workoutTimer';
 
 const base = { routineId: 'r1', routineName: 'Peito A', day: '2026-06-29' };
@@ -93,5 +94,21 @@ describe('msToMinutes', () => {
     expect(msToMinutes(60_000)).toBe(1); // 1min
     expect(msToMinutes(90_000)).toBe(2); // 1.5min -> 2
     expect(msToMinutes(150_000)).toBe(3); // 2.5min -> 3
+  });
+});
+
+describe('startAction', () => {
+  const active = startWorkout(
+    { routineId: 'r1', routineName: 'Treino A', day: '2026-06-29' },
+    1000,
+  );
+  it('WT01_sem_ativo_inicia', () => {
+    expect(startAction(null, 'r1')).toBe('start');
+  });
+  it('WT01_mesma_rotina_abre', () => {
+    expect(startAction(active, 'r1')).toBe('open');
+  });
+  it('WT01_outra_rotina_confirma', () => {
+    expect(startAction(active, 'r2')).toBe('confirm');
   });
 });

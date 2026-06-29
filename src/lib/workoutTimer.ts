@@ -79,3 +79,19 @@ export function formatHMS(ms: number): string {
 export function msToMinutes(ms: number): number {
   return Math.max(1, Math.round(ms / 60000));
 }
+
+/**
+ * Decide o que fazer quando o usuário toca uma rotina pra iniciar (evita o
+ * redirect silencioso que mostrava o treino errado):
+ * - 'start'   — não há treino ativo → inicia o novo.
+ * - 'open'    — já há um ativo DA MESMA rotina → só abre (continua).
+ * - 'confirm' — já há um ativo de OUTRA rotina → confirmar (continuar/descartar).
+ */
+export function startAction(
+  active: ActiveWorkout | null,
+  routineId: string | null,
+): 'start' | 'open' | 'confirm' {
+  if (!active) return 'start';
+  if (active.routineId !== null && active.routineId === routineId) return 'open';
+  return 'confirm';
+}
