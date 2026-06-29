@@ -8,7 +8,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Stack, useLocalSearchParams, useRouter, type Href } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import {
   X,
   Pencil,
@@ -30,7 +30,7 @@ import {
 import { useCreateTemplate } from '@/hooks/useTemplates';
 import { useExerciseImagesMap } from '@/hooks/useExercises';
 import { useProfile } from '@/hooks/useProfile';
-import { useActiveWorkout } from '@/hooks/useActiveWorkout';
+import { useStartWorkoutFlow } from '@/hooks/useStartWorkoutFlow';
 import { useAlert } from '@/components/GlobalAlertProvider';
 import { Button, Card, Screen } from '@/components/ui';
 import Disclaimer from '@/components/Disclaimer';
@@ -52,16 +52,11 @@ export default function RotinaDetalheScreen() {
   const readOnly = isStudent && fromCoach;
   const createTemplate = useCreateTemplate();
   const alert = useAlert();
-  const { active: activeWorkout, start: startWorkout } = useActiveWorkout();
+  const { requestStart, active: activeWorkout } = useStartWorkoutFlow();
 
   function handleStart() {
     if (!detailQ.data) return;
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    // Um treino ativo por vez: se já há, vai pro cronômetro existente.
-    if (!activeWorkout) {
-      startWorkout({ id: detailQ.data.id, name: detailQ.data.name });
-    }
-    router.push('/treino-ativo' as Href);
+    requestStart({ id: detailQ.data.id, name: detailQ.data.name });
   }
 
   const [editing, setEditing] = useState(false);
@@ -253,7 +248,11 @@ export default function RotinaDetalheScreen() {
 
               {!isCoach && (
                 <Button
-                  label={activeWorkout ? 'Ver treino em andamento' : 'Iniciar treino'}
+                  label={
+                    activeWorkout?.routineId === detailQ.data.id
+                      ? 'Ver treino em andamento'
+                      : 'Iniciar treino'
+                  }
                   onPress={handleStart}
                   icon={<Play size={18} color={colors.textInverse} fill={colors.textInverse} />}
                 />
