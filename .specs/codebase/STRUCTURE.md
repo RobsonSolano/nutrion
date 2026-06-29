@@ -33,6 +33,7 @@ app/                          # Rotas Expo Router (file-based)
   solicitacoes/               # Fila aluno → professor
   anamnese.tsx                # Anamnese do aluno (autopreenchimento)
   log.tsx                     # Log rápido (refeição/água/treino)
+  treino-ativo.tsx            # Cronômetro de treino em tempo real (start/pausa/parar/salvar)
   sanity-check.tsx            # Validação de prato via foto (IA visão)
   editar-perfil.tsx           # Edição de perfil (comum/aluno) + Zona de risco
   notificacoes.tsx            # Preferências granulares de push
@@ -48,6 +49,7 @@ src/
     routine/                  # Editor + ExerciseReadRow (compartilhado)
     coach/                    # TemplatePicker, RoutinesReorderList, StudentAnamneseCard
     log/                      # Tabs de log rápido
+    workout/                  # PendingWorkoutModal (recuperação de treino pendente)
     AddProgressEntryModal.tsx, AnamneseForm.tsx, AvatarPicker.tsx
     ChatBubble.tsx, CoachCard.tsx, DangerZone.tsx
     Disclaimer.tsx, GlobalAlertProvider.tsx, ProgressTimeline.tsx
@@ -73,11 +75,14 @@ src/
     pushNotifications.ts      # Registro de Expo Push Token + handlers
     pushPreferences.ts        # Opt-in/out granular por tipo
     workoutImport.ts          # Import por texto via IA
+    activeWorkout.ts          # Persistência do treino ativo em AsyncStorage
+    workoutNotifications.ts   # Notificações locais do cronômetro (ongoing + 2h)
   stores/                     # Zustand stores
     useSessionStore.ts        # Sessão Supabase
     useOnboardingStore.ts     # Estado do form de onboarding
     useOnboardingResultStore.ts
     useUiStore.ts             # Estado UI global (ex: isPromotingProfessor)
+    useActiveWorkoutStore.ts  # Treino sendo cronometrado (runtime + espelho AsyncStorage)
   hooks/                      # Hooks React Query e utilitários
                               # (auth, profile, routines, students, anamnese,
                               # contracts, avatar, push prefs, OTA update, etc.)
