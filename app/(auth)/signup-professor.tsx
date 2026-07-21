@@ -32,6 +32,7 @@ import { queryKeys } from '@/lib/queryKeys';
 import { colors } from '@/lib/theme';
 import { Button, Input, Logo, Screen } from '@/components/ui';
 import TermsAcceptance from '@/components/TermsAcceptance';
+import HealthDataConsent from '@/components/HealthDataConsent';
 import { useAlert } from '@/components/GlobalAlertProvider';
 import { captureError } from '@/lib/sentry';
 
@@ -53,6 +54,7 @@ export default function SignupProfessorScreen() {
   const [bio, setBio] = useState('');
   const [cref, setCref] = useState('');
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [healthConsent, setHealthConsent] = useState(false);
 
   const emailRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
@@ -102,7 +104,8 @@ export default function SignupProfessorScreen() {
     cref.trim().length >= 4 &&
     cref.length <= MAX_CREF &&
     bio.length <= MAX_BIO &&
-    acceptedTerms;
+    acceptedTerms &&
+    healthConsent;
 
   return (
     <Screen variant="hero" edges={['top', 'bottom']}>
@@ -218,10 +221,14 @@ export default function SignupProfessorScreen() {
               {bio.length}/{MAX_BIO}
             </Text>
 
-            <View className="mt-1">
+            <View className="mt-1 gap-3">
               <TermsAcceptance
                 accepted={acceptedTerms}
                 onChange={setAcceptedTerms}
+              />
+              <HealthDataConsent
+                accepted={healthConsent}
+                onChange={setHealthConsent}
               />
             </View>
 

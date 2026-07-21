@@ -2,6 +2,18 @@
 
 > Atualizado conforme as features avançam. Carregado no contexto base do nano-spec.
 
+### consentimento-dados-saude (2026-07-21) — em andamento (branch `feature/assinatura`)
+
+**Baseline Test Gate — OVERRIDE [2] (2026-07-21):** vitest 41/41 GREEN, mas `typecheck` tem 1 erro
+**pré-existente e alheio** à task: `src/lib/paywall.ts(6,17)` — `"/paywall"` não bate com as rotas
+tipadas do expo-router (provável `.expo/types` stale, regenera no `expo start`/prebuild). Dev autorizou
+seguir com a feature de consentimento e investigar o `/paywall` à parte depois. Não tocar em paywall.ts nesta task.
+
+**Feature:** adicionar consentimento específico e destacado p/ tratamento de dado de saúde (LGPD art. 11, I)
+no cadastro comum (`login.tsx`, cobre e-mail + Google) e professor (`signup-professor.tsx`). Storage: reusa
+infra de auditoria (`legal_documents` novo `doc_type='consentimento_saude'` requires_acceptance=true →
+`recordLegalAcceptance` grava automático). Grandfather por ausência (existentes não recadastram), igual spec #4.
+
 ## Billing (iniciativa de assinatura)
 
 ### billing-core (spec #1) — implementado em 2026-06-22 (branch `feature/implementacao-assinatura-paginas-auxiliares`)

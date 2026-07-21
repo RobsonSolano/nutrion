@@ -25,6 +25,7 @@ import { useAlert } from '@/components/GlobalAlertProvider';
 import { requestPasswordReset } from '@/services/auth';
 import { recordLegalAcceptanceSafe } from '@/services/legal';
 import TermsAcceptance from '@/components/TermsAcceptance';
+import HealthDataConsent from '@/components/HealthDataConsent';
 import { colors } from '@/lib/theme';
 import { IS_EXPO_GO } from '@/lib/platform';
 import {
@@ -71,6 +72,7 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [healthConsent, setHealthConsent] = useState(false);
 
   const [forgotOpen, setForgotOpen] = useState(false);
   const [forgotLoading, setForgotLoading] = useState(false);
@@ -107,11 +109,13 @@ export default function LoginScreen() {
   const kbHeight = useKeyboardHeight();
 
   async function handleGoogle() {
-    // Aceite dos termos trava o cadastro/login via Google (cobre conta nova via Google).
-    if (!acceptedTerms) {
+    // Aceite dos termos + consentimento de saúde travam o cadastro/login via Google
+    // (cobre conta nova via Google).
+    if (!acceptedTerms || !healthConsent) {
       alert.showAlert({
-        title: 'Aceite os termos',
-        message: 'Marque o aceite dos Termos de Uso e Contrato pra continuar com o Google.',
+        title: 'Marque os dois aceites',
+        message:
+          'Aceite os Termos de Uso e Contrato e autorize o tratamento dos dados de saúde pra continuar com o Google.',
         type: 'warning',
       });
       return;
@@ -146,7 +150,8 @@ export default function LoginScreen() {
   const canSubmit =
     email.length > 3 &&
     password.length >= 6 &&
-    (mode === 'login' || (fullName.trim().length >= 2 && acceptedTerms));
+    (mode === 'login' ||
+      (fullName.trim().length >= 2 && acceptedTerms && healthConsent));
 
   // Aceite aparece quando há ação de criar conta na tela: no signup, ou sempre que
   // o botão Google está disponível (fora do Expo Go) — pois o aceite trava o Google.
@@ -184,10 +189,14 @@ export default function LoginScreen() {
           </View>
 
           {showTerms && (
-            <View className="mb-5">
+            <View className="mb-5 gap-3">
               <TermsAcceptance
                 accepted={acceptedTerms}
                 onChange={setAcceptedTerms}
+              />
+              <HealthDataConsent
+                accepted={healthConsent}
+                onChange={setHealthConsent}
               />
             </View>
           )}
