@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { ScrollView, Text, View, Pressable } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Check, Crown, X } from 'lucide-react-native';
+import { useQueryClient } from '@tanstack/react-query';
 
 import Screen from '@/components/ui/Screen';
 import Card from '@/components/ui/Card';
@@ -8,21 +10,146 @@ import Button from '@/components/ui/Button';
 import { colors } from '@/lib/theme';
 import { paywallContent } from '@/lib/paywallContent';
 import { useProfile } from '@/hooks/useProfile';
+import { useAuth } from '@/hooks/useAuth';
+import { useEntitlement } from '@/hooks/useEntitlement';
+import { useOfferings } from '@/hooks/useOfferings';
 import { useAlert } from '@/components/GlobalAlertProvider';
+import {
+  selectProductId,
+  findPackage,
+  type Role,
+} from '@/lib/purchaseSelection';
+import {
+  purchasePackage,
+  restore,
+  isUserCancelledError,
+  isBillingAvailable,
+} from '@/services/billing';
+import { pollUntil } from '@/lib/pollUntil';
+import { fetchEntitlement } from '@/services/entitlement';
+import { queryKeys } from '@/lib/queryKeys';
+import type { FeatureKey } from '@/types/billing';
 
 /**
- * Paywall contextual (spec #2 paywall-ui). Recebe ?feature= do 402 needs_upgrade e
- * apresenta o upsell. Compra real é a spec #5 → CTA "em breve". Aluno não compra:
- * IA é herdada do plano do professor (C4).
+ * Paywall contextual (spec #2). Recebe ?feature= do 402 needs_upgrade e apresenta o upsell.
+ * Compra real (#5b): CTA → seleciona o produto por role/feature/tier, compra via RevenueCat, e
+ * re-busca o entitlement (resolve_entitlement é a verdade; o webhook #5a é async → poll). Aluno
+ * não compra: IA herdada do professor (C4).
  */
 export default function PaywallScreen() {
   const router = useRouter();
+  const qc = useQueryClient();
   const { feature } = useLocalSearchParams<{ feature?: string }>();
   const { data: profile } = useProfile();
+  const { user } = useAuth();
+  const { data: entitlement } = useEntitlement();
+  const { data: offerings } = useOfferings();
   const alert = useAlert();
+
+  const [busy, setBusy] = useState(false);
 
   const content = paywallContent(feature);
   const isAluno = profile?.role === 'aluno';
+
+  /** Re-busca o entitlement até refletir a compra (webhook async) e atualiza o cache. */
+  async function refreshEntitlement(): Promise<boolean> {
+    const { satisfied } = await pollUntil({
+      fn: fetchEntitlement,
+      done: (e) => e.tier !== 'free',
+    });
+    if (user?.id) {
+      await qc.invalidateQueries({ queryKey: queryKeys.entitlement(user.id) });
+    }
+    return satisfied;
+  }
+
+  async function handleSubscribe() {
+    if (!isBillingAvailable) {
+      alert.showAlert({
+        type: 'info',
+        title: 'Indisponível agora',
+        message:
+          'A assinatura fica disponível no app instalado da loja. Em breve por aqui.',
+      });
+      return;
+    }
+    const productId = selectProductId({
+      role: profile?.role as Role | undefined,
+      feature: feature as FeatureKey | undefined,
+      currentTier: entitlement?.tier ?? 'free',
+    });
+    if (!productId) {
+      alert.showAlert({
+        type: 'info',
+        title: 'Tudo certo',
+        message: 'Seu plano atual já cobre esse recurso.',
+      });
+      return;
+    }
+    const pkg = findPackage(offerings, productId);
+    if (!pkg) {
+      alert.showAlert({
+        type: 'warning',
+        title: 'Planos indisponíveis',
+        message: 'Não consegui carregar os planos agora. Tente de novo em instantes.',
+      });
+      return;
+    }
+
+    setBusy(true);
+    try {
+      await purchasePackage(pkg);
+      const liberado = await refreshEntitlement();
+      if (liberado) {
+        alert.showAlert({
+          type: 'success',
+          title: 'Assinatura ativa!',
+          message: 'Seus recursos foram liberados. Aproveite 💪',
+        });
+      } else {
+        alert.showAlert({
+          type: 'info',
+          title: 'Compra recebida',
+          message:
+            'Estamos liberando seu acesso — pode levar alguns instantes. Se demorar, toque em "Restaurar compras".',
+        });
+      }
+      router.back();
+    } catch (err) {
+      if (isUserCancelledError(err)) return; // usuário cancelou — sem erro técnico
+      alert.showError(err);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleRestore() {
+    if (!isBillingAvailable) return;
+    setBusy(true);
+    try {
+      await restore();
+      const liberado = await refreshEntitlement();
+      if (liberado) {
+        alert.showAlert({
+          type: 'success',
+          title: 'Assinatura restaurada!',
+          message: 'Seus recursos foram liberados novamente.',
+        });
+        router.back();
+      } else {
+        alert.showAlert({
+          type: 'info',
+          title: 'Nada pra restaurar',
+          message: 'Não encontramos uma assinatura ativa nesta conta.',
+        });
+      }
+    } catch (err) {
+      if (isUserCancelledError(err)) return;
+      alert.showError(err);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <>
@@ -99,20 +226,24 @@ export default function PaywallScreen() {
                 variant="primary"
                 size="lg"
                 fullWidth
-                onPress={() =>
-                  alert.showAlert({
-                    type: 'info',
-                    title: 'Em breve',
-                    message:
-                      'A assinatura está a caminho. Avisaremos assim que abrir pra você desbloquear esses recursos.',
-                  })
-                }
+                loading={busy}
+                disabled={busy}
+                onPress={handleSubscribe}
+              />
+              <Button
+                label="Já assinei · Restaurar compras"
+                variant="ghost"
+                size="md"
+                fullWidth
+                disabled={busy}
+                onPress={handleRestore}
               />
               <Button
                 label="Agora não"
                 variant="ghost"
                 size="md"
                 fullWidth
+                disabled={busy}
                 onPress={() => router.back()}
               />
             </View>
