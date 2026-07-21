@@ -23,12 +23,12 @@ create table if not exists public.legal_documents (
 comment on table public.legal_documents is
   'Catálogo de documentos legais (metadados + URL pública do hotsite). Texto não fica aqui.';
 
--- Seed — URLs PLACEHOLDER. TODO: trocar pelas URLs reais do hotsite quando existir
--- (pode ser via update direto, sem release do app).
+-- Seed — URLs reais do hotsite (páginas publicadas em hotsite/public/legal/).
+-- version = data da última atualização dos documentos publicados.
 insert into public.legal_documents (doc_type, version, url, title, requires_acceptance) values
-  ('privacidade',    '2026-06-22','https://personafit.app/legal/privacidade',  'Política de Privacidade', false),
-  ('termos_uso',     '2026-06-22','https://personafit.app/legal/termos-de-uso','Termos de Uso',           true),
-  ('termos_contrato','2026-06-22','https://personafit.app/legal/contrato',     'Termos de Contrato',      true)
+  ('privacidade',    '2026-07-21','https://personafit.app/legal/privacidade',  'Política de Privacidade', false),
+  ('termos_uso',     '2026-07-21','https://personafit.app/legal/termos-de-uso','Termos de Uso',           true),
+  ('termos_contrato','2026-07-21','https://personafit.app/legal/contrato',     'Termos de Contrato',      true)
 on conflict (doc_type) do nothing;
 
 -- ---------------------------------------------------------------------
