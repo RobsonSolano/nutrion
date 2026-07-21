@@ -26,9 +26,9 @@ comment on table public.legal_documents is
 -- Seed — URLs reais do hotsite (páginas publicadas em hotsite/public/legal/).
 -- version = data da última atualização dos documentos publicados.
 insert into public.legal_documents (doc_type, version, url, title, requires_acceptance) values
-  ('privacidade',    '2026-07-21','https://personafit.app/legal/privacidade',  'Política de Privacidade', false),
-  ('termos_uso',     '2026-07-21','https://personafit.app/legal/termos-de-uso','Termos de Uso',           true),
-  ('termos_contrato','2026-07-21','https://personafit.app/legal/contrato',     'Termos de Contrato',      true)
+  ('privacidade',    '2026-07-21','https://apppersonafit.vercel.app/legal/privacidade',  'Política de Privacidade', false),
+  ('termos_uso',     '2026-07-21','https://apppersonafit.vercel.app/legal/termos-de-uso','Termos de Uso',           true),
+  ('termos_contrato','2026-07-21','https://apppersonafit.vercel.app/legal/contrato',     'Termos de Contrato',      true)
 on conflict (doc_type) do nothing;
 
 -- ---------------------------------------------------------------------
