@@ -423,9 +423,15 @@ serve(async (req: Request) => {
         model: modelToUse,
         messages,
         temperature: 0.6,
-        max_tokens: 700,
+        max_tokens: isMultimodal ? 1500 : 700,
         top_p: 0.9,
         stream: useStream,
+        // Visão usa o qwen (único modelo de visão da Groq), que é "reasoning":
+        // por padrão gasta 1000+ tokens "pensando", estoura o max_tokens e
+        // trunca o JSON (erro json_validate_failed). reasoning_effort:'none'
+        // desliga o raciocínio → JSON direto, rápido e sem estourar o TPM do
+        // free tier. (llama, no caminho de texto, não é reasoning — não recebe.)
+        ...(isMultimodal ? { reasoning_effort: 'none' } : {}),
         // JSON mode no sanity_check: força a API a retornar JSON valido.
         // Resolve definitivamente o problema do modelo retornar texto livre
         // que o parser nao consegue extrair.

@@ -103,9 +103,9 @@ Regras gerais (siga com rigor):
   Déficit 15-20% para perda; superávit 10-15% para ganho; manutenção = TMB*fator.
 - Proteína: 1.6-2.2 g/kg de peso corporal, conforme treino e objetivo.
 - Água: 35 ml/kg base. +500ml se treina >= 3x/semana.
-- Use APENAS exercícios do catálogo fornecido; cada item DEVE vir com o
-  "exercise_id" exato retornado no catálogo (UUID). Use "exercise_name" igual
-  ao "name" do catálogo.
+- Use APENAS exercícios do catálogo fornecido; cada item DEVE ter
+  "exercise_name" IDÊNTICO ao "name" do catálogo (é por esse nome que casamos
+  com a base — nome diferente = exercício descartado).
 - Respeite limitações físicas declaradas: não prescreva movimentos que piorem
   a condição (ex: joelho instável → evitar agachamento profundo/pliometria).
 - Respeite o objetivo: perda de gordura → compostos + finalização aeróbica;
@@ -137,7 +137,6 @@ Formato de saída obrigatório (somente JSON válido, nada mais):
       "description": "Foco força e hipertrofia",
       "exercises": [
         {
-          "exercise_id": "uuid-do-catalogo",
           "exercise_name": "Supino reto (barra)",
           "sets": 4,
           "reps_min": 6,
@@ -347,19 +346,28 @@ export function buildUserBlock(
   }
 
   if (!onlyFood) {
+    // Enxuga o catálogo pro prompt caber no TPM do free tier da Groq (12k
+    // tokens). Antes mandava os 269 exercícios com UUID+equipment+is_compound
+    // (~14k tokens só de catálogo → estourava). Agora: só nome+modality+grupo
+    // (sem UUID — o sanitizador casa por NOME via byName), no máximo N por
+    // grupo (compostos primeiro, pra priorizar os principais). O exercise_id
+    // salvo vem do nosso catálogo (hit.id), não da IA.
+    const PER_GROUP = 8;
+    const seen = new Map<string, number>();
+    const slim = [...catalog]
+      .sort((a, b) => (b.is_compound ? 1 : 0) - (a.is_compound ? 1 : 0))
+      .filter((e) => {
+        const key = `${e.modality}:${e.group_slug ?? '_'}`;
+        const n = seen.get(key) ?? 0;
+        if (n >= PER_GROUP) return false;
+        seen.set(key, n + 1);
+        return true;
+      })
+      .map((e) => ({ name: e.name, modality: e.modality, group: e.group_slug }));
     lines.push(
       '',
-      'Catálogo de exercícios disponíveis (use EXATAMENTE estes ids/nomes; cada exercício tem sua "modality" — rotina escolhe um modality e usa só exercícios desse modality):',
-      JSON.stringify(
-        catalog.map((e) => ({
-          id: e.id,
-          name: e.name,
-          modality: e.modality,
-          group_slug: e.group_slug,
-          equipment: e.equipment,
-          is_compound: e.is_compound,
-        })),
-      ),
+      `Catálogo de exercícios (${slim.length} opções — use EXATAMENTE estes NOMES no campo "exercise_name"; cada exercício tem sua "modality"; cada rotina é monomodal e usa só exercícios daquele modality):`,
+      JSON.stringify(slim),
     );
   }
 
@@ -585,7 +593,10 @@ export async function generatePlan(
         { role: 'user', content: userBlock },
       ],
       temperature: 0.4,
-      max_tokens: 2400,
+      // Espaço p/ o plano completo (rotinas + exercícios + rationale) sem
+      // truncar, mas contido: prompt + max_tokens tem que caber no TPM de 12k
+      // do free tier (com o catálogo enxuto, o prompt agora é pequeno).
+      max_tokens: 3500,
       top_p: 0.9,
       response_format: { type: 'json_object' },
     }),
