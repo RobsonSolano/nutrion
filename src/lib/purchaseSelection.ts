@@ -36,7 +36,7 @@ export function selectProductId({ role, feature, currentTier }: Params): Product
     if (feature === 'student_limit' && currentTier === 'pro') {
       return 'nutrion_prof_premium';
     }
-    // Free (IA de coach ou limite) → pro cobre (IA + 20 alunos).
+    // Free (IA de coach ou limite) → pro cobre (IA + até 5 alunos).
     if (currentTier === 'free') return 'nutrion_prof_pro';
     // Pro pedindo feature de IA que o pro já cobre → nada a fazer (defensivo).
     return null;

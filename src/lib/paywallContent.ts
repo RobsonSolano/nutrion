@@ -44,7 +44,7 @@ const STUDENT_LIMIT: PaywallContent = {
   title: 'Adicione mais alunos',
   subtitle: 'Você atingiu o limite de alunos do seu plano atual.',
   bullets: [
-    'Pro: gerencie até 20 alunos',
+    'Pro: gerencie até 5 alunos',
     'Premium: alunos ilimitados',
     'Seus alunos atuais continuam sem mudança',
   ],
