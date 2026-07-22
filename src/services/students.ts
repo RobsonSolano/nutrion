@@ -6,6 +6,7 @@ import type {
   WeeklyFrequency,
 } from '@/types/database';
 import type { OnboardingPlan } from './onboarding';
+import { parseNeedsUpgrade } from '@/lib/needsUpgrade';
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!;
 const ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
@@ -120,6 +121,9 @@ async function callFn<T>(name: string, body: unknown): Promise<T> {
 
   if (!res.ok) {
     const text = await res.text();
+    // Gating do billing-core: 402 needs_upgrade → erro tipado pro paywall.
+    const nu = parseNeedsUpgrade(res.status, text);
+    if (nu) throw nu;
     let detail = text;
     try {
       const parsed = JSON.parse(text);

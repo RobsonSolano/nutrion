@@ -11,6 +11,14 @@ import {
   type DeleteMyAccountError,
 } from '@/services/auth';
 import { useSessionStore } from '@/stores/useSessionStore';
+import { initBilling, logoutBilling } from '@/services/billing';
+
+// Sincroniza o billing (RevenueCat) com a sessão: identifica o SDK com profiles.id (= user.id,
+// que o webhook #5a usa) ao logar, e desidentifica no logout. Best-effort e no-op sem billing.
+function syncBilling(userId: string | undefined) {
+  if (userId) void initBilling(userId);
+  else void logoutBilling();
+}
 
 export function useAuthBootstrap() {
   const setSession = useSessionStore((s) => s.setSession);
@@ -23,10 +31,12 @@ export function useAuthBootstrap() {
       if (!alive) return;
       setSession(data.session);
       setBootstrapping(false);
+      syncBilling(data.session?.user?.id);
     });
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
+      syncBilling(session?.user?.id);
     });
 
     return () => {

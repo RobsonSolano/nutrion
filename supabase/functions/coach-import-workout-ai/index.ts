@@ -10,6 +10,7 @@
 import { serve } from 'std/http/server.ts';
 import { createClient } from '@supabase/supabase-js';
 import { getAiCircuitState } from '../_shared/aiCircuit.ts';
+import { getEntitlement, needsUpgrade } from '../_shared/entitlement.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
@@ -143,6 +144,12 @@ serve(async (req: Request) => {
       .maybeSingle();
     if (callerProfile?.role !== 'professor') {
       return json({ error: 'forbidden', detail: 'Apenas professores.' }, 403);
+    }
+
+    // Gating de IA de coach (billing-core).
+    const ent = await getEntitlement(supabaseAuth);
+    if (!ent.ai_coach) {
+      return needsUpgrade('coach_import_workout', CORS);
     }
 
     const body = (await req.json().catch(() => null)) as Body | null;

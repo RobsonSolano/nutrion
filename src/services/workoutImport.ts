@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import type { Modality } from '@/types/database';
+import { needsUpgradeFromInvokeError } from '@/lib/needsUpgrade';
 
 export type ImportImage = {
   base64: string;
@@ -47,7 +48,12 @@ export async function importWorkoutFromAi(params: {
       },
     },
   );
-  if (error) throw error;
+  if (error) {
+    // Gating do billing-core: o invoke engole o body em 402 — lê via context.
+    const nu = await needsUpgradeFromInvokeError(error);
+    if (nu) throw nu;
+    throw error;
+  }
   if (!data) throw new Error('Resposta vazia ao importar treino.');
   return data;
 }

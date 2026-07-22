@@ -22,9 +22,12 @@ import {
   AlertTriangle,
 } from 'lucide-react-native';
 import { Button, Card, Screen } from '@/components/ui';
+import PaywallNotice from '@/components/ui/PaywallNotice';
 import { useAlert } from '@/components/GlobalAlertProvider';
 import { colors } from '@/lib/theme';
 import { readFileAsBase64 } from '@/lib/uploadFile';
+import { handleNeedsUpgrade, openPaywall } from '@/lib/paywall';
+import { useAiCoachLocked } from '@/hooks/useEntitlement';
 import {
   useImportWorkoutAi,
   useSaveImportedWorkout,
@@ -60,6 +63,7 @@ export default function ImportWorkoutScreen() {
 
   const importMutation = useImportWorkoutAi();
   const saveMutation = useSaveImportedWorkout();
+  const aiCoachLocked = useAiCoachLocked();
 
   const [phase, setPhase] = useState<Phase>('setup');
   const [images, setImages] = useState<LocalImage[]>([]);
@@ -118,6 +122,10 @@ export default function ImportWorkoutScreen() {
   }
 
   async function handleGenerate() {
+    if (aiCoachLocked) {
+      openPaywall('coach_import_workout');
+      return;
+    }
     if (images.length === 0 && text.trim().length === 0) {
       Alert.alert(
         'Falta conteúdo',
@@ -151,6 +159,8 @@ export default function ImportWorkoutScreen() {
       setPhase('preview');
     } catch (err) {
       setPhase('setup');
+      // Gating do billing-core: 402 needs_upgrade → paywall.
+      if (handleNeedsUpgrade(err)) return;
       alert.showError(err);
     }
   }
@@ -310,6 +320,14 @@ export default function ImportWorkoutScreen() {
             {text.length} caracteres
           </Text>
         </Card>
+
+        {aiCoachLocked && (
+          <PaywallNotice
+            feature="coach_import_workout"
+            title="Importar treino por IA é Pro"
+            description="Extraia treinos de fotos e textos automaticamente. Assine pra desbloquear. Toque pra ver os planos."
+          />
+        )}
 
         <Button
           label="Gerar treino com IA"

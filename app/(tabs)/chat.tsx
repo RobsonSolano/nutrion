@@ -14,11 +14,14 @@ import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useChat, type ChatMessage } from '@/hooks/useChat';
 import { useProfile } from '@/hooks/useProfile';
+import { useAiPersonalLocked } from '@/hooks/useEntitlement';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { Screen } from '@/components/ui';
+import PaywallNotice from '@/components/ui/PaywallNotice';
 import ChatBubble from '@/components/ChatBubble';
 import TypingIndicator from '@/components/TypingIndicator';
 import { colors } from '@/lib/theme';
+import { openPaywall } from '@/lib/paywall';
 
 const SUGGESTIONS = [
   'Como estou em relação à minha meta de hoje?',
@@ -44,6 +47,7 @@ export default function ChatScreen() {
     maxChars,
   } = useChat();
   const profileQ = useProfile();
+  const aiLocked = useAiPersonalLocked();
   const insets = useSafeAreaInsets();
   const kbHeight = useKeyboardHeight();
   const isKeyboardOpen = kbHeight > 0;
@@ -61,10 +65,14 @@ export default function ChatScreen() {
   const handleSend = useCallback(() => {
     const trimmed = text.trim();
     if (!trimmed || isSending || limitReached) return;
+    if (aiLocked) {
+      openPaywall('chat');
+      return;
+    }
     setText('');
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     sendMessage(trimmed);
-  }, [text, isSending, limitReached, sendMessage]);
+  }, [text, isSending, limitReached, aiLocked, sendMessage]);
 
   const handleSuggestion = useCallback(
     (s: string) => {
@@ -206,7 +214,14 @@ export default function ChatScreen() {
           className="px-4 pt-2 border-t border-border-subtle bg-bg-deep"
           style={{ paddingBottom: isKeyboardOpen ? 8 : tabBarHeight + 8 }}
         >
-          {limitReached ? (
+          {aiLocked ? (
+            <PaywallNotice
+              feature="chat"
+              title="Chat IA é um recurso Pro"
+              description="Assine pra conversar com a IA sobre seus treinos e dieta. Toque pra ver os planos."
+              style={{ marginBottom: 8 }}
+            />
+          ) : limitReached ? (
             <View className="rounded-2xl border border-warn/40 bg-warn/10 px-4 py-3 mb-2">
               <Text className="text-warn text-[13px] font-semibold mb-1">
                 Limite diário atingido

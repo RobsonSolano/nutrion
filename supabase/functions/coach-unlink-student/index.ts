@@ -134,6 +134,19 @@ serve(async (req: Request) => {
       );
     }
 
+    // 3.5 Concede o trial de servidor ao ex-aluno (spec #3, [TRIAL]-03).
+    // Best-effort: não reverte o desvínculo se falhar. grant_server_trial é
+    // grandfather-safe + anti-abuso (não concede a quem é grandfather/já consumiu).
+    let trialGranted = false;
+    try {
+      const { data: grantResult } = await supaService.rpc('grant_server_trial', {
+        p_uid: body.student_id,
+      });
+      trialGranted = grantResult === 'granted';
+    } catch (err) {
+      console.error('[coach-unlink] grant_server_trial falhou:', err);
+    }
+
     // 4. Push pro aluno (fire-and-forget). Falha não impacta retorno.
     const daysWithCoach = student.created_at
       ? Math.max(
@@ -148,11 +161,13 @@ serve(async (req: Request) => {
     void sendPushAi(supaService, body.student_id, 'coach_unlinked', {
       coach_name: (coachProfile?.full_name as string | null) ?? 'Seu professor',
       days_with_coach: daysWithCoach,
+      trial_granted: trialGranted,
+      trial_days: trialGranted ? 7 : 0,
     }).catch((err) => {
       console.error('[coach-unlink] push falhou:', err);
     });
 
-    return json({ ok: true });
+    return json({ ok: true, trial_granted: trialGranted });
   } catch (err) {
     console.error('[coach-unlink-student] unexpected:', err);
     return json(

@@ -178,8 +178,9 @@ Você está escrevendo pra um PROFESSOR (coach), avisando que um aluno acabou de
       return `Contexto:
 - Coach: ${ctx.coach_name ?? 'seu professor'}
 - Tempo com o coach: ${ctx.days_with_coach ?? 0} dias
+${ctx.trial_granted ? `- Ganhou ${ctx.trial_days ?? 7} dias de teste grátis do plano Pro (Chat IA + Sanity Check)` : ''}
 
-Você está escrevendo pra um ALUNO que acabou de ser desvinculado pelo professor dele. Tom: factual, sem culpa nem dramatização. Reconhece a mudança e enfatiza que agora ele gerencia o próprio plano. NÃO use emoji. NÃO julga o motivo do desvínculo.`;
+Você está escrevendo pra um ALUNO que acabou de ser desvinculado pelo professor dele. Tom: factual, sem culpa nem dramatização. Reconhece a mudança e enfatiza que agora ele gerencia o próprio plano.${ctx.trial_granted ? ' Mencione, de forma breve e animadora, que ele ganhou dias de teste grátis do Pro pra continuar usando a IA.' : ''} NÃO use emoji. NÃO julga o motivo do desvínculo.`;
   }
 }
 
