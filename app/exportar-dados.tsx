@@ -54,7 +54,7 @@ export default function ExportarDadosScreen() {
       // Tenta compartilhar arquivo (iOS) ou texto inline (fallback Android).
       await Share.share(
         {
-          title: 'Meus dados NutriOn',
+          title: 'Meus dados Persona Fit',
           message: json,
           url: fileUri,
         },

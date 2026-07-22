@@ -64,7 +64,7 @@ function parseError(err: unknown): { title: string; message: string } {
     return {
       title: 'Email já cadastrado',
       message:
-        'Esse email já tem uma conta no NutriOn. Use outro email ou faça login com a conta existente.',
+        'Esse email já tem uma conta no Persona Fit. Use outro email ou faça login com a conta existente.',
     };
   }
   if (lower.includes('weak_password')) {

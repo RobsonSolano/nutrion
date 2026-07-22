@@ -27,13 +27,16 @@ import { runSanityCheck, type SanityCheckResult } from '@/services/sanityCheck';
 import { useCreateFoodLog } from '@/hooks/useLogMutations';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { useDailySanityUsage } from '@/hooks/useAiUsage';
+import { useAiPersonalLocked } from '@/hooks/useEntitlement';
 import { useImagePicker } from '@/hooks/useImagePicker';
 import { useAlert } from '@/components/GlobalAlertProvider';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys, todayKey } from '@/lib/queryKeys';
 import { useAuth } from '@/hooks/useAuth';
 import { Button, Card, Input, MarkdownText, Screen } from '@/components/ui';
+import PaywallNotice from '@/components/ui/PaywallNotice';
 import { colors } from '@/lib/theme';
+import { handleNeedsUpgrade, openPaywall } from '@/lib/paywall';
 import { captureError } from '@/lib/sentry';
 
 type Stage = 'input' | 'analyzing' | 'result';
@@ -43,6 +46,7 @@ export default function SanityCheckScreen() {
   const createFood = useCreateFoodLog();
   const kbHeight = useKeyboardHeight();
   const sanityUsage = useDailySanityUsage();
+  const aiLocked = useAiPersonalLocked();
   const qc = useQueryClient();
   const { user } = useAuth();
   const alert = useAlert();
@@ -54,6 +58,10 @@ export default function SanityCheckScreen() {
   const [result, setResult] = useState<SanityCheckResult | null>(null);
 
   async function handleAnalyze() {
+    if (aiLocked) {
+      openPaywall('sanity_check');
+      return;
+    }
     if (!photo.base64) {
       alert.showAlert({
         title: 'Foto do prato',
@@ -96,6 +104,8 @@ export default function SanityCheckScreen() {
       }
     } catch (err) {
       setStage('input');
+      // Gating do billing-core: 402 needs_upgrade → paywall, sem erro.
+      if (handleNeedsUpgrade(err)) return;
       const message =
         err instanceof Error
           ? err.message
@@ -195,6 +205,14 @@ export default function SanityCheckScreen() {
             automaticallyAdjustKeyboardInsets
             showsVerticalScrollIndicator={false}
           >
+            {stage === 'input' && aiLocked && (
+              <PaywallNotice
+                feature="sanity_check"
+                title="Sanity check é um recurso Pro"
+                description="Assine pra validar seus pratos por foto com IA. Toque pra ver os planos."
+              />
+            )}
+
             {stage === 'input' && (
               <InputStage
                 photoUri={photo.uri}

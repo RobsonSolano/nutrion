@@ -8,12 +8,13 @@ import {
 } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter, type Href } from 'expo-router';
-import { Dumbbell, Plus, ChevronRight, BookOpen, Activity, GraduationCap } from 'lucide-react-native';
+import { Dumbbell, Plus, ChevronRight, BookOpen, Activity, GraduationCap, Play } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
 import { useRoutines } from '@/hooks/useRoutines';
+import { useStartWorkoutFlow } from '@/hooks/useStartWorkoutFlow';
 import { useExerciseGroups } from '@/hooks/useExercises';
 import { queryKeys } from '@/lib/queryKeys';
 import { Button, Card, Screen } from '@/components/ui';
@@ -33,6 +34,7 @@ export default function TreinoScreen() {
 
   const routinesQ = useRoutines();
   const groupsQ = useExerciseGroups();
+  const { requestStart } = useStartWorkoutFlow();
 
   const isStudent = profileQ.data?.role === 'aluno';
 
@@ -65,9 +67,10 @@ export default function TreinoScreen() {
           void Haptics.selectionAsync();
           router.push(`/rotina/${item.id}` as Href);
         }}
+        onStart={() => requestStart({ id: item.id, name: item.name })}
       />
     ),
-    [groupsById, router],
+    [groupsById, router, requestStart],
   );
 
   const isEmpty = !routinesQ.isLoading && routines.length === 0;
@@ -142,10 +145,12 @@ function RoutineCard({
   routine,
   group,
   onPress,
+  onStart,
 }: {
   routine: WorkoutRoutineListItem;
   group: ExerciseGroup | null;
   onPress: () => void;
+  onStart: () => void;
 }) {
   const exercisesLabel =
     routine.exercises_count === 1
@@ -178,6 +183,13 @@ function RoutineCard({
               </View>
             )}
           </View>
+          <Pressable
+            onPress={onStart}
+            hitSlop={10}
+            className="h-10 w-10 rounded-full bg-accent/15 border border-accent/40 items-center justify-center active:opacity-70"
+          >
+            <Play size={16} color={colors.accent} fill={colors.accent} />
+          </Pressable>
           <ChevronRight size={16} color={colors.textMuted} />
         </View>
       </Card>

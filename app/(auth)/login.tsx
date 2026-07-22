@@ -23,6 +23,9 @@ import { useAuth } from '@/hooks/useAuth';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { useAlert } from '@/components/GlobalAlertProvider';
 import { requestPasswordReset } from '@/services/auth';
+import { recordLegalAcceptanceSafe } from '@/services/legal';
+import TermsAcceptance from '@/components/TermsAcceptance';
+import HealthDataConsent from '@/components/HealthDataConsent';
 import { colors } from '@/lib/theme';
 import { IS_EXPO_GO } from '@/lib/platform';
 import {
@@ -68,6 +71,8 @@ export default function LoginScreen() {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [healthConsent, setHealthConsent] = useState(false);
 
   const [forgotOpen, setForgotOpen] = useState(false);
   const [forgotLoading, setForgotLoading] = useState(false);
@@ -104,9 +109,21 @@ export default function LoginScreen() {
   const kbHeight = useKeyboardHeight();
 
   async function handleGoogle() {
+    // Aceite dos termos + consentimento de saúde travam o cadastro/login via Google
+    // (cobre conta nova via Google).
+    if (!acceptedTerms || !healthConsent) {
+      alert.showAlert({
+        title: 'Marque os dois aceites',
+        message:
+          'Aceite os Termos de Uso e Contrato e autorize o tratamento dos dados de saúde pra continuar com o Google.',
+        type: 'warning',
+      });
+      return;
+    }
     setLoading(true);
     try {
       await loginWithGoogle();
+      await recordLegalAcceptanceSafe(); // auditoria do aceite — best-effort
     } catch (err) {
       alert.showError(err);
     } finally {
@@ -121,6 +138,7 @@ export default function LoginScreen() {
         await loginWithEmail(email, password);
       } else {
         await signUp(fullName, email, password);
+        await recordLegalAcceptanceSafe();
       }
     } catch (err) {
       alert.showError(err);
@@ -132,7 +150,12 @@ export default function LoginScreen() {
   const canSubmit =
     email.length > 3 &&
     password.length >= 6 &&
-    (mode === 'login' || fullName.trim().length >= 2);
+    (mode === 'login' ||
+      (fullName.trim().length >= 2 && acceptedTerms && healthConsent));
+
+  // Aceite aparece quando há ação de criar conta na tela: no signup, ou sempre que
+  // o botão Google está disponível (fora do Expo Go) — pois o aceite trava o Google.
+  const showTerms = mode === 'signup' || !IS_EXPO_GO;
 
   return (
     <Screen variant="hero" edges={['top', 'bottom']}>
@@ -164,6 +187,19 @@ export default function LoginScreen() {
               Biohacking · Nutrição · Treino
             </Text>
           </View>
+
+          {showTerms && (
+            <View className="mb-5 gap-3">
+              <TermsAcceptance
+                accepted={acceptedTerms}
+                onChange={setAcceptedTerms}
+              />
+              <HealthDataConsent
+                accepted={healthConsent}
+                onChange={setHealthConsent}
+              />
+            </View>
+          )}
 
           {!IS_EXPO_GO && (
             <View className="mb-5">
@@ -280,7 +316,7 @@ export default function LoginScreen() {
             <View className="mt-5 rounded-2xl bg-violet/10 border border-violet/30 px-4 py-3">
               <Text className="text-violet-soft text-[11px] leading-relaxed">
                 💡 Você está no Expo Go. Login com Google fica disponível no APK
-                (development build) do NutriOn.
+                (development build) do Persona Fit.
               </Text>
             </View>
           )}

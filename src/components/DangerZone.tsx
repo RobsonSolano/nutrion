@@ -164,7 +164,7 @@ function DeleteAccountModal({
 
           <View className="px-5 py-4 gap-3">
             <Text className="text-text-muted text-sm leading-relaxed">
-              Ao confirmar, você perderá totalmente o acesso ao NutriOn e
+              Ao confirmar, você perderá totalmente o acesso ao Persona Fit e
               seus dados serão apagados. Essa ação NÃO pode ser desfeita.
             </Text>
 

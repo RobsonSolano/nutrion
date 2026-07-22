@@ -15,6 +15,7 @@ import {
   Trash2,
   GraduationCap,
   BookmarkPlus,
+  Play,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import RoutineEditor from '@/components/routine/RoutineEditor';
@@ -29,6 +30,7 @@ import {
 import { useCreateTemplate } from '@/hooks/useTemplates';
 import { useExerciseImagesMap } from '@/hooks/useExercises';
 import { useProfile } from '@/hooks/useProfile';
+import { useStartWorkoutFlow } from '@/hooks/useStartWorkoutFlow';
 import { useAlert } from '@/components/GlobalAlertProvider';
 import { Button, Card, Screen } from '@/components/ui';
 import Disclaimer from '@/components/Disclaimer';
@@ -50,6 +52,12 @@ export default function RotinaDetalheScreen() {
   const readOnly = isStudent && fromCoach;
   const createTemplate = useCreateTemplate();
   const alert = useAlert();
+  const { requestStart, active: activeWorkout } = useStartWorkoutFlow();
+
+  function handleStart() {
+    if (!detailQ.data) return;
+    requestStart({ id: detailQ.data.id, name: detailQ.data.name });
+  }
 
   const [editing, setEditing] = useState(false);
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
@@ -237,6 +245,18 @@ export default function RotinaDetalheScreen() {
                   </Text>
                 )}
               </Card>
+
+              {!isCoach && (
+                <Button
+                  label={
+                    activeWorkout?.routineId === detailQ.data.id
+                      ? 'Ver treino em andamento'
+                      : 'Iniciar treino'
+                  }
+                  onPress={handleStart}
+                  icon={<Play size={18} color={colors.textInverse} fill={colors.textInverse} />}
+                />
+              )}
 
               <Card padding="md">
                 <Text className="text-text-dim text-[11px] uppercase tracking-widest mb-3">

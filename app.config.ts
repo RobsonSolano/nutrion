@@ -12,9 +12,9 @@ const plugins: ExpoConfig['plugins'] = [
     'expo-image-picker',
     {
       photosPermission:
-        'O NutriOn precisa acessar suas fotos para analisar refeições.',
+        'O Persona Fit precisa acessar suas fotos para analisar refeições.',
       cameraPermission:
-        'O NutriOn precisa da câmera para registrar pratos em tempo real.',
+        'O Persona Fit precisa da câmera para registrar pratos em tempo real.',
     },
   ],
   // Sentry plugin desabilitado temporariamente — upload de source maps
@@ -38,7 +38,7 @@ if (!IS_EXPO_GO) {
 }
 
 const config: ExpoConfig = {
-  name: 'NutriOn',
+  name: 'Persona Fit',
   slug: 'nutrion',
   scheme: 'nutrion',
   version: '1.3.0',
@@ -81,6 +81,9 @@ const config: ExpoConfig = {
     eas: {
       projectId: '6aed6bd3-078e-4424-b7e1-5d4afbd9d624',
     },
+    // URL pública da Política de Privacidade (exigida pela Google Play / App Store).
+    // Deve casar com legal_documents.privacidade (seed em 20260622020000_legal_docs.sql).
+    privacyPolicyUrl: 'https://apppersonafit.vercel.app/legal/privacidade',
   },
 };
 

@@ -43,6 +43,9 @@ export const queryKeys = {
   pushPreferences: (userId: string) =>
     ['push-preferences', userId] as const,
   anamnese: (userId: string) => ['anamnese', userId] as const,
+  entitlement: (userId: string) => ['entitlement', userId] as const,
+  offerings: () => ['offerings'] as const,
+  legalDocuments: () => ['legal-documents'] as const,
 };
 
 export function todayKey() {

@@ -16,6 +16,7 @@ import { queryKeys, todayKey } from '@/lib/queryKeys';
 import { Card, Screen, StatRing } from '@/components/ui';
 import WeekStreak, { calcStreak } from '@/components/WeekStreak';
 import Disclaimer from '@/components/Disclaimer';
+import TrialBanner from '@/components/TrialBanner';
 import { colors } from '@/lib/theme';
 
 export default function HomeScreen() {
@@ -114,6 +115,8 @@ export default function HomeScreen() {
             </Text>
           </Pressable>
         </View>
+
+        <TrialBanner />
 
         <Card glow accent="green">
           <View className="flex-row items-center justify-between mb-4">

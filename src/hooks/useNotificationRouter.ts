@@ -7,6 +7,7 @@ import type * as NotificationsType from 'expo-notifications';
 type PushPayload = {
   event?: string;
   request_id?: string;
+  type?: string;
 };
 
 // Lazy require: em Expo Go o módulo warna no import top-level.
@@ -42,9 +43,12 @@ export function useNotificationRouter() {
     if (!isAuthenticated) return;
 
     function navigate(payload: PushPayload | null | undefined) {
-      if (!payload?.event) return;
+      if (!payload) return;
       let target: Href | null = null;
-      if (payload.event === 'new_request') {
+      if (payload.type === 'active_workout') {
+        // Notificação local do cronômetro (ongoing ou aviso de 2h).
+        target = '/treino-ativo' as Href;
+      } else if (payload.event === 'new_request') {
         target = '/(coach)/solicitacoes' as Href;
       } else if (payload.event === 'request_response') {
         target = '/solicitacoes' as Href;

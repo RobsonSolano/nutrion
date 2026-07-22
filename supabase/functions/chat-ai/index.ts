@@ -9,6 +9,7 @@ import {
   fetchReferences,
   formatReferencesForPrompt,
 } from '../_shared/references.ts';
+import { getEntitlement, needsUpgrade } from '../_shared/entitlement.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
@@ -164,6 +165,13 @@ serve(async (req: Request) => {
     }
 
     const isChatMode = body.mode !== 'sanity_check';
+
+    // Gating de IA pessoal (billing-core): chat e sanity_check exigem entitlement.
+    const ent = await getEntitlement(supabase);
+    if (!ent.ai_personal) {
+      return needsUpgrade(isChatMode ? 'chat' : 'sanity_check', CORS);
+    }
+
     const userMessage = body.message?.trim() ?? '';
     const featureLabel: 'chat' | 'sanity_check' = isChatMode
       ? 'chat'
