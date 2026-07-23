@@ -6,6 +6,7 @@ import {
   listStudents,
   saveStudentPlan,
   sendStudentCredentials,
+  setActiveStudents,
   unlinkStudent,
   updateStudent,
   type CreateStudentInput,
@@ -170,6 +171,24 @@ export function useUnlinkStudent() {
     onSuccess: () => {
       if (user?.id) {
         void qc.invalidateQueries({ queryKey: studentsKey(user.id) });
+      }
+    },
+  });
+}
+
+/**
+ * Define o conjunto de alunos ATIVOS (os demais ficam suspensos). Usado pela
+ * tela escolher-alunos após um downgrade. Invalida lista + entitlement.
+ */
+export function useSetActiveStudents() {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (activeIds: string[]) => setActiveStudents(activeIds),
+    onSuccess: () => {
+      if (user?.id) {
+        void qc.invalidateQueries({ queryKey: studentsKey(user.id) });
+        void qc.invalidateQueries({ queryKey: queryKeys.entitlement(user.id) });
       }
     },
   });
