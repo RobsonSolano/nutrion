@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { selectProductId, findPackage } from './purchaseSelection';
+import { selectProductId, findPackage, availablePlans } from './purchaseSelection';
 
 const pkg = (identifier: string) => ({ product: { identifier } });
 const offerings = {
@@ -118,5 +118,36 @@ describe('findPackage', () => {
   it('offerings null/undefined → null (defensivo)', () => {
     expect(findPackage(null, 'nutrion_comum_pro')).toBeNull();
     expect(findPackage(undefined, 'nutrion_comum_pro')).toBeNull();
+  });
+});
+
+describe('availablePlans', () => {
+  it('professor free → Pro e Premium, nessa ordem', () => {
+    expect(availablePlans({ role: 'professor', currentTier: 'free' })).toEqual([
+      { tier: 'pro', productId: 'nutrion_prof_pro' },
+      { tier: 'premium', productId: 'nutrion_prof_premium' },
+    ]);
+  });
+  it('professor pro → só Premium', () => {
+    expect(availablePlans({ role: 'professor', currentTier: 'pro' })).toEqual([
+      { tier: 'premium', productId: 'nutrion_prof_premium' },
+    ]);
+  });
+  it('professor premium → nada (topo)', () => {
+    expect(availablePlans({ role: 'professor', currentTier: 'premium' })).toEqual([]);
+  });
+  it('comum free → só Pro', () => {
+    expect(availablePlans({ role: 'comum', currentTier: 'free' })).toEqual([
+      { tier: 'pro', productId: 'nutrion_comum_pro' },
+    ]);
+  });
+  it('comum pro → nada', () => {
+    expect(availablePlans({ role: 'comum', currentTier: 'pro' })).toEqual([]);
+  });
+  it('aluno → nada (IA herdada)', () => {
+    expect(availablePlans({ role: 'aluno', currentTier: 'free' })).toEqual([]);
+  });
+  it('role indefinido → nada', () => {
+    expect(availablePlans({ role: null, currentTier: 'free' })).toEqual([]);
   });
 });

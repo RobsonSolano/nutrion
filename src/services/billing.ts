@@ -65,9 +65,36 @@ export async function getOfferings(): Promise<PurchasesOfferings | null> {
   return load().getOfferings();
 }
 
-export async function purchasePackage(pkg: PurchasesPackage): Promise<CustomerInfo> {
+/**
+ * Product identifier da assinatura ativa (Google), ou null. Usado pra troca de
+ * plano (pro→premium): precisamos do produto antigo pra substituir em vez de
+ * criar uma 2ª assinatura.
+ */
+export async function getActiveProductId(): Promise<string | null> {
+  if (!isBillingAvailable) return null;
+  const info = await load().getCustomerInfo();
+  return info.activeSubscriptions?.[0] ?? null;
+}
+
+/**
+ * Compra um package. Com `oldProductId`, faz TROCA de plano (Google product
+ * change) com proração imediata — substitui a assinatura atual (evita cobrança
+ * dupla no pro→premium). Sem ele, é compra normal (free→qualquer).
+ */
+export async function purchasePackage(
+  pkg: PurchasesPackage,
+  opts?: { oldProductId?: string | null },
+): Promise<CustomerInfo> {
   if (!isBillingAvailable) throw new BillingUnavailableError();
-  const { customerInfo } = await load().purchasePackage(pkg);
+  const Purchases = load();
+  if (opts?.oldProductId) {
+    const { customerInfo } = await Purchases.purchasePackage(pkg, null, {
+      oldProductIdentifier: opts.oldProductId,
+      prorationMode: Purchases.PRORATION_MODE.IMMEDIATE_AND_CHARGE_PRORATED_PRICE,
+    });
+    return customerInfo;
+  }
+  const { customerInfo } = await Purchases.purchasePackage(pkg);
   return customerInfo;
 }
 
