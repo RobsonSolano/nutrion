@@ -12,6 +12,7 @@ import { ArrowLeft, Save } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { Button, Card, Input, Screen } from '@/components/ui';
 import AvatarPicker from '@/components/AvatarPicker';
+import SubscriptionCard from '@/components/SubscriptionCard';
 import DangerZone from '@/components/DangerZone';
 import { useStudents } from '@/hooks/useStudents';
 import type { Href } from 'expo-router';
@@ -209,6 +210,8 @@ export default function CoachPerfilScreen() {
               loading={update.isPending}
               icon={<Save size={16} color={colors.textInverse} />}
             />
+
+            <SubscriptionCard />
 
             <DangerZone
               blockedReason={

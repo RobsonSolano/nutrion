@@ -33,6 +33,7 @@ import { useDailyOnboardingUsage } from '@/hooks/useAiUsage';
 import { useOnboardingStore } from '@/stores/useOnboardingStore';
 import { Button, Card, ConfirmModal, Screen } from '@/components/ui';
 import CoachCard from '@/components/CoachCard';
+import SubscriptionCard from '@/components/SubscriptionCard';
 import StudentAssessmentCard from '@/components/StudentAssessmentCard';
 import { Avatar } from '@/components/ui';
 import Disclaimer from '@/components/Disclaimer';
@@ -170,6 +171,8 @@ export default function PerfilScreen() {
             </View>
           </View>
         </Card>
+
+        <SubscriptionCard />
 
         <Card padding="md">
           <Text className="text-text-dim text-[11px] uppercase tracking-widest mb-3">
