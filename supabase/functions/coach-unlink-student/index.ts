@@ -147,6 +147,19 @@ serve(async (req: Request) => {
       console.error('[coach-unlink] grant_server_trial falhou:', err);
     }
 
+    // Desvincular liberou uma vaga: reconcilia pra reativar o suspenso mais antigo (se houver).
+    // Best-effort: não impacta o retorno do desvínculo.
+    try {
+      const { error: syncErr } = await supaService.rpc('sync_coach_student_access', {
+        p_coach_id: caller.id,
+      });
+      if (syncErr) {
+        console.error('[coach-unlink] sync_coach_student_access:', syncErr.message);
+      }
+    } catch (err) {
+      console.error('[coach-unlink] sync falhou:', err);
+    }
+
     // 4. Push pro aluno (fire-and-forget). Falha não impacta retorno.
     const daysWithCoach = student.created_at
       ? Math.max(
