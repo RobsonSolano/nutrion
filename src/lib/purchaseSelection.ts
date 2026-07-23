@@ -70,3 +70,38 @@ export function findPackage<P extends MinimalPackage>(
   }
   return null;
 }
+
+/** Um plano comprável a ser exibido no paywall. */
+export type Plan = { tier: 'pro' | 'premium'; productId: ProductId };
+
+/**
+ * Lista ordenada de planos a exibir no paywall (upgrade). Professor free vê
+ * Pro + Premium; pro vê só Premium; premium nada. Comum só tem Pro. Aluno nunca
+ * compra (IA herdada do professor, C4).
+ */
+export function availablePlans({
+  role,
+  currentTier,
+}: {
+  role: Role | null | undefined;
+  currentTier: Tier;
+}): Plan[] {
+  if (role === 'professor') {
+    if (currentTier === 'free') {
+      return [
+        { tier: 'pro', productId: 'nutrion_prof_pro' },
+        { tier: 'premium', productId: 'nutrion_prof_premium' },
+      ];
+    }
+    if (currentTier === 'pro') {
+      return [{ tier: 'premium', productId: 'nutrion_prof_premium' }];
+    }
+    return []; // premium = topo
+  }
+  if (role === 'comum') {
+    return currentTier === 'free'
+      ? [{ tier: 'pro', productId: 'nutrion_comum_pro' }]
+      : [];
+  }
+  return []; // aluno / indefinido
+}
