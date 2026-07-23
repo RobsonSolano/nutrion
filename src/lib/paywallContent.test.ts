@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { paywallContent } from './paywallContent';
+import { planContent } from './paywallContent';
 
 describe('paywallContent', () => {
   it('chat e sanity_check apontam pro plano pessoal', () => {
@@ -29,5 +30,25 @@ describe('paywallContent', () => {
     const c = paywallContent('xpto');
     expect(c.title).toBeTruthy();
     expect(c.bullets.length).toBeGreaterThan(0);
+  });
+});
+
+describe('planContent', () => {
+  it('professor pro: nome Pro, sem highlight, fala em 5 alunos', () => {
+    const c = planContent('pro', 'professor');
+    expect(c.name).toBe('Pro');
+    expect(c.highlight).toBeFalsy();
+    expect(c.bullets.some((b) => b.includes('5 alunos'))).toBe(true);
+  });
+  it('professor premium: nome Premium, highlight, fala em ilimitado', () => {
+    const c = planContent('premium', 'professor');
+    expect(c.name).toBe('Premium');
+    expect(c.highlight).toBe(true);
+    expect(c.bullets.some((b) => b.toLowerCase().includes('ilimitado'))).toBe(true);
+  });
+  it('comum pro: bullets pessoais (chat IA)', () => {
+    const c = planContent('pro', 'comum');
+    expect(c.name).toBe('Pro');
+    expect(c.bullets.some((b) => b.toLowerCase().includes('chat ia'))).toBe(true);
   });
 });
