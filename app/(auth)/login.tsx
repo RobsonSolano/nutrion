@@ -109,13 +109,13 @@ export default function LoginScreen() {
   const kbHeight = useKeyboardHeight();
 
   async function handleGoogle() {
-    // Aceite dos termos + consentimento de saúde travam o cadastro/login via Google
-    // (cobre conta nova via Google).
-    if (!acceptedTerms || !healthConsent) {
+    // No cadastro (aba "Cadastre-se") o Google cria conta → exige os 2 aceites.
+    // No login (usuário returning) não re-pede consentimento.
+    if (mode === 'signup' && (!acceptedTerms || !healthConsent)) {
       alert.showAlert({
         title: 'Marque os dois aceites',
         message:
-          'Aceite os Termos de Uso e Contrato e autorize o tratamento dos dados de saúde pra continuar com o Google.',
+          'Aceite os Termos de Uso e Contrato e autorize o tratamento dos dados de saúde pra criar sua conta com o Google.',
         type: 'warning',
       });
       return;
@@ -153,10 +153,6 @@ export default function LoginScreen() {
     (mode === 'login' ||
       (fullName.trim().length >= 2 && acceptedTerms && healthConsent));
 
-  // Aceite aparece quando há ação de criar conta na tela: no signup, ou sempre que
-  // o botão Google está disponível (fora do Expo Go) — pois o aceite trava o Google.
-  const showTerms = mode === 'signup' || !IS_EXPO_GO;
-
   return (
     <Screen variant="hero" edges={['top', 'bottom']}>
       <KeyboardAvoidingView
@@ -187,19 +183,6 @@ export default function LoginScreen() {
               Biohacking · Nutrição · Treino
             </Text>
           </View>
-
-          {showTerms && (
-            <View className="mb-5 gap-3">
-              <TermsAcceptance
-                accepted={acceptedTerms}
-                onChange={setAcceptedTerms}
-              />
-              <HealthDataConsent
-                accepted={healthConsent}
-                onChange={setHealthConsent}
-              />
-            </View>
-          )}
 
           {!IS_EXPO_GO && (
             <View className="mb-5">
@@ -286,6 +269,19 @@ export default function LoginScreen() {
               <Text className="text-text-muted text-[11px] px-1">
                 Mínimo de 6 caracteres.
               </Text>
+            )}
+
+            {mode === 'signup' && (
+              <View className="mt-1 gap-3">
+                <TermsAcceptance
+                  accepted={acceptedTerms}
+                  onChange={setAcceptedTerms}
+                />
+                <HealthDataConsent
+                  accepted={healthConsent}
+                  onChange={setHealthConsent}
+                />
+              </View>
             )}
 
             <View className="mt-2">

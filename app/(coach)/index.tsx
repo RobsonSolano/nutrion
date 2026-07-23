@@ -22,6 +22,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
 import { useStudents, useStudentsTracking } from '@/hooks/useStudents';
+import CoachPlanBadge from '@/components/CoachPlanBadge';
 import { useDowngradeStatus } from '@/hooks/useDowngradeStatus';
 import { useCoachRequests } from '@/hooks/useRequests';
 import { usePushToggle } from '@/hooks/usePushToggle';
@@ -89,6 +90,8 @@ export default function CoachHome() {
             )}
           </View>
         </View>
+
+        <CoachPlanBadge />
 
         {downgrade.needsChoice && (
           <Pressable

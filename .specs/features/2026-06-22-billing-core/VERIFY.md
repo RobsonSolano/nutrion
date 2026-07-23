@@ -44,7 +44,7 @@ Chame a função com o JWT de:
 - um usuário **com** direito (ex: grandfather, ou linha `subscriptions` tier=pro) → fluxo normal.
 
 Casos a cobrir: `chat-ai` (chat e sanity → `ai_personal`), `coach-generate-plan` /
-`coach-import-workout-ai` (`ai_coach`), `coach-create-student` (`student_limit`: free=5/pro=20/premium=∞).
+`coach-import-workout-ai` (`ai_coach`), `coach-create-student` (`student_limit`: free=2/pro=5/premium=∞ — ajustado na migration 20260722000000).
 
 ## 4. Caminho para a PROD (quando a #2 estiver pronta)
 Seguindo o CONCERN de ordem de deploy (STATE.md), **junto** do build com paywall-ui:
