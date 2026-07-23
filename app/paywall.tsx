@@ -27,6 +27,7 @@ import {
 } from '@/services/billing';
 import { pollUntil } from '@/lib/pollUntil';
 import { fetchEntitlement } from '@/services/entitlement';
+import { syncMyCoachAccess } from '@/services/suspension';
 import { queryKeys } from '@/lib/queryKeys';
 import type { FeatureKey } from '@/types/billing';
 
@@ -58,7 +59,17 @@ export default function PaywallScreen() {
       done: (e) => e.tier !== 'free',
     });
     if (user?.id) {
+      // Professor: reconcilia acesso dos alunos (reativa suspensos ao subir de
+      // plano). No-op p/ não-professor; idempotente com o sync do webhook. Sem
+      // isso, a lista de alunos fica com `suspended_at` velho no cache e o
+      // banner "N suspensos" persiste mesmo já tendo virado Pro.
+      try {
+        await syncMyCoachAccess(user.id);
+      } catch {
+        // best-effort: o webhook também reconcilia server-side
+      }
       await qc.invalidateQueries({ queryKey: queryKeys.entitlement(user.id) });
+      await qc.invalidateQueries({ queryKey: ['students', user.id] });
     }
     return satisfied;
   }
