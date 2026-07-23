@@ -47,3 +47,27 @@ export async function recordLegalAcceptanceSafe(): Promise<void> {
     console.warn('[legal] recordLegalAcceptance:', e);
   }
 }
+
+/**
+ * True se o usuário atual já aceitou TODOS os docs que exigem aceite (na versão
+ * atual). Usado pelo gate pós-login (SplashGate) pra cobrir qualquer conta nova
+ * — inclusive Google — que tenha entrado sem passar pelos consentimentos.
+ */
+export async function hasAcceptedRequiredLegal(): Promise<boolean> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return true; // sem sessão o SplashGate já manda pro login
+
+  const required = requiredAcceptanceDocs(await fetchLegalDocuments());
+  if (required.length === 0) return true;
+
+  const { data, error } = await supabase
+    .from('legal_acceptances')
+    .select('doc_type, version')
+    .eq('user_id', user.id);
+  if (error) throw error;
+
+  const accepted = new Set((data ?? []).map((r) => `${r.doc_type}:${r.version}`));
+  return required.every((d) => accepted.has(`${d.doc_type}:${d.version}`));
+}
