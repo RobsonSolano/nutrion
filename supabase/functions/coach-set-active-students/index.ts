@@ -59,10 +59,7 @@ serve(async (req: Request) => {
     const activeIds = [...new Set(body.active_ids)];
 
     // Limite do tier do professor.
-    const { data: ent, error: entErr } = await supaService.rpc(
-      '_resolve_entitlement',
-      { p_uid: caller.id },
-    );
+    const { data: ent, error: entErr } = await supaAuth.rpc('resolve_entitlement');
     if (entErr) {
       return json({ error: 'entitlement_failed', detail: entErr.message }, 500);
     }
