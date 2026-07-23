@@ -22,6 +22,7 @@ export type StudentLite = Pick<
   | 'goal_type'
   | 'created_at'
   | 'onboarding_completed_at'
+  | 'suspended_at'
 >;
 
 export type StudentDetailed = Profile;
@@ -147,7 +148,7 @@ export async function listStudents(): Promise<StudentLite[]> {
   const { data, error } = await supabase
     .from('profiles')
     .select(
-      'id, full_name, avatar_url, weight_kg, height_cm, goal_type, created_at, onboarding_completed_at',
+      'id, full_name, avatar_url, weight_kg, height_cm, goal_type, created_at, onboarding_completed_at, suspended_at',
     )
     .eq('coach_id', user.id)
     .eq('role', 'aluno')
@@ -234,5 +235,18 @@ export async function updateStudent(
 export async function unlinkStudent(studentId: string): Promise<{ ok: true }> {
   return callFn<{ ok: true }>('coach-unlink-student', {
     student_id: studentId,
+  });
+}
+
+/**
+ * Define o conjunto de alunos ATIVOS do professor. Os de fora ficam suspensos
+ * (sem acesso ao app até serem reativados ou o professor fazer upgrade).
+ * Substitui a lógica destrutiva de "escolher quem fica" (que desvinculava).
+ */
+export async function setActiveStudents(
+  activeIds: string[],
+): Promise<{ ok: true }> {
+  return callFn<{ ok: true }>('coach-set-active-students', {
+    active_ids: activeIds,
   });
 }
