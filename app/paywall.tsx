@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ScrollView, Text, View, Pressable } from 'react-native';
+import { ActivityIndicator, ScrollView, Text, View, Pressable } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Check, Crown, X } from 'lucide-react-native';
 import { useQueryClient } from '@tanstack/react-query';
@@ -52,12 +52,13 @@ export default function PaywallScreen() {
   const currentTier = entitlement?.tier ?? 'free';
   const isAluno = role === 'aluno';
   const plans = availablePlans({ role, currentTier });
+  const dataReady = profile !== undefined && entitlement !== undefined;
 
   /** Re-busca o entitlement até refletir a compra + reconcilia acesso dos alunos. */
-  async function refreshEntitlement(): Promise<boolean> {
+  async function refreshEntitlement(targetTier?: 'pro' | 'premium'): Promise<boolean> {
     const { satisfied } = await pollUntil({
       fn: fetchEntitlement,
-      done: (e) => e.tier !== 'free',
+      done: (e) => (targetTier ? e.tier === targetTier : e.tier !== 'free'),
     });
     if (user?.id) {
       try {
@@ -94,8 +95,18 @@ export default function PaywallScreen() {
       // pro→premium: troca de plano (substitui a assinatura atual, sem 2ª cobrança).
       const oldProductId =
         currentTier !== 'free' ? await getActiveProductId().catch(() => null) : null;
+      // Falha fechado: se já é pago mas não confirmamos o produto atual, NÃO compra
+      // (evitaria substituir e criaria uma 2ª assinatura = cobrança dupla).
+      if (currentTier !== 'free' && !oldProductId) {
+        alert.showAlert({
+          type: 'warning',
+          title: 'Não consegui confirmar seu plano atual',
+          message: 'Tenta de novo em instantes.',
+        });
+        return;
+      }
       await purchasePackage(pkg, { oldProductId });
-      const liberado = await refreshEntitlement();
+      const liberado = await refreshEntitlement(plan.tier);
       alert.showAlert(
         liberado
           ? {
@@ -178,7 +189,11 @@ export default function PaywallScreen() {
             <Text className="text-text-dim text-base text-center">{header.subtitle}</Text>
           </View>
 
-          {isAluno ? (
+          {!dataReady ? (
+            <View className="items-center py-10">
+              <ActivityIndicator color={colors.violetSoft} />
+            </View>
+          ) : isAluno ? (
             <Card padding="lg">
               <Text className="text-text text-base font-semibold mb-1">
                 Acesso pelo seu professor
