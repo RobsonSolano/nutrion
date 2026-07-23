@@ -1,4 +1,5 @@
 import { ScrollView, Text, View } from 'react-native';
+import { Redirect, type Href } from 'expo-router';
 import { Ban } from 'lucide-react-native';
 import { useAuth } from '@/hooks/useAuth';
 import { Button, Logo, Screen } from '@/components/ui';
@@ -10,7 +11,12 @@ import { colors } from '@/lib/theme';
  * o professor precisa reativar (ou fazer upgrade). Única saída é sair.
  */
 export default function SuspendedScreen() {
-  const { logout } = useAuth();
+  const { logout, isAuthenticated } = useAuth();
+
+  // Ao tocar "Sair", logout() zera a sessão — mas esta rota é solta (fora do
+  // SplashGate/tabs), então precisa redirecionar reativamente pro login;
+  // senão o usuário fica preso até reabrir o app.
+  if (!isAuthenticated) return <Redirect href={'/(auth)/login' as Href} />;
 
   return (
     <Screen variant="hero" edges={['top', 'bottom']}>

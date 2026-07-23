@@ -1,6 +1,8 @@
 // Conteúdo contextual do paywall por feature key (do 402 needs_upgrade do billing-core).
 // Lógica pura → testável sem RN. A tela app/paywall.tsx só renderiza o resultado.
 
+import type { Role } from '@/lib/purchaseSelection';
+
 export type PaywallContent = {
   title: string;
   subtitle: string;
@@ -66,4 +68,43 @@ export function paywallContent(feature: string | undefined): PaywallContent {
       // Fallback seguro: trata como upsell pessoal (caso mais comum) sem quebrar a tela.
       return PERSONAL;
   }
+}
+
+export type PlanContent = { name: string; highlight?: boolean; bullets: string[] };
+
+/**
+ * Conteúdo do CARD de um plano (nome + bullets). Preço real vem do package do
+ * RevenueCat na tela — não aqui. Professor tem Pro e Premium; comum só Pro.
+ */
+export function planContent(tier: 'pro' | 'premium', role: Role): PlanContent {
+  if (role === 'professor') {
+    if (tier === 'premium') {
+      return {
+        name: 'Premium',
+        highlight: true,
+        bullets: [
+          'Alunos ilimitados',
+          'Tudo do Pro incluído',
+          'IA de professor completa (gerar + importar treino)',
+        ],
+      };
+    }
+    return {
+      name: 'Pro',
+      bullets: [
+        'Até 5 alunos',
+        'IA de professor: gerar plano completo',
+        'IA de professor: importar treino por texto ou foto',
+      ],
+    };
+  }
+  // comum só tem Pro (IA pessoal)
+  return {
+    name: 'Pro',
+    bullets: [
+      'Chat IA ilimitado pra treino e dieta',
+      'Sanity check: valide seu prato por foto',
+      'Respostas ancoradas no seu perfil e metas',
+    ],
+  };
 }

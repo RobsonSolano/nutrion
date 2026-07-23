@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
-import { useRouter, type Href } from 'expo-router';
+import { Redirect, useRouter, type Href } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { useAlert } from '@/components/GlobalAlertProvider';
@@ -16,13 +16,18 @@ import { Button, Logo, Screen } from '@/components/ui';
  */
 export default function ConsentScreen() {
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, logout, isAuthenticated } = useAuth();
   const qc = useQueryClient();
   const alert = useAlert();
 
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [healthConsent, setHealthConsent] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // "Sair" zera a sessão; esta rota é solta (fora do SplashGate), então
+  // redireciona reativamente pro login pra não prender o usuário.
+  // Depois de todos os hooks (Rules of Hooks).
+  if (!isAuthenticated) return <Redirect href={'/(auth)/login' as Href} />;
 
   async function handleAccept() {
     setLoading(true);

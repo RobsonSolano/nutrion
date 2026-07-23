@@ -8,6 +8,7 @@ import { useEntitlement } from '@/hooks/useEntitlement';
 import { useAlert } from '@/components/GlobalAlertProvider';
 import { openPaywall } from '@/lib/paywall';
 import { restore, isBillingAvailable } from '@/services/billing';
+import { syncMyCoachAccess } from '@/services/suspension';
 import { queryKeys } from '@/lib/queryKeys';
 import { Button, Card } from '@/components/ui';
 import { colors } from '@/lib/theme';
@@ -67,7 +68,15 @@ export default function SubscriptionCard() {
     try {
       await restore();
       if (user?.id) {
+        // Professor: reativa alunos suspensos se o restore recuperar um plano
+        // maior. No-op p/ não-professor. Depois invalida entitlement + lista.
+        try {
+          await syncMyCoachAccess(user.id);
+        } catch {
+          // best-effort: o webhook também reconcilia
+        }
         await qc.invalidateQueries({ queryKey: queryKeys.entitlement(user.id) });
+        await qc.invalidateQueries({ queryKey: ['students', user.id] });
       }
       alert.showAlert({
         title: 'Compras restauradas',
