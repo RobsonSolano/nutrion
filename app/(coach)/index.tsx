@@ -26,9 +26,11 @@ import CoachPlanBadge from '@/components/CoachPlanBadge';
 import { useDowngradeStatus } from '@/hooks/useDowngradeStatus';
 import { useCoachRequests } from '@/hooks/useRequests';
 import { usePushToggle } from '@/hooks/usePushToggle';
+import { useCoachAccessSync } from '@/hooks/useCoachAccessSync';
 import { getMyCoach } from '@/services/coach';
 import type { StudentLite } from '@/services/students';
 import type { StudentTracking } from '@/services/studentTracking';
+import { suspendedCount } from '@/lib/suspension';
 
 const GOAL_LABEL: Record<string, string> = {
   lose_fat: 'Emagrecer',
@@ -42,6 +44,7 @@ export default function CoachHome() {
   const { logout, user } = useAuth();
   const profileQ = useProfile();
   const downgrade = useDowngradeStatus();
+  useCoachAccessSync();
   const studentsQ = useStudents();
   const openRequestsQ = useCoachRequests('open');
   const coachQ = useQuery({
@@ -56,6 +59,7 @@ export default function CoachHome() {
   const openRequestsCount = openRequestsQ.data?.length ?? 0;
 
   const studentIds = (studentsQ.data ?? []).map((s) => s.id);
+  const suspended = suspendedCount(studentsQ.data ?? []);
   const trackingResults = useStudentsTracking(studentIds);
   const trackingByStudent = new Map<string, StudentTracking | undefined>(
     studentIds.map((id, i) => [id, trackingResults[i]?.data]),
@@ -93,17 +97,17 @@ export default function CoachHome() {
 
         <CoachPlanBadge />
 
-        {downgrade.needsChoice && (
+        {suspended > 0 && (
           <Pressable
             onPress={() => router.push('/(coach)/escolher-alunos' as Href)}
             className="rounded-2xl border border-warn/50 bg-warn/10 px-4 py-3 active:opacity-80"
           >
             <Text className="text-warn text-[13px] font-semibold mb-1">
-              Seu plano agora permite {downgrade.studentLimit} alunos
+              ⚠️ {suspended} de {studentsQ.data?.length ?? 0} alunos com acesso suspenso
             </Text>
             <Text className="text-text-dim text-[12px] leading-relaxed">
-              Você tem {downgrade.studentCount}. Escolha quais {downgrade.studentLimit}{' '}
-              continuam — os demais ({downgrade.overBy}) viram contas individuais. Toque pra resolver.
+              Seu plano permite {downgrade.studentLimit} ativos. Escolha quem fica
+              ativo ou faça upgrade pra liberar todos. Toque pra resolver.
             </Text>
           </Pressable>
         )}
@@ -294,11 +298,12 @@ function StudentRow({
   const initial = (student.full_name ?? '?').slice(0, 1).toUpperCase();
   const goalLabel = student.goal_type ? GOAL_LABEL[student.goal_type] : null;
   const adherence = tracking?.adherenceLast7;
+  const suspended = student.suspended_at != null;
 
   return (
     <Pressable
       onPress={onPress}
-      className="flex-row items-center gap-3 rounded-2xl border border-border bg-surface-muted px-3 py-3 active:opacity-70"
+      className={`flex-row items-center gap-3 rounded-2xl border border-border bg-surface-muted px-3 py-3 active:opacity-70 ${suspended ? 'opacity-60' : ''}`}
     >
       <View className="h-10 w-10 rounded-xl bg-violet/15 border border-violet/40 items-center justify-center">
         <Text className="text-violet-soft text-base font-bold">{initial}</Text>
@@ -318,6 +323,11 @@ function StudentRow({
             <Text className="text-text-muted text-[11px]">
               {student.weight_kg}kg
             </Text>
+          )}
+          {suspended && (
+            <View className="rounded-full border border-warn/40 bg-warn/10 px-2 py-0.5">
+              <Text className="text-warn text-[10px] font-bold">suspenso</Text>
+            </View>
           )}
         </View>
       </View>
