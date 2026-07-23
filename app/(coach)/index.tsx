@@ -1,4 +1,5 @@
-import { ScrollView, Text, View, Pressable, ActivityIndicator } from 'react-native';
+import { ScrollView, Text, View, Pressable, ActivityIndicator, TextInput } from 'react-native';
+import { useState } from 'react';
 import { useRouter, type Href } from 'expo-router';
 import {
   GraduationCap,
@@ -60,6 +61,13 @@ export default function CoachHome() {
 
   const studentIds = (studentsQ.data ?? []).map((s) => s.id);
   const suspended = suspendedCount(studentsQ.data ?? []);
+  const [studentFilter, setStudentFilter] = useState('');
+  const allStudents = studentsQ.data ?? [];
+  const filteredStudents = studentFilter.trim()
+    ? allStudents.filter((s) =>
+        (s.full_name ?? '').toLowerCase().includes(studentFilter.trim().toLowerCase()),
+      )
+    : allStudents;
   const trackingResults = useStudentsTracking(studentIds);
   const trackingByStudent = new Map<string, StudentTracking | undefined>(
     studentIds.map((id, i) => [id, trackingResults[i]?.data]),
@@ -142,19 +150,38 @@ export default function CoachHome() {
             <Text className="text-danger text-xs py-3">
               Não consegui carregar a lista. Tenta de novo.
             </Text>
-          ) : studentsQ.data && studentsQ.data.length > 0 ? (
-            <View className="gap-2 mt-2">
-              {studentsQ.data.map((s) => (
-                <StudentRow
-                  key={s.id}
-                  student={s}
-                  tracking={trackingByStudent.get(s.id)}
-                  onPress={() =>
-                    router.push(`/(coach)/aluno/${s.id}` as Href)
-                  }
+          ) : allStudents.length > 0 ? (
+            <>
+              {allStudents.length > 10 && (
+                <TextInput
+                  value={studentFilter}
+                  onChangeText={setStudentFilter}
+                  placeholder="Buscar aluno pelo nome"
+                  placeholderTextColor={colors.textMuted}
+                  className="mb-2 rounded-2xl border border-border bg-surface-muted px-3 py-2.5 text-text text-sm"
                 />
-              ))}
-            </View>
+              )}
+              <ScrollView
+                style={{ maxHeight: 6 * 68 }}
+                nestedScrollEnabled
+                showsVerticalScrollIndicator
+                contentContainerStyle={{ gap: 8 }}
+              >
+                {filteredStudents.map((s) => (
+                  <StudentRow
+                    key={s.id}
+                    student={s}
+                    tracking={trackingByStudent.get(s.id)}
+                    onPress={() => router.push(`/(coach)/aluno/${s.id}` as Href)}
+                  />
+                ))}
+                {filteredStudents.length === 0 && (
+                  <Text className="text-text-muted text-xs text-center py-4">
+                    Nenhum aluno com esse nome.
+                  </Text>
+                )}
+              </ScrollView>
+            </>
           ) : (
             <View className="py-6 items-center gap-2">
               <Text className="text-text-muted text-xs text-center px-4 leading-relaxed">
