@@ -52,5 +52,14 @@ serve(async (req: Request) => {
     return new Response('ok', { status: 200 });
   }
 
+  // Reconcilia acesso dos alunos se o assinante for professor (no-op caso contrário).
+  // Downgrade -> suspende excedente; upgrade -> reativa todos. Best-effort (não trava o ack).
+  const { error: syncErr } = await supa.rpc('sync_coach_student_access', {
+    p_coach_id: mapped.userId,
+  });
+  if (syncErr) {
+    console.error('[revenuecat-webhook] sync_coach_student_access:', syncErr.message);
+  }
+
   return new Response('ok', { status: 200 });
 });
