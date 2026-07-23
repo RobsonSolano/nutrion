@@ -8,6 +8,7 @@ import { useProfile } from '@/hooks/useProfile';
 import { useUnreadStudentRequests } from '@/hooks/useRequests';
 import { useAutoRequestPushPermission } from '@/hooks/useAutoRequestPushPermission';
 import { useActiveWorkoutHeartbeat } from '@/hooks/useActiveWorkoutHeartbeat';
+import { useStudentSuspension } from '@/hooks/useStudentSuspension';
 import { PendingWorkoutModal } from '@/components/workout/PendingWorkoutModal';
 import { useUiStore } from '@/stores/useUiStore';
 import { colors } from '@/lib/theme';
@@ -19,6 +20,7 @@ export default function TabsLayout() {
   const unreadQ = useUnreadStudentRequests();
   const insets = useSafeAreaInsets();
   const isStudent = profileQ.data?.role === 'aluno';
+  const suspension = useStudentSuspension(isStudent);
   const unreadCount = isStudent ? unreadQ.data ?? 0 : 0;
 
   useAutoRequestPushPermission();
@@ -36,6 +38,12 @@ export default function TabsLayout() {
   // Professor não usa as tabs do app — vai pra área do professor.
   if (profileQ.data?.role === 'professor') {
     return <Redirect href={'/(coach)' as Href} />;
+  }
+
+  // Aluno suspenso: bloqueio total (acesso liberado só pelo professor/upgrade).
+  if (isStudent) {
+    if (suspension.isChecking) return null;
+    if (suspension.suspended) return <Redirect href={'/suspended' as Href} />;
   }
 
   if (

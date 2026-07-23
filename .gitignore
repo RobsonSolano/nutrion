@@ -52,3 +52,4 @@ supabase/.temp/
 # firebase service account (privado — só upload via eas credentials)
 *firebase-adminsdk*.json
 firebase-service-account.json
+.superpowers/

@@ -3,6 +3,7 @@ import { useRouter, type Href } from 'expo-router';
 import { IS_EXPO_GO } from '@/lib/platform';
 import { useSessionStore } from '@/stores/useSessionStore';
 import type * as NotificationsType from 'expo-notifications';
+import { checkMySuspension } from '@/services/suspension';
 
 type PushPayload = {
   event?: string;
@@ -61,7 +62,18 @@ export function useNotificationRouter() {
       }
       if (!target) return;
       // Pequeno delay deixa o gate de role/onboarding finalizar antes.
-      setTimeout(() => router.push(target!), 500);
+      // Aluno suspenso não pode furar o bloqueio via deep-link de push:
+      // checa (e auto-cura) a suspensão antes de rotear. checkMySuspension
+      // retorna false rápido pra não-alunos. Fail-open em erro pra não
+      // quebrar notificações de todo mundo (o cold-open ainda é barrado
+      // pelo gate do (tabs)/_layout).
+      setTimeout(() => {
+        void checkMySuspension()
+          .then((suspended) =>
+            router.push((suspended ? '/suspended' : target!) as Href),
+          )
+          .catch(() => router.push(target!));
+      }, 500);
     }
 
     // Cold start: app aberto a partir do tap na notificação.

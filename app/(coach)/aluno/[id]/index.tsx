@@ -154,7 +154,7 @@ export default function AlunoDetalheScreen() {
     return <FullScreenLoading title="Salvando..." />;
   }
   if (phase === 'deleting') {
-    return <FullScreenLoading title="Excluindo aluno..." />;
+    return <FullScreenLoading title="Desvinculando..." />;
   }
   if (phase === 'preview' && plan) {
     return (

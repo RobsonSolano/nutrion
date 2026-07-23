@@ -2,41 +2,39 @@ import { useState } from 'react';
 import { ScrollView, Text, View, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
-import { useQueryClient } from '@tanstack/react-query';
 
 import { Button, Card, Screen } from '@/components/ui';
 import Checkbox from '@/components/ui/Checkbox';
-import { useStudents, useUnlinkStudent } from '@/hooks/useStudents';
+import { useStudents, useSetActiveStudents } from '@/hooks/useStudents';
 import { useDowngradeStatus } from '@/hooks/useDowngradeStatus';
-import { useAuth } from '@/hooks/useAuth';
 import { useAlert } from '@/components/GlobalAlertProvider';
-import { queryKeys } from '@/lib/queryKeys';
+import { activeIds } from '@/lib/suspension';
 import { colors } from '@/lib/theme';
 
 /**
- * "Escolhe quem fica" (revenuecat-integration #5a, [RC]-04). Professor que sofreu downgrade
- * (acima do novo limite) escolhe quais alunos mantém; os demais são desvinculados (viram
- * comum + ganham trial, via coach-unlink-student do #3).
+ * Seletor de alunos ATIVOS após downgrade. O professor marca até `limit`
+ * alunos que ficam ativos; os demais ficam suspensos (sem acesso ao app até
+ * reativar ou dar upgrade). NÃO desvincula/deleta — suspensão é reversível.
  */
 export default function EscolherAlunosScreen() {
   const router = useRouter();
-  const qc = useQueryClient();
-  const { user } = useAuth();
   const alert = useAlert();
   const studentsQ = useStudents();
   const { studentLimit } = useDowngradeStatus();
-  const unlink = useUnlinkStudent();
+  const setActive = useSetActiveStudents();
 
   const students = studentsQ.data ?? [];
   const limit = studentLimit ?? 0;
-  const [kept, setKept] = useState<Set<string>>(new Set());
+  const [kept, setKept] = useState<Set<string>>(
+    () => new Set(activeIds(students).slice(0, limit)),
+  );
   const [working, setWorking] = useState(false);
 
   const toggle = (id: string) => {
     setKept((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
-      else if (next.size < limit) next.add(id); // não deixa passar do limite
+      else if (next.size < limit) next.add(id); // não passa do limite
       return next;
     });
   };
@@ -44,26 +42,9 @@ export default function EscolherAlunosScreen() {
   const canConfirm = kept.size > 0 && kept.size <= limit && !working;
 
   async function handleConfirm() {
-    const toUnlink = students.filter((s) => !kept.has(s.id));
     setWorking(true);
     try {
-      // Paralelo + tolerante: os que falharem não derrubam os que deram certo.
-      const results = await Promise.allSettled(
-        toUnlink.map((s) => unlink.mutateAsync(s.id)),
-      );
-      const failed = results.filter((r) => r.status === 'rejected').length;
-      if (failed > 0) {
-        // Os bem-sucedidos já saíram da lista (invalidação no hook); re-tentar resolve o resto.
-        alert.showAlert({
-          type: 'error',
-          title: 'Alguns não saíram',
-          message: `${failed} aluno(s) não foram desvinculados. Tenta de novo.`,
-        });
-        return;
-      }
-      if (user?.id) {
-        await qc.invalidateQueries({ queryKey: queryKeys.entitlement(user.id) });
-      }
+      await setActive.mutateAsync(Array.from(kept));
       router.back();
     } catch (err) {
       alert.showError(err);
@@ -82,7 +63,7 @@ export default function EscolherAlunosScreen() {
         >
           <ArrowLeft size={18} color={colors.textDim} />
         </Pressable>
-        <Text className="text-text font-semibold">Escolha quem continua</Text>
+        <Text className="text-text font-semibold">Quem fica ativo</Text>
       </View>
 
       <ScrollView
@@ -91,9 +72,10 @@ export default function EscolherAlunosScreen() {
       >
         <Card accent="violet" padding="md">
           <Text className="text-text-dim text-[13px] leading-relaxed">
-            Seu plano permite <Text className="text-text font-semibold">{limit}</Text> alunos.
-            Marque quem continua com você — os não marcados viram contas individuais (e ganham
-            7 dias de teste). Selecionados: {kept.size}/{limit}.
+            Seu plano permite <Text className="text-text font-semibold">{limit}</Text> alunos
+            ativos. Marque quem continua com acesso — os não marcados ficam{' '}
+            <Text className="text-text font-semibold">suspensos</Text> (sem acesso ao app até
+            você reativar ou fazer upgrade). Nada é apagado. Selecionados: {kept.size}/{limit}.
           </Text>
         </Card>
 
@@ -110,7 +92,7 @@ export default function EscolherAlunosScreen() {
 
       <View className="px-5 pb-2">
         <Button
-          label={working ? 'Aplicando…' : `Manter ${kept.size} e desvincular ${students.length - kept.size}`}
+          label={working ? 'Salvando…' : `Salvar (${kept.size} ativo${kept.size === 1 ? '' : 's'})`}
           onPress={handleConfirm}
           variant="primary"
           size="lg"
